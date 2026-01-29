@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+
+# Generated outputs
+dam_outputs/
+aruc_outputs/
+aruc_debug/
+
+# Old uncertainty sets (superseded by uncertainty_sets_refactored/)
+uncertainty_sets/
+
+# Data artifacts (keep source data, exclude generated)
+*.parquet

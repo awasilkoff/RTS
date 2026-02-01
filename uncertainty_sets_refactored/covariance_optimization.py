@@ -43,6 +43,12 @@ class FitConfig:
     cholesky_jitter_mult: float = 10.0
     finite_check: bool = True
     device: str = "cpu"
+    omega_l2_reg: float = 0.0  # L2 regularization on omega (only used when omega_constraint="none")
+    omega_constraint: str = "none"  # "none", "softmax", "simplex", or "normalize"
+    # - "none": No constraint on omega scale. L2 reg pulls toward 1.0.
+    # - "softmax": Learn unconstrained alpha, omega = softmax(alpha). Ensures sum(omega)=1. L2 reg ignored.
+    # - "simplex": Project omega onto probability simplex after each step. Ensures sum(omega)=1. L2 reg ignored.
+    # - "normalize": Divide omega by sum(omega) at the end (post-hoc normalization). L2 reg ignored.
 
 
 @dataclass(frozen=True)
@@ -85,6 +91,25 @@ def _as_1d(a: np.ndarray, name: str) -> np.ndarray:
     if a.ndim != 1:
         raise ValueError(f"{name} must be 1D, got shape {a.shape}")
     return a
+
+
+def _project_simplex_torch(v: "torch.Tensor") -> "torch.Tensor":
+    """
+    Project vector v onto the probability simplex (sum=1, all >= 0).
+
+    Uses the algorithm from "Efficient Projections onto the L1-Ball
+    for Learning in High Dimensions" (Duchi et al., 2008).
+    """
+    n = v.shape[0]
+    # Sort in descending order
+    u, _ = torch.sort(v, descending=True)
+    cssv = torch.cumsum(u, dim=0)
+    # Find rho: largest j such that u[j] - (cssv[j] - 1) / (j+1) > 0
+    ind = torch.arange(1, n + 1, device=v.device, dtype=v.dtype)
+    cond = u - (cssv - 1) / ind > 0
+    rho = torch.where(cond)[0][-1]  # Last index where condition holds
+    theta = (cssv[rho] - 1) / (rho + 1)
+    return torch.clamp(v - theta, min=0)
 
 
 # -----------------------------
@@ -150,6 +175,15 @@ def fit_omega(
     """Gradient descent to optimize feature weights (omega) for covariance estimation.
 
     IMPORTANT: This performs leave-one-out moment estimation on the *training* set indices.
+
+    The omega_constraint option in fit_cfg controls how omega is parameterized:
+    - "none": Learn omega directly (current behavior, no sum constraint)
+    - "softmax": Learn alpha, omega = softmax(alpha). Ensures sum(omega)=1, omega>=0.
+    - "simplex": Project omega onto probability simplex after each step.
+    - "normalize": Divide omega by sum(omega) at the end (post-hoc).
+
+    When omega_constraint is "softmax" or "simplex", omega represents relative feature
+    importance (sums to 1), separating feature weighting from kernel bandwidth (tau).
     """
     _check_torch()
 
@@ -160,6 +194,12 @@ def fit_omega(
 
     dtype = _torch_dtype(fit_cfg.dtype)
     device = fit_cfg.device
+    constraint = fit_cfg.omega_constraint
+
+    if constraint not in ("none", "softmax", "simplex", "normalize"):
+        raise ValueError(
+            f"omega_constraint must be 'none', 'softmax', 'simplex', or 'normalize', got {constraint!r}"
+        )
 
     Xtr = torch.as_tensor(X[train_idx], dtype=dtype, device=device)
     Ytr = torch.as_tensor(Y[train_idx], dtype=dtype, device=device)
@@ -167,20 +207,45 @@ def fit_omega(
     Nt, M = Xtr.shape[0], Ytr.shape[1]
     I = torch.eye(M, dtype=dtype, device=device)
 
-    omega_t = torch.tensor(
-        np.asarray(omega0, dtype=np.float64),
-        dtype=dtype,
-        device=device,
-        requires_grad=True,
-    )
+    # Initialize parameters based on constraint type
+    if constraint == "softmax":
+        # Learn in log-space: alpha, then omega = softmax(alpha)
+        # Initialize alpha so that softmax(alpha) ≈ omega0 / sum(omega0)
+        omega0_normalized = omega0 / omega0.sum()
+        # alpha = log(omega0_normalized) + constant (constant cancels in softmax)
+        alpha_init = np.log(omega0_normalized + 1e-10)
+        param_t = torch.tensor(
+            alpha_init.astype(np.float64),
+            dtype=dtype,
+            device=device,
+            requires_grad=True,
+        )
+    else:
+        # Learn omega directly
+        param_t = torch.tensor(
+            np.asarray(omega0, dtype=np.float64),
+            dtype=dtype,
+            device=device,
+            requires_grad=True,
+        )
+
     history = []
     prev_loss = None
-    opt = torch.optim.Adam([omega_t], lr=float(fit_cfg.step_size))
+    opt = torch.optim.Adam([param_t], lr=float(fit_cfg.step_size))
 
     for it in range(1, fit_cfg.max_iters + 1):
         opt.zero_grad()
 
-        om = torch.clamp(omega_t, min=0.0) if cfg.enforce_nonneg_omega else omega_t
+        # Convert parameter to omega based on constraint type
+        if constraint == "softmax":
+            # omega = softmax(alpha), ensures sum(omega)=1 and omega>=0
+            om = torch.softmax(param_t, dim=0)
+        elif constraint == "simplex":
+            # Will project after gradient step; for now use clamped param
+            om = torch.clamp(param_t, min=0.0) if cfg.enforce_nonneg_omega else param_t
+        else:
+            # "none" or "normalize": use clamped param directly
+            om = torch.clamp(param_t, min=0.0) if cfg.enforce_nonneg_omega else param_t
 
         # leave-one-out distances and masked softmax on training set
         D = _pairwise_sqdist(Xtr, Xtr, om)  # (Nt, Nt)
@@ -213,7 +278,15 @@ def fit_omega(
         )  # (Nt,)
         x = torch.cholesky_solve(r, Lchol)  # (Nt, M, 1)
         quad = (r.transpose(1, 2) @ x).squeeze(-1).squeeze(-1)  # (Nt,)
-        loss = (logdet + quad).mean()
+        nll_loss = (logdet + quad).mean()
+
+        # L2 regularization on omega (only when no constraint)
+        # With constraints (softmax/simplex/normalize), the constraint itself acts as regularization
+        if constraint == "none" and fit_cfg.omega_l2_reg > 0:
+            omega_reg = fit_cfg.omega_l2_reg * ((om - 1.0) ** 2).sum()
+        else:
+            omega_reg = torch.tensor(0.0, dtype=dtype, device=device)
+        loss = nll_loss + omega_reg
 
         if fit_cfg.finite_check and (not torch.isfinite(loss)):
             logger.error("Non-finite loss at iter=%s; stopping.", it)
@@ -222,30 +295,48 @@ def fit_omega(
         loss.backward()
 
         if fit_cfg.grad_clip is not None and float(fit_cfg.grad_clip) > 0:
-            torch.nn.utils.clip_grad_norm_([omega_t], float(fit_cfg.grad_clip))
+            torch.nn.utils.clip_grad_norm_([param_t], float(fit_cfg.grad_clip))
 
         opt.step()
 
-        eps_w = 1e-2
+        # Post-step projection/clamping based on constraint type
         with torch.no_grad():
-            omega_t.clamp_(min=eps_w)
+            if constraint == "softmax":
+                # No clamping needed - softmax handles constraints
+                pass
+            elif constraint == "simplex":
+                # Project onto probability simplex
+                param_t.copy_(_project_simplex_torch(param_t))
+            else:
+                # "none" or "normalize": just clamp to positive
+                eps_w = 1e-2
+                param_t.clamp_(min=eps_w)
 
-        gn = float(torch.linalg.norm(omega_t.grad.detach()).item())
+        gn = float(torch.linalg.norm(param_t.grad.detach()).item())
         if return_history:
             with torch.no_grad():
-                om_now = (
-                    torch.clamp(omega_t, min=0.0)
-                    if cfg.enforce_nonneg_omega
-                    else omega_t
-                )
+                # Compute actual omega for logging
+                if constraint == "softmax":
+                    om_now = torch.softmax(param_t, dim=0)
+                elif constraint == "simplex":
+                    om_now = param_t.clone()
+                else:
+                    om_now = (
+                        torch.clamp(param_t, min=0.0)
+                        if cfg.enforce_nonneg_omega
+                        else param_t
+                    )
                 history.append(
                     {
                         "iter": it,
                         "loss": float(loss.item()),
+                        "nll_loss": float(nll_loss.item()),
+                        "omega_reg": float(omega_reg.item()),
                         "grad_norm": gn,
                         "omega_min": float(om_now.min().item()),
                         "omega_max": float(om_now.max().item()),
                         "omega_mean": float(om_now.mean().item()),
+                        "omega_sum": float(om_now.sum().item()),
                         "omega_nnz": int((om_now > 0).sum().item()),
                     }
                 )
@@ -254,16 +345,23 @@ def fit_omega(
                 "Iter %s: loss=%.6f, grad_norm=%.3e", it, float(loss.item()), gn
             )
             with torch.no_grad():
-                om_now = (
-                    torch.clamp(omega_t, min=0.0)
-                    if cfg.enforce_nonneg_omega
-                    else omega_t
-                )
+                # Compute actual omega for logging
+                if constraint == "softmax":
+                    om_now = torch.softmax(param_t, dim=0)
+                elif constraint == "simplex":
+                    om_now = param_t.clone()
+                else:
+                    om_now = (
+                        torch.clamp(param_t, min=0.0)
+                        if cfg.enforce_nonneg_omega
+                        else param_t
+                    )
                 logger.info(
-                    "omega: min=%.3e, max=%.3e, mean=%.3e, nnz=%d/%d",
+                    "omega: min=%.3e, max=%.3e, mean=%.3e, sum=%.3f, nnz=%d/%d",
                     float(om_now.min().item()),
                     float(om_now.max().item()),
                     float(om_now.mean().item()),
+                    float(om_now.sum().item()),
                     int((om_now > 0).sum().item()),
                     int(om_now.numel()),
                 )
@@ -277,9 +375,20 @@ def fit_omega(
             break
         prev_loss = float(loss.item())
 
-        # if it % fit_cfg.verbose_every == 0:
-        #     logger.info("Iter %s: loss=%.6f", it, float(loss.item()))
-    omega_out = omega_t.detach().cpu().numpy()
+    # Convert parameter to final omega based on constraint type
+    with torch.no_grad():
+        if constraint == "softmax":
+            omega_out = torch.softmax(param_t, dim=0).cpu().numpy()
+        elif constraint == "simplex":
+            omega_out = param_t.cpu().numpy()
+        elif constraint == "normalize":
+            # Post-hoc normalization: divide by sum
+            omega_clamped = torch.clamp(param_t, min=0.0)
+            omega_out = (omega_clamped / omega_clamped.sum()).cpu().numpy()
+        else:
+            # "none": return as-is
+            omega_out = param_t.cpu().numpy()
+
     if return_history:
         return omega_out, history
     return omega_out
@@ -440,6 +549,88 @@ def predict_mu_sigma_topk(
 # -----------------------------
 # Scalar rho helper
 # -----------------------------
+
+
+# -----------------------------
+# KNN Baseline (no learned weights)
+# -----------------------------
+
+
+def predict_mu_sigma_knn(
+    X_query: np.ndarray,
+    X_ref: np.ndarray,
+    Y_ref: np.ndarray,
+    k: int = 64,
+    ridge: float = 1e-4,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Simple KNN: uniform weights over k nearest neighbors.
+
+    This is a baseline that uses standard Euclidean distance (no learned omega)
+    with uniform weights over the k nearest neighbors.
+
+    Parameters
+    ----------
+    X_query : np.ndarray
+        Query features, shape (Nq, K).
+    X_ref : np.ndarray
+        Reference features (standardized), shape (Nr, K).
+    Y_ref : np.ndarray
+        Reference targets, shape (Nr, M).
+    k : int
+        Number of neighbors to use.
+    ridge : float
+        Ridge regularization for covariance matrix.
+
+    Returns
+    -------
+    Mu : np.ndarray
+        Predicted means, shape (Nq, M).
+    Sigma : np.ndarray
+        Predicted covariance matrices, shape (Nq, M, M).
+    """
+    X_query = _as_2d(X_query, "X_query")
+    X_ref = _as_2d(X_ref, "X_ref")
+    Y_ref = _as_2d(Y_ref, "Y_ref")
+
+    if X_ref.shape[0] != Y_ref.shape[0]:
+        raise ValueError(
+            f"X_ref rows ({X_ref.shape[0]}) must match Y_ref rows ({Y_ref.shape[0]})."
+        )
+    if X_query.shape[1] != X_ref.shape[1]:
+        raise ValueError(
+            f"X_query features ({X_query.shape[1]}) must match X_ref features ({X_ref.shape[1]})."
+        )
+
+    Nq = X_query.shape[0]
+    Nr = X_ref.shape[0]
+    M = Y_ref.shape[1]
+    k_eff = min(k, Nr)
+
+    # Euclidean distance: ||x_q - x_r||^2 for all pairs
+    # Using broadcasting: (Nq, 1, K) - (1, Nr, K) -> (Nq, Nr, K) -> sum -> (Nq, Nr)
+    diff = X_query[:, np.newaxis, :] - X_ref[np.newaxis, :, :]  # (Nq, Nr, K)
+    D = np.sum(diff**2, axis=2)  # (Nq, Nr)
+
+    # Find k nearest neighbors for each query
+    idx = np.argpartition(D, k_eff - 1, axis=1)[:, :k_eff]  # (Nq, k_eff)
+
+    # Compute uniform-weighted mean and covariance for each query
+    Mu = np.zeros((Nq, M))
+    Sigma = np.zeros((Nq, M, M))
+    I = np.eye(M)
+
+    for i in range(Nq):
+        Y_neighbors = Y_ref[idx[i]]  # (k_eff, M)
+        mu_i = Y_neighbors.mean(axis=0)
+        Mu[i] = mu_i
+
+        # Sample covariance with uniform weights
+        C = Y_neighbors - mu_i  # (k_eff, M)
+        Sigma_i = (C.T @ C) / k_eff  # (M, M)
+        # Symmetrize and add ridge
+        Sigma[i] = 0.5 * (Sigma_i + Sigma_i.T) + ridge * I
+
+    return Mu, Sigma
 
 
 def implied_rho_from_total_lower_bound(

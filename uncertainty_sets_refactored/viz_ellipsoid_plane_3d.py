@@ -155,6 +155,125 @@ def plot_3d_ellipsoid_and_plane(
     plt.close(fig)
 
 
+def plot_multi_ellipsoid_comparison(
+    *,
+    mu_dict: dict[str, np.ndarray],
+    sigma_dict: dict[str, np.ndarray],
+    rho: float,
+    y_actual: np.ndarray | None = None,
+    out_png: Path,
+    dims3: tuple[int, int, int] = (0, 1, 2),
+    colors: dict[str, str] | None = None,
+    title: str | None = None,
+):
+    """Overlay multiple covariance ellipsoids for method comparison.
+
+    Parameters
+    ----------
+    mu_dict : dict[str, np.ndarray]
+        Method name -> mean vector (M,).
+    sigma_dict : dict[str, np.ndarray]
+        Method name -> covariance matrix (M, M).
+    rho : float
+        Ellipsoid radius (same for all methods for fair comparison).
+    y_actual : np.ndarray, optional
+        Actual observation point to mark on plot (M,).
+    out_png : Path
+        Output path for PNG file.
+    dims3 : tuple[int, int, int]
+        Which 3 dimensions to plot if M > 3.
+    colors : dict[str, str], optional
+        Method name -> color. Defaults provided if None.
+    title : str, optional
+        Plot title.
+    """
+    default_colors = {
+        "Equal Weights": "blue",
+        "Learned Omega": "green",
+        "KNN": "orange",
+    }
+    if colors is None:
+        colors = default_colors
+
+    fig = plt.figure(figsize=(12, 10))
+    ax = fig.add_subplot(111, projection="3d")
+
+    d0, d1, d2 = dims3
+    all_surfaces = []
+
+    for method_name in mu_dict.keys():
+        mu = mu_dict[method_name]
+        Sigma = sigma_dict[method_name]
+        color = colors.get(method_name, "gray")
+
+        # Extract 3D subset
+        mu3 = mu[[d0, d1, d2]]
+        Sigma3 = Sigma[np.ix_([d0, d1, d2], [d0, d1, d2])]
+
+        # Build ellipsoid mesh
+        X, Y, Z = ellipsoid_mesh(mu3, Sigma3, rho)
+        all_surfaces.append((X, Y, Z))
+
+        # Plot as wireframe for better visibility
+        ax.plot_wireframe(
+            X, Y, Z, alpha=0.4, linewidth=0.5, color=color, label=method_name
+        )
+
+        # Mark center
+        ax.scatter([mu3[0]], [mu3[1]], [mu3[2]], s=60, c=color, marker="o")
+
+    # Mark actual observation if provided
+    if y_actual is not None:
+        y3 = y_actual[[d0, d1, d2]]
+        ax.scatter(
+            [y3[0]], [y3[1]], [y3[2]], s=100, c="red", marker="*", label="Actual Y"
+        )
+
+    ax.legend(loc="upper right")
+
+    if title:
+        ax.set_title(title)
+    else:
+        ax.set_title(f"Covariance Ellipsoid Comparison (dims {dims3})")
+
+    ax.set_xlabel(f"x[{d0}]")
+    ax.set_ylabel(f"x[{d1}]")
+    ax.set_zlabel(f"x[{d2}]")
+
+    # Set axis limits based on all surfaces
+    xs = np.concatenate([s[0].ravel() for s in all_surfaces])
+    ys = np.concatenate([s[1].ravel() for s in all_surfaces])
+    zs = np.concatenate([s[2].ravel() for s in all_surfaces])
+
+    if y_actual is not None:
+        y3 = y_actual[[d0, d1, d2]]
+        xs = np.append(xs, y3[0])
+        ys = np.append(ys, y3[1])
+        zs = np.append(zs, y3[2])
+
+    xs = xs[np.isfinite(xs)]
+    ys = ys[np.isfinite(ys)]
+    zs = zs[np.isfinite(zs)]
+
+    pad = 0.1
+    x_min, x_max = xs.min(), xs.max()
+    y_min, y_max = ys.min(), ys.max()
+    z_min, z_max = zs.min(), zs.max()
+
+    x_range = x_max - x_min if x_max > x_min else 1.0
+    y_range = y_max - y_min if y_max > y_min else 1.0
+    z_range = z_max - z_min if z_max > z_min else 1.0
+
+    ax.set_xlim(x_min - pad * x_range, x_max + pad * x_range)
+    ax.set_ylim(y_min - pad * y_range, y_max + pad * y_range)
+    ax.set_zlim(z_min - pad * z_range, z_max + pad * z_range)
+
+    plt.tight_layout()
+    out_png.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(out_png, dpi=200)
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     DATA_DIR = Path("/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets/data/")
     ART = DATA_DIR / "viz_artifacts"

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from utils import fit_standard_scaler
-from data_processing import build_XY_for_covariance
+from data_processing import build_XY_for_covariance_system_only
 from covariance_optimization import (
     KernelCovConfig,
     FitConfig,
@@ -66,7 +66,7 @@ def run_sweep(
     actuals = pd.read_parquet(actuals_parquet)
     forecasts = pd.read_parquet(forecasts_parquet)
 
-    X, Y, times, x_cols, y_cols = build_XY_for_covariance(
+    X, Y, times, x_cols, y_cols = build_XY_for_covariance_system_only(
         forecasts, actuals, drop_any_nan_rows=True
     )
 
@@ -173,18 +173,18 @@ def run_sweep(
 
 
 if __name__ == "__main__":
-    DATA_DIR = Path("/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets/data/")
+    DATA_DIR = Path(__file__).parent / "data"
     ART = DATA_DIR / "viz_artifacts"
 
     run_sweep(
-        forecasts_parquet=DATA_DIR / "forecasts_filtered_rts4_constellation_v1.parquet",
-        actuals_parquet=DATA_DIR / "actuals_filtered_rts4_constellation_v1.parquet",
-        out_csv=ART / "cov_fit_sweep_summary_tau_k.csv",
-        taus=(5.0, 10.0, 20.0, 40.0),
-        ks=(32, 64, 128, 256),
+        forecasts_parquet=DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet",
+        actuals_parquet=DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet",
+        out_csv=ART / "cov_fit_sweep_summary_rts3.csv",
+        taus=(1.0, 2.0, 5.0, 10.0, 20.0, 50.0),
+        ks=(16, 32, 64, 128, 256),
         ridge=1e-3,
-        max_iters=150,
-        step_sizes=(1e-3, 3e-3, 1e-2),
-        grad_clips=(None, 10.0),
+        max_iters=300,
+        step_sizes=(1e-4, 1e-3, 3e-3, 1e-2, 3e-2, 0.1),
+        grad_clips=(None, 5.0, 10.0),
         dtype_list=("float32",),
     )

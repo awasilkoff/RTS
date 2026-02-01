@@ -19,3 +19,4 @@ uncertainty_sets/
 
 # Data artifacts (keep source data, exclude generated)
 *.parquet
+uncertainty_sets_refactored/data/viz_artifacts/

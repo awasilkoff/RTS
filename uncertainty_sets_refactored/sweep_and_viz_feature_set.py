@@ -85,7 +85,7 @@ def run_sweep(
     artifact_dir: Path,
     *,
     scaler_types: tuple[str, ...] = ("standard", "minmax"),
-    taus: tuple[float, ...] = (1.0, 5.0, 20.0),
+    taus: tuple[float, ...] = (0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 5.0, 20.0),
     omega_l2_regs: tuple[float, ...] = (0.0, 0.01, 0.1, 1.0),
     omega_constraints: tuple[str, ...] = ("none",),  # "none", "softmax", "simplex", or "normalize"
     k: int = 128,  # Number of neighbors (hyperparameter, not just for speed)
@@ -572,8 +572,8 @@ def main():
         "--taus",
         nargs="+",
         type=float,
-        default=[1.0, 5.0, 20.0],
-        help="Tau values to sweep",
+        default=[0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 5.0, 20.0],
+        help="Tau values to sweep (finer at low tau where performance is better)",
     )
     parser.add_argument(
         "--omega-l2-regs",

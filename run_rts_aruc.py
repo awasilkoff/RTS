@@ -20,15 +20,16 @@ to match your local setup and chosen study period.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 
 import numpy as np
 import pandas as pd
 import gurobipy as gp
 
 from models import DAMData
-from aruc_model import build_aruc_ldr_model
+from aruc_model import build_aruc_ldr_model, align_uncertainty_to_aruc
 from io_rts import build_damdata_from_rts
+from uncertainty_set_provider import UncertaintySetProvider
 
 
 # ---------------------------------------------------------------------------
@@ -343,6 +344,8 @@ def run_rts_aruc(
     wind_std_fraction: float = 0.15,
     slack_bus_id: Optional[int | str] = None,
     dam_results: Optional[Dict[str, Any]] = None,
+    uncertainty_provider_path: Optional[Union[Path, str]] = None,
+    provider_start_idx: int = 0,
 ) -> Dict[str, Any]:
     """
     Full pipeline for ARUC-LDR:
@@ -350,8 +353,29 @@ def run_rts_aruc(
 
     Parameters
     ----------
+    source_dir : Path
+        Directory containing RTS source data
+    ts_dir : Path
+        Directory containing RTS time series data
+    start_time : pd.Timestamp
+        Start time for the horizon
+    horizon_hours : int
+        Number of hours in the horizon
+    m_penalty : float
+        Big-M penalty for power balance slack
+    rho : float
+        Ellipsoid radius for static uncertainty (ignored if provider used)
+    wind_std_fraction : float
+        Standard deviation fraction for static uncertainty (ignored if provider used)
+    slack_bus_id : int or str, optional
+        Slack bus ID for PTDF computation
     dam_results : dict, optional
         Results from deterministic DAM run for comparison
+    uncertainty_provider_path : Path or str, optional
+        Path to pre-computed uncertainty set NPZ file. If provided, uses
+        time-varying uncertainty instead of static.
+    provider_start_idx : int
+        Starting index for provider query (default 0)
 
     Returns
     -------
@@ -361,8 +385,9 @@ def run_rts_aruc(
           "model": gp.Model,
           "vars": dict of Gurobi var containers,
           "results": dict of DataFrames (u, p0, Z, obj),
-          "Sigma": covariance matrix,
-          "rho": ellipsoid radius,
+          "Sigma": covariance matrix (K,K) or (T,K,K),
+          "rho": ellipsoid radius (scalar or (T,) array),
+          "time_varying": bool indicating if time-varying uncertainty was used,
         }
     """
     print("Building DAMData from RTS-GMLC...")
@@ -378,14 +403,43 @@ def run_rts_aruc(
     print(f"    n_lines  = {data.n_lines}")
     print(f"    n_periods= {data.n_periods}")
 
-    print("\nConstructing uncertainty set...")
-    Sigma, rho = build_uncertainty_set(
-        data, rho=rho, wind_std_fraction=wind_std_fraction
-    )
+    # Determine whether to use time-varying or static uncertainty
+    time_varying = False
+    sqrt_Sigma = None
+
+    if uncertainty_provider_path is not None:
+        # Time-varying uncertainty from pre-computed provider
+        print(f"\nLoading time-varying uncertainty from {uncertainty_provider_path}...")
+        provider = UncertaintySetProvider.from_npz(uncertainty_provider_path)
+        horizon = provider.get_by_indices(
+            provider_start_idx, horizon_hours, compute_sqrt=True
+        )
+
+        Sigma, rho, sqrt_Sigma = align_uncertainty_to_aruc(
+            horizon, data, provider.get_wind_gen_ids()
+        )
+        time_varying = True
+
+        print(f"  Wind IDs from provider: {provider.get_wind_gen_ids()}")
+        print(f"  Sigma shape: {Sigma.shape}")
+        print(f"  rho range: [{rho.min():.3f}, {rho.max():.3f}]")
+        model_name = "ARUC_LDR_TimeVarying"
+    else:
+        # Static uncertainty (original behavior)
+        print("\nConstructing static uncertainty set...")
+        Sigma, rho = build_uncertainty_set(
+            data, rho=rho, wind_std_fraction=wind_std_fraction
+        )
+        model_name = "ARUC_LDR_RTS"
 
     print("\nBuilding Gurobi ARUC-LDR model...")
     model, vars_dict = build_aruc_ldr_model(
-        data=data, Sigma=Sigma, rho=rho, M_p=m_penalty, model_name="ARUC_LDR_RTS"
+        data=data,
+        Sigma=Sigma,
+        rho=rho,
+        sqrt_Sigma=sqrt_Sigma,
+        M_p=m_penalty,
+        model_name=model_name,
     )
     print("  Model built. Starting optimization...")
 
@@ -413,6 +467,7 @@ def run_rts_aruc(
         "results": results,
         "Sigma": Sigma,
         "rho": rho,
+        "time_varying": time_varying,
     }
 
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
 import gurobipy as gp
@@ -9,10 +9,68 @@ from gurobipy import GRB
 from models import DAMData
 
 
+def align_uncertainty_to_aruc(
+    horizon: "HorizonUncertaintySet",
+    data: DAMData,
+    provider_wind_ids: List[str],
+) -> Tuple[np.ndarray, np.ndarray, Union[np.ndarray, None]]:
+    """
+    Align provider uncertainty sets to ARUC wind generator ordering.
+
+    The provider may have wind generators in a different order than the ARUC
+    model. This function permutes the covariance matrices to match ARUC's
+    wind generator ordering.
+
+    Parameters
+    ----------
+    horizon : HorizonUncertaintySet
+        Horizon uncertainty set from the provider
+    data : DAMData
+        ARUC data object containing generator information
+    provider_wind_ids : List[str]
+        Wind generator IDs from the provider (in provider's order)
+
+    Returns
+    -------
+    Sigma_aligned : np.ndarray
+        Covariance matrices aligned to ARUC ordering, shape (T, K, K)
+    rho : np.ndarray
+        Ellipsoid radii, shape (T,)
+    sqrt_Sigma_aligned : np.ndarray or None
+        Cholesky factors aligned to ARUC ordering, shape (T, K, K),
+        or None if horizon.sqrt_sigma is None
+    """
+    # Get ARUC wind ordering
+    is_wind = np.array([gt.upper() == "WIND" for gt in data.gen_type])
+    aruc_wind_ids = [data.gen_ids[i] for i in range(len(data.gen_ids)) if is_wind[i]]
+
+    # Validate all ARUC wind IDs are in provider
+    provider_set = set(provider_wind_ids)
+    for wid in aruc_wind_ids:
+        if wid not in provider_set:
+            raise ValueError(
+                f"ARUC wind generator '{wid}' not in provider: {provider_wind_ids}"
+            )
+
+    # Build permutation: provider index -> ARUC index
+    provider_idx_map = {wid: i for i, wid in enumerate(provider_wind_ids)}
+    perm = [provider_idx_map[wid] for wid in aruc_wind_ids]
+
+    # Apply permutation to covariance matrices
+    # For Sigma[t], we need to permute both rows and columns
+    Sigma_aligned = horizon.sigma[:, perm, :][:, :, perm]
+    sqrt_Sigma_aligned = None
+    if horizon.sqrt_sigma is not None:
+        sqrt_Sigma_aligned = horizon.sqrt_sigma[:, perm, :][:, :, perm]
+
+    return Sigma_aligned, horizon.rho.copy(), sqrt_Sigma_aligned
+
+
 def build_aruc_ldr_model(
     data: DAMData,
     Sigma: np.ndarray,
-    rho: float,
+    rho: Union[float, np.ndarray],
+    sqrt_Sigma: Union[np.ndarray, None] = None,
     M_p: float = 1e5,
     model_name: str = "ARUC_LDR",
 ) -> Tuple[gp.Model, Dict[str, object]]:
@@ -24,6 +82,35 @@ def build_aruc_ldr_model(
     with r in ellipsoidal uncertainty set:
         { r : r^T Sigma r <= rho^2 }
 
+    Supports both static and time-varying uncertainty:
+    - Static: Sigma (K, K), rho scalar - same for all time periods
+    - Time-varying: Sigma (T, K, K), rho (T,) - different for each period
+
+    Parameters
+    ----------
+    data : DAMData
+        UC problem data
+    Sigma : np.ndarray
+        Covariance matrix. Shape (K, K) for static or (T, K, K) for time-varying.
+    rho : float or np.ndarray
+        Ellipsoid radius. Scalar for static or shape (T,) for time-varying.
+    sqrt_Sigma : np.ndarray or None
+        Pre-computed Cholesky factor(s). Shape (K, K) or (T, K, K).
+        If None, computed from Sigma.
+    M_p : float
+        Big-M penalty for power balance slack
+    model_name : str
+        Gurobi model name
+
+    Returns
+    -------
+    model : gp.Model
+        Gurobi model
+    vars_dict : dict
+        Dictionary of variable containers
+
+    Notes
+    -----
     This shares the same DAMData as the deterministic DAM model, but:
     - p is represented as an affine function of r.
     - Constraints are enforced for all r in the ellipsoid (robust counterpart).
@@ -67,8 +154,36 @@ def build_aruc_ldr_model(
     # simplest: one r per wind generator (aggregate over time),
     # or one per wind gen and time. For now, assume K = n_wind.
     K = n_wind
-    assert Sigma.shape == (K, K), f"Expected Sigma shape ({K}, {K}), got {Sigma.shape}"
-    sqrt_Sigma = np.linalg.cholesky(Sigma)  # K x K
+
+    # Detect time-varying mode
+    time_varying = (Sigma.ndim == 3) or (
+        isinstance(rho, np.ndarray) and rho.ndim == 1
+    )
+
+    if time_varying:
+        # Normalize to (T, K, K) and (T,)
+        if Sigma.ndim == 2:
+            Sigma = np.tile(Sigma[np.newaxis, :, :], (T, 1, 1))
+        if isinstance(rho, (int, float)):
+            rho = np.full(T, rho)
+
+        assert Sigma.shape == (T, K, K), (
+            f"Expected Sigma shape ({T}, {K}, {K}), got {Sigma.shape}"
+        )
+        assert rho.shape == (T,), f"Expected rho shape ({T},), got {rho.shape}"
+
+        # Use provided sqrt_Sigma or compute
+        if sqrt_Sigma is None:
+            sqrt_Sigma = np.zeros_like(Sigma)
+            for t_idx in range(T):
+                sqrt_Sigma[t_idx] = np.linalg.cholesky(Sigma[t_idx])
+    else:
+        # Static mode (original)
+        assert Sigma.shape == (K, K), (
+            f"Expected Sigma shape ({K}, {K}), got {Sigma.shape}"
+        )
+        if sqrt_Sigma is None:
+            sqrt_Sigma = np.linalg.cholesky(Sigma)
 
     # Map bus -> list of generators
     gens_at_bus = [[] for _ in range(N)]
@@ -236,6 +351,10 @@ def build_aruc_ldr_model(
 
     for l in range(L):
         for t in range(T):
+            # Get time-specific values
+            sqrt_Sigma_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
+            rho_t = rho[t] if time_varying else rho
+
             # 1) flow_nom_expr
             flow_nom = gp.LinExpr()
             for n in range(N):
@@ -257,7 +376,7 @@ def build_aruc_ldr_model(
             for i_k in range(K):
                 expr = gp.LinExpr()
                 for j_k in range(K):
-                    coef = sqrt_Sigma[i_k, j_k]
+                    coef = sqrt_Sigma_t[i_k, j_k]
                     if abs(coef) < 1e-10:
                         continue
                     expr += coef * a_expr[j_k]
@@ -275,11 +394,11 @@ def build_aruc_ldr_model(
 
             # 5) Robust line limits
             m.addConstr(
-                flow_nom + rho * z_line[l, t] <= Fmax[l],
+                flow_nom + rho_t * z_line[l, t] <= Fmax[l],
                 name=f"line_max_rob_l{l}_t{t}",
             )
             m.addConstr(
-                -flow_nom + rho * z_line[l, t] <= Fmax[l],
+                -flow_nom + rho_t * z_line[l, t] <= Fmax[l],
                 name=f"line_min_rob_l{l}_t{t}",
             )
 
@@ -290,6 +409,10 @@ def build_aruc_ldr_model(
 
     for k_wind, i in enumerate(wind_idx):
         for t in range(T):
+            # Get time-specific values
+            sqrt_Sigma_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
+            rho_t = rho[t] if time_varying else rho
+
             # Deterministic forecast for this wind unit (Pbar)
             Pbar_it = Pmax_2d[i, t]  # interpret Pmax_2d for wind as forecast
 
@@ -309,7 +432,7 @@ def build_aruc_ldr_model(
             for q in range(K):
                 expr = gp.LinExpr()
                 for j in range(K):
-                    coef = float(sqrt_Sigma[q, j])
+                    coef = float(sqrt_Sigma_t[q, j])
                     if abs(coef) < 1e-12:
                         continue
                     expr += coef * a_expr[j]
@@ -329,7 +452,7 @@ def build_aruc_ldr_model(
 
             # Robust inequality: alpha + rho * z_wind <= 0
             m.addConstr(
-                alpha_expr + rho * z_wind[k_wind, t] <= 0.0,
+                alpha_expr + rho_t * z_wind[k_wind, t] <= 0.0,
                 name=f"wind_max_rob_i{i}_t{t}",
             )
 

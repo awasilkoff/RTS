@@ -154,10 +154,12 @@ def test_regression_constant_equals_static():
     """Test that time-varying with constant values equals static mode."""
     print("\nTesting regression: constant time-varying equals static...")
 
+    import gurobipy as gp
     from models import DAMData
 
     I, N, L, T, B, K = 2, 3, 1, 4, 2, 1
 
+    # Use larger capacities to ensure feasibility with robust constraints
     dummy_data = DAMData(
         gen_ids=["G0", "G1"],
         bus_ids=["B0", "B1", "B2"],
@@ -166,9 +168,9 @@ def test_regression_constant_equals_static():
         gen_type=["THERMAL", "WIND"],
         gen_to_bus=np.array([0, 2], dtype=int),
         Pmin=np.zeros(I),
-        Pmax=np.ones(I),
-        RU=np.ones(I) * 10.0,
-        RD=np.ones(I) * 10.0,
+        Pmax=np.ones(I) * 100.0,  # Larger Pmax for robust headroom
+        RU=np.ones(I) * 50.0,
+        RD=np.ones(I) * 50.0,
         MUT=np.ones(I) * 2,
         MDT=np.ones(I) * 2,
         startup_cost=np.ones(I) * 5.0,
@@ -177,7 +179,7 @@ def test_regression_constant_equals_static():
         u_init=np.array([1.0, 0.0]),
         init_up_time=np.array([1.0, 0.0]),
         init_down_time=np.array([0.0, 3.0]),
-        block_cap=np.ones((I, B)) * 50.0,
+        block_cap=np.ones((I, B)) * 60.0,  # Must cover worst-case dispatch
         block_cost=np.array([[10.0, 20.0], [12.0, 25.0]]),
         PTDF=np.zeros((L, N)),
         Fmax=np.ones(L) * 100.0,
@@ -193,6 +195,9 @@ def test_regression_constant_equals_static():
     model_static, _ = build_aruc_ldr_model(dummy_data, Sigma_static, rho_static, M_p=1e3)
     model_static.Params.OutputFlag = 0
     model_static.optimize()
+
+    if model_static.Status != gp.GRB.OPTIMAL:
+        raise RuntimeError(f"Static model not optimal, status={model_static.Status}")
     obj_static = model_static.ObjVal
 
     # Time-varying with constant values
@@ -201,6 +206,9 @@ def test_regression_constant_equals_static():
     model_tv, _ = build_aruc_ldr_model(dummy_data, Sigma_tv, rho_tv, M_p=1e3)
     model_tv.Params.OutputFlag = 0
     model_tv.optimize()
+
+    if model_tv.Status != gp.GRB.OPTIMAL:
+        raise RuntimeError(f"Time-varying model not optimal, status={model_tv.Status}")
     obj_tv = model_tv.ObjVal
 
     print(f"  Static objective: {obj_static:.2f}")

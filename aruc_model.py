@@ -240,35 +240,67 @@ def build_aruc_ldr_model(
     m.setObjective(obj, GRB.MINIMIZE)
 
     # ------------------------------------------------------------------
-    # Constraints – UC logic, min/max, ramps stay on p0
+    # Robust Pmin/Pmax/Block constraints
     # ------------------------------------------------------------------
+    # These require ||Z_{i,t} L_t|| for each generator i at time t.
+    # We introduce auxiliary variables z_gen[i,t] >= ||y_gen[i,t,:]||
+    # where y_gen[i,t,:] = L_t @ Z_{i,t}
 
-    # Block limits on p0
+    z_gen = m.addVars(I, T, lb=0.0, name="z_gen")
+    y_gen = m.addVars(I, T, K, lb=-GRB.INFINITY, name="y_gen")
+
     for i in range(I):
         for t in range(T):
+            # Get time-specific Cholesky factor and rho
+            sqrt_Sigma_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
+            rho_t = rho[t] if time_varying else rho
+
+            # Define y_gen[i,t,k] = (L @ Z_{i,t})_k = sum_j L[k,j] * Z[i,t,j]
+            for k_idx in range(K):
+                expr = gp.LinExpr()
+                for j_idx in range(K):
+                    coef = float(sqrt_Sigma_t[k_idx, j_idx])
+                    if abs(coef) < 1e-12:
+                        continue
+                    expr += coef * Z[i, t, j_idx]
+                m.addConstr(
+                    y_gen[i, t, k_idx] == expr, name=f"y_gen_def_i{i}_t{t}_k{k_idx}"
+                )
+
+            # SOC: z_gen[i,t] >= ||y_gen[i,t,:]||
+            m.addConstr(
+                z_gen[i, t] * z_gen[i, t]
+                >= gp.quicksum(y_gen[i, t, k] * y_gen[i, t, k] for k in range(K)),
+                name=f"soc_gen_i{i}_t{t}",
+            )
+
+            # Block capacity limits (unchanged)
             for b in range(B):
                 m.addConstr(
                     p0_block[i, t, b] <= block_cap[i, b] * u[i, t],
                     name=f"p0_block_cap_i{i}_t{t}_b{b}",
                 )
+
+            # Robust block aggregation: a + rho*||Z L|| <= sum_b p_{i,t,b}
             m.addConstr(
-                p0[i, t] == gp.quicksum(p0_block[i, t, b] for b in range(B)),
-                name=f"p0_agg_i{i}_t{t}",
+                p0[i, t] + rho_t * z_gen[i, t]
+                <= gp.quicksum(p0_block[i, t, b] for b in range(B)),
+                name=f"p0_agg_rob_i{i}_t{t}",
             )
 
-    # Min/max on nominal part (you'll later add robust margins using Z)
-    for i in range(I):
-        for t in range(T):
+            # Robust Pmax: a + rho*||Z L|| <= Pmax * u
             m.addConstr(
-                p0[i, t] >= Pmin[i] * u[i, t],
-                name=f"p0_min_i{i}_t{t}",
-            )
-            m.addConstr(
-                p0[i, t] <= Pmax_2d[i, t] * u[i, t],
-                name=f"p0_max_i{i}_t{t}",
+                p0[i, t] + rho_t * z_gen[i, t] <= Pmax_2d[i, t] * u[i, t],
+                name=f"p0_max_rob_i{i}_t{t}",
             )
 
-    # Ramps on p0 (again, later robustify using Z if needed)
+            # Robust Pmin: Pmin * u <= a - rho*||Z L||
+            m.addConstr(
+                Pmin[i] * u[i, t] <= p0[i, t] - rho_t * z_gen[i, t],
+                name=f"p0_min_rob_i{i}_t{t}",
+            )
+
+    # Ramps on nominal dispatch (paper formulation uses nominal ramps)
     for i in range(I):
         for t in range(1, T):
             m.addConstr(
@@ -467,6 +499,8 @@ def build_aruc_ldr_model(
         "p0_block": p0_block,
         "Z": Z,
         "s_p": s_p,
+        "z_gen": z_gen,
+        "y_gen": y_gen,
         "z_line": z_line,
         "y_line": y_line,
         "z_wind": z_wind,

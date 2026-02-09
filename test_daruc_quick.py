@@ -105,11 +105,21 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Quick DARUC test")
     parser.add_argument("--hours", type=int, default=4, help="Horizon hours")
-    parser.add_argument("--rho", type=float, default=2.0, help="Ellipsoid radius")
+    parser.add_argument("--rho", type=float, default=2.0, help="Ellipsoid radius (static mode only)")
     parser.add_argument("--no-lines", action="store_true", help="Copper-plate (no line limits)")
+    parser.add_argument(
+        "--uncertainty-npz", type=str, default=None,
+        help="Path to time-varying uncertainty NPZ (enables time-varying mode)",
+    )
+    parser.add_argument("--provider-start", type=int, default=0, help="Start index into NPZ time series")
     args = parser.parse_args()
 
-    suffix = "_copperplate" if args.no_lines else ""
+    parts = []
+    if args.no_lines:
+        parts.append("copperplate")
+    if args.uncertainty_npz:
+        parts.append("tv")
+    suffix = ("_" + "_".join(parts)) if parts else ""
     out_dir = Path(f"daruc_outputs/quick_test{suffix}")
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -117,6 +127,8 @@ if __name__ == "__main__":
         horizon_hours=args.hours,
         rho=args.rho,
         enforce_lines=not args.no_lines,
+        uncertainty_provider_path=args.uncertainty_npz,
+        provider_start_idx=args.provider_start,
     )
 
     daruc_results = outputs["daruc_results"]

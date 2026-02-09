@@ -45,10 +45,12 @@ START_TIME = pd.Timestamp(year=2020, month=1, day=1, hour=0)
 HORIZON_HOURS = 48
 
 M_PENALTY = 1e4
-UNCERTAINTY_RHO = 2.0
+UNCERTAINTY_RHO = 0.5
 
 # SPP forecast override for wind Pmax (set to None to use DAY_AHEAD_wind.csv)
-SPP_FORECASTS_PARQUET = Path("uncertainty_sets_refactored/data/forecasts_filtered_rts4_constellation_v2.parquet")
+SPP_FORECASTS_PARQUET = Path(
+    "uncertainty_sets_refactored/data/forecasts_filtered_rts4_constellation_v2.parquet"
+)
 SPP_START_IDX = 0
 
 
@@ -207,6 +209,7 @@ def run_rts_daruc(
     provider_start_idx: int = 0,
     spp_forecasts_parquet: Optional[Path] = SPP_FORECASTS_PARQUET,
     spp_start_idx: int = SPP_START_IDX,
+    enforce_lines: bool = True,
 ) -> Dict[str, Any]:
     """
     Two-step DARUC pipeline (Setup 1):
@@ -253,6 +256,7 @@ def run_rts_daruc(
         m_penalty=m_penalty,
         spp_forecasts_parquet=spp_forecasts_parquet,
         spp_start_idx=spp_start_idx,
+        enforce_lines=enforce_lines,
     )
 
     dam_results = dam_outputs["results"]
@@ -310,6 +314,7 @@ def run_rts_daruc(
         M_p=m_penalty,
         model_name=model_name,
         dam_commitment=dam_commitment,
+        enforce_lines=enforce_lines,
     )
     print("  Model built. Starting optimization...")
 

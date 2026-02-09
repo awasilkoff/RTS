@@ -148,6 +148,7 @@ def run_rts_dam(
     slack_bus_id: Optional[int | str] = None,  # if your build_damdata uses it
     spp_forecasts_parquet: Optional[Path] = SPP_FORECASTS_PARQUET,
     spp_start_idx: int = SPP_START_IDX,
+    enforce_lines: bool = True,
 ) -> Dict[str, Any]:
     """
     Full pipeline:
@@ -181,7 +182,7 @@ def run_rts_dam(
     print(f"    n_periods= {data.n_periods}")
 
     print("\nBuilding Gurobi DAM UC model...")
-    model, vars_dict = build_dam_model(data, M_p=m_penalty)
+    model, vars_dict = build_dam_model(data, M_p=m_penalty, enforce_lines=enforce_lines)
     print("  Model built. Starting optimization...")
 
     model.optimize()

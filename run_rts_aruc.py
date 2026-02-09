@@ -352,6 +352,7 @@ def run_rts_aruc(
     provider_start_idx: int = 0,
     spp_forecasts_parquet: Optional[Path] = SPP_FORECASTS_PARQUET,
     spp_start_idx: int = SPP_START_IDX,
+    enforce_lines: bool = True,
 ) -> Dict[str, Any]:
     """
     Full pipeline for ARUC-LDR:
@@ -448,6 +449,7 @@ def run_rts_aruc(
         sqrt_Sigma=sqrt_Sigma,
         M_p=m_penalty,
         model_name=model_name,
+        enforce_lines=enforce_lines,
     )
     print("  Model built. Starting optimization...")
 

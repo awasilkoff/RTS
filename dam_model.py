@@ -30,6 +30,7 @@ def build_dam_model(
     data: DAMData,
     M_p: float = 1e5,
     model_name: str = "DAM_UC",
+    enforce_lines: bool = True,
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Build a deterministic day-ahead UC model using Gurobi.
@@ -290,26 +291,29 @@ def build_dam_model(
     # We'll construct:
     #   inj[n,t] = sum_{i ∈ I_n} p[i,t] - d[n,t]
     # and then apply PTDF * inj[:,t] for each line.
-    for l in range(L):
-        for t in range(T):
-            # Line flow expression via PTDF
-            flow_expr = gp.LinExpr()
-            for n in range(N):
-                if PTDF[l, n] == 0.0:
-                    continue
-                gen_sum = gp.quicksum(p[i, t] for i in gens_at_bus[n])
-                # net injection at bus n
-                inj_n = gen_sum - float(d[n, t])
-                flow_expr += PTDF[l, n] * inj_n
+    if not enforce_lines:
+        print("  [DAM] Line flow constraints DISABLED (copper-plate mode)")
+    if enforce_lines:
+        for l in range(L):
+            for t in range(T):
+                # Line flow expression via PTDF
+                flow_expr = gp.LinExpr()
+                for n in range(N):
+                    if PTDF[l, n] == 0.0:
+                        continue
+                    gen_sum = gp.quicksum(p[i, t] for i in gens_at_bus[n])
+                    # net injection at bus n
+                    inj_n = gen_sum - float(d[n, t])
+                    flow_expr += PTDF[l, n] * inj_n
 
-            m.addConstr(
-                flow_expr <= Fmax[l],
-                name=f"line_max_l{l}_t{t}",
-            )
-            m.addConstr(
-                flow_expr >= -Fmax[l],
-                name=f"line_min_l{l}_t{t}",
-            )
+                m.addConstr(
+                    flow_expr <= Fmax[l],
+                    name=f"line_max_l{l}_t{t}",
+                )
+                m.addConstr(
+                    flow_expr >= -Fmax[l],
+                    name=f"line_min_l{l}_t{t}",
+                )
 
     # ------------------------------------------------------------------
     # Basic Gurobi parameters (tune as you like)

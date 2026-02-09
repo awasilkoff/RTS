@@ -74,6 +74,7 @@ def build_aruc_ldr_model(
     M_p: float = 1e5,
     model_name: str = "ARUC_LDR",
     dam_commitment: Optional[Dict[str, np.ndarray]] = None,
+    enforce_lines: bool = True,
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Adaptive robust UC with linear decision rules:
@@ -441,63 +442,64 @@ def build_aruc_ldr_model(
                 name=f"bal_Z_t{t}_k{k}",
             )
 
-    # 2) Line flows robust
+    # 2) Line flows robust (skip entirely in copper-plate mode)
     z_line = m.addVars(L, T, lb=0.0, name="z_line")
-    # Auxiliary variables for SOC constraints
     y_line = m.addVars(L, T, K, lb=-GRB.INFINITY, name="y_line")
 
-    for l in range(L):
-        for t in range(T):
-            # Get time-specific values
-            sqrt_Sigma_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
-            rho_t = rho[t] if time_varying else rho
+    if not enforce_lines:
+        print("  [ARUC] Line flow constraints DISABLED (copper-plate mode)")
+    if enforce_lines:
+        for l in range(L):
+            for t in range(T):
+                # Get time-specific values
+                sqrt_Sigma_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
+                rho_t = rho[t] if time_varying else rho
 
-            # 1) flow_nom_expr
-            flow_nom = gp.LinExpr()
-            for n in range(N):
-                if abs(PTDF[l, n]) < 1e-10:
-                    continue
-                gen_sum = gp.quicksum(p0[i, t] for i in gens_at_bus[n])
-                flow_nom += PTDF[l, n] * (gen_sum - float(d[n, t]))
-
-            # 2) a_expr[k] = d(flow) / d r_k
-            a_expr = [gp.LinExpr() for _ in range(K)]
-            for i in range(I):
-                n = int(gen_to_bus[i])
-                if abs(PTDF[l, n]) < 1e-10:
-                    continue
-                for k in range(K):
-                    a_expr[k] += PTDF[l, n] * Z[i, t, k]
-
-            # 3) Define auxiliary variables: y_line[l,t,k] = (sqrt_Sigma @ a_expr)[k]
-            for i_k in range(K):
-                expr = gp.LinExpr()
-                for j_k in range(K):
-                    coef = sqrt_Sigma_t[i_k, j_k]
-                    if abs(coef) < 1e-10:
+                # 1) flow_nom_expr
+                flow_nom = gp.LinExpr()
+                for n in range(N):
+                    if abs(PTDF[l, n]) < 1e-10:
                         continue
-                    expr += coef * a_expr[j_k]
+                    gen_sum = gp.quicksum(p0[i, t] for i in gens_at_bus[n])
+                    flow_nom += PTDF[l, n] * (gen_sum - float(d[n, t]))
+
+                # 2) a_expr[k] = d(flow) / d r_k
+                a_expr = [gp.LinExpr() for _ in range(K)]
+                for i in range(I):
+                    n = int(gen_to_bus[i])
+                    if abs(PTDF[l, n]) < 1e-10:
+                        continue
+                    for k in range(K):
+                        a_expr[k] += PTDF[l, n] * Z[i, t, k]
+
+                # 3) Define auxiliary variables: y_line[l,t,k] = (sqrt_Sigma @ a_expr)[k]
+                for i_k in range(K):
+                    expr = gp.LinExpr()
+                    for j_k in range(K):
+                        coef = sqrt_Sigma_t[i_k, j_k]
+                        if abs(coef) < 1e-10:
+                            continue
+                        expr += coef * a_expr[j_k]
+                    m.addConstr(
+                        y_line[l, t, i_k] == expr, name=f"y_line_def_l{l}_t{t}_k{i_k}"
+                    )
+
+                # 4) SOC: z_line[l,t] >= ||y_line[l,t,:]||
                 m.addConstr(
-                    y_line[l, t, i_k] == expr, name=f"y_line_def_l{l}_t{t}_k{i_k}"
+                    z_line[l, t] * z_line[l, t]
+                    >= gp.quicksum(y_line[l, t, k] * y_line[l, t, k] for k in range(K)),
+                    name=f"soc_line_l{l}_t{t}",
                 )
 
-            # 4) SOC: z_line[l,t] >= ||y_line[l,t,:]||
-            # Use addConstr with cone constraint: (z, y) in quadratic cone
-            m.addConstr(
-                z_line[l, t] * z_line[l, t]
-                >= gp.quicksum(y_line[l, t, k] * y_line[l, t, k] for k in range(K)),
-                name=f"soc_line_l{l}_t{t}",
-            )
-
-            # 5) Robust line limits
-            m.addConstr(
-                flow_nom + rho_t * z_line[l, t] <= Fmax[l],
-                name=f"line_max_rob_l{l}_t{t}",
-            )
-            m.addConstr(
-                -flow_nom + rho_t * z_line[l, t] <= Fmax[l],
-                name=f"line_min_rob_l{l}_t{t}",
-            )
+                # 5) Robust line limits
+                m.addConstr(
+                    flow_nom + rho_t * z_line[l, t] <= Fmax[l],
+                    name=f"line_max_rob_l{l}_t{t}",
+                )
+                m.addConstr(
+                    -flow_nom + rho_t * z_line[l, t] <= Fmax[l],
+                    name=f"line_min_rob_l{l}_t{t}",
+                )
 
     # 3) Wind availability
     z_wind = m.addVars(n_wind, T, lb=0.0, name="z_wind")

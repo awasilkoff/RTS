@@ -325,12 +325,10 @@ def fig2_3d_ellipsoid_comparison(
     Sigma_global = np.cov(Y_train, rowvar=False) + ridge * np.eye(Y_train.shape[1])
 
     # Learned ellipsoid for this sample
-    Mu_learned = learned_result["Mu"][sample_idx]
     Sigma_learned = learned_result["Sigma"][sample_idx]
 
-    # Apply offset to centers so axes stay non-negative
-    Mu_global = Mu_global + offset
-    Mu_learned = Mu_learned + offset
+    # Use global mean as the common center for all ellipsoids
+    Mu_common = Mu_global + offset
 
     # Colors: high-contrast, distinct hues
     color_global = "#4361EE"   # Blue
@@ -351,17 +349,16 @@ def fig2_3d_ellipsoid_comparison(
     # --- Left panel: Global vs Learned ---
     ax1 = fig.add_subplot(121, projection="3d")
 
-    X_g, Y_g, Z_g = ellipsoid_surface_3d(Mu_global, Sigma_global, rho=rho, n_points=n_pts)
+    X_g, Y_g, Z_g = ellipsoid_surface_3d(Mu_common, Sigma_global, rho=rho, n_points=n_pts)
     ax1.plot_surface(X_g, Y_g, Z_g, color=color_global, alpha=0.15, edgecolor=color_global, linewidth=0.3)
     ax1.plot_wireframe(X_g, Y_g, Z_g, color=color_global, alpha=0.35, linewidth=0.5, rstride=5, cstride=5)
 
-    X_l, Y_l, Z_l = ellipsoid_surface_3d(Mu_learned, Sigma_learned, rho=rho, n_points=n_pts)
+    X_l, Y_l, Z_l = ellipsoid_surface_3d(Mu_common, Sigma_learned, rho=rho, n_points=n_pts)
     ax1.plot_surface(X_l, Y_l, Z_l, color=color_learned, alpha=0.25, edgecolor=color_learned, linewidth=0.3)
     ax1.plot_wireframe(X_l, Y_l, Z_l, color=color_learned, alpha=0.5, linewidth=0.6, rstride=5, cstride=5)
 
-    # Centers
-    ax1.scatter([Mu_global[0]], [Mu_global[1]], [Mu_global[2]], s=40, c=color_global, marker="o", edgecolors="black", linewidths=0.5, zorder=5)
-    ax1.scatter([Mu_learned[0]], [Mu_learned[1]], [Mu_learned[2]], s=50, c=color_learned, marker="D", edgecolors="black", linewidths=0.5, zorder=6)
+    # Common center
+    ax1.scatter([Mu_common[0]], [Mu_common[1]], [Mu_common[2]], s=50, c="black", marker="o", edgecolors="black", linewidths=0.5, zorder=6)
 
     ax1.set_title("Global vs Learned ω", fontsize=9)
     _labels(ax1)
@@ -377,18 +374,16 @@ def fig2_3d_ellipsoid_comparison(
     # --- Right panel: k-NN vs Learned ---
     ax2 = fig.add_subplot(122, projection="3d")
 
-    Mu_knn = knn_results[knn_k]["Mu"][sample_idx] + offset
     Sigma_knn = knn_results[knn_k]["Sigma"][sample_idx]
-    X_k, Y_k, Z_k = ellipsoid_surface_3d(Mu_knn, Sigma_knn, rho=rho, n_points=n_pts)
+    X_k, Y_k, Z_k = ellipsoid_surface_3d(Mu_common, Sigma_knn, rho=rho, n_points=n_pts)
     ax2.plot_surface(X_k, Y_k, Z_k, color=color_knn, alpha=0.15, edgecolor=color_knn, linewidth=0.3)
     ax2.plot_wireframe(X_k, Y_k, Z_k, color=color_knn, alpha=0.35, linewidth=0.5, rstride=5, cstride=5)
 
     ax2.plot_surface(X_l, Y_l, Z_l, color=color_learned, alpha=0.25, edgecolor=color_learned, linewidth=0.3)
     ax2.plot_wireframe(X_l, Y_l, Z_l, color=color_learned, alpha=0.5, linewidth=0.6, rstride=5, cstride=5)
 
-    # Centers
-    ax2.scatter([Mu_knn[0]], [Mu_knn[1]], [Mu_knn[2]], s=40, c=color_knn, marker="o", edgecolors="black", linewidths=0.5, zorder=5)
-    ax2.scatter([Mu_learned[0]], [Mu_learned[1]], [Mu_learned[2]], s=50, c=color_learned, marker="D", edgecolors="black", linewidths=0.5, zorder=6)
+    # Common center
+    ax2.scatter([Mu_common[0]], [Mu_common[1]], [Mu_common[2]], s=50, c="black", marker="o", edgecolors="black", linewidths=0.5, zorder=6)
 
     ax2.set_title(f"k-NN (k={knn_k}) vs Learned ω", fontsize=9)
     _labels(ax2)
@@ -1464,17 +1459,21 @@ def fig8_ellipse_grid(
     colors = ["#2A9D8F", "#E9C46A", "#E76F51"]
     dims = (0, 1)  # First two dimensions
 
+    # Use global mean as common center (from largest k, which approximates global)
+    max_k = max(k_values)
+
     # Pre-compute all ellipses to find consistent axis limits per row
     ellipses_data = {}
     for row, sample_idx in enumerate(sample_indices):
+        # Common center per row: use mean from the largest k
+        mu_common = results[max_k]["Mu"][sample_idx][[dims[0], dims[1]]]
+
         row_xmin, row_xmax, row_ymin, row_ymax = np.inf, -np.inf, np.inf, -np.inf
         for col, k in enumerate(k_values):
-            Mu = results[k]["Mu"][sample_idx]
             Sigma = results[k]["Sigma"][sample_idx]
-            mu2 = Mu[[dims[0], dims[1]]]
             Sigma2 = Sigma[np.ix_([dims[0], dims[1]], [dims[0], dims[1]])]
-            ex, ey = ellipse_points_2d(mu2, Sigma2, rho=rho)
-            ellipses_data[(row, col)] = (mu2, ex, ey)
+            ex, ey = ellipse_points_2d(mu_common, Sigma2, rho=rho)
+            ellipses_data[(row, col)] = (mu_common, ex, ey)
             row_xmin = min(row_xmin, ex.min())
             row_xmax = max(row_xmax, ex.max())
             row_ymin = min(row_ymin, ey.min())
@@ -1495,8 +1494,8 @@ def fig8_ellipse_grid(
             ax.plot(ex, ey, "-", linewidth=2, color=colors[col])
             ax.fill(ex, ey, alpha=0.2, color=colors[col])
 
-            # Plot center
-            ax.scatter([mu2[0]], [mu2[1]], s=60, c=[colors[col]], marker="o", zorder=5)
+            # Plot common center
+            ax.scatter([mu2[0]], [mu2[1]], s=60, c="black", marker="o", zorder=5)
 
             ax.set_xlabel(y_cols[dims[0]] if y_cols else f"Y[{dims[0]}]")
             ax.set_ylabel(y_cols[dims[1]] if y_cols else f"Y[{dims[1]}]")
@@ -1589,16 +1588,20 @@ def fig10_ellipse_overlay(
 
     fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, IEEE_COL_WIDTH))
 
+    # Use global mean (from k=N_train) as common center
+    Mu_global = results[N_train]["Mu"][sample_idx]
+    mu_common = Mu_global[[dims[0], dims[1]]]
+
     for i, k in enumerate(k_values):
-        Mu = results[k]["Mu"][sample_idx]
         Sigma = results[k]["Sigma"][sample_idx]
-        mu2 = Mu[[dims[0], dims[1]]]
         Sigma2 = Sigma[np.ix_([dims[0], dims[1]], [dims[0], dims[1]])]
-        ex, ey = ellipse_points_2d(mu2, Sigma2, rho=rho)
+        ex, ey = ellipse_points_2d(mu_common, Sigma2, rho=rho)
         ax.plot(ex, ey, "-", linewidth=2, color=colors[i], label=labels[i])
         ax.fill(ex, ey, alpha=0.1, color=colors[i])
-        ax.scatter([mu2[0]], [mu2[1]], s=40, c=[colors[i]], marker="o",
-                   edgecolors="black", linewidths=0.5, zorder=5)
+
+    # Single common center
+    ax.scatter([mu_common[0]], [mu_common[1]], s=40, c="black", marker="o",
+               edgecolors="black", linewidths=0.5, zorder=5)
 
     ax.set_xlabel(y_cols[dims[0]] if y_cols else f"Y[{dims[0]}]")
     ax.set_ylabel(y_cols[dims[1]] if y_cols else f"Y[{dims[1]}]")

@@ -49,6 +49,10 @@ HORIZON_HOURS = 48
 # Big-M penalty for power-balance slack
 M_PENALTY = 1e4
 
+# SPP forecast override for wind Pmax (set to None to use DAY_AHEAD_wind.csv)
+SPP_FORECASTS_PARQUET = Path("uncertainty_sets_refactored/data/forecasts_filtered_rts4_constellation_v2.parquet")
+SPP_START_IDX = 0
+
 
 # ---------------------------------------------------------------------------
 # Helpers for extracting results
@@ -142,6 +146,8 @@ def run_rts_dam(
     horizon_hours: int = HORIZON_HOURS,
     m_penalty: float = M_PENALTY,
     slack_bus_id: Optional[int | str] = None,  # if your build_damdata uses it
+    spp_forecasts_parquet: Optional[Path] = SPP_FORECASTS_PARQUET,
+    spp_start_idx: int = SPP_START_IDX,
 ) -> Dict[str, Any]:
     """
     Full pipeline:
@@ -165,7 +171,8 @@ def run_rts_dam(
         ts_dir=ts_dir,
         start_time=start_time,
         horizon_hours=horizon_hours,
-        # slack_bus_id=slack_bus_id,  # if you routed that through
+        spp_forecasts_parquet=spp_forecasts_parquet,
+        spp_start_idx=spp_start_idx,
     )
     print("  Done. Data shapes:")
     print(f"    n_gens   = {data.n_gens}")

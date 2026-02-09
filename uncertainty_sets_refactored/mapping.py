@@ -455,6 +455,198 @@ def rename_resources_to_rts_names(
 
 
 # -----------------------------
+# Resource subsetting (e.g., 4-resource -> 3-resource)
+# -----------------------------
+def filter_rts_data_to_subset(
+    actuals: pd.DataFrame,
+    forecasts: pd.DataFrame,
+    mapping_df: pd.DataFrame,
+    spp_names_to_keep: list[str],
+    out_dir: Path,
+    *,
+    tag: str = "rts3",
+    id_col: str = "ID_RESOURCE",
+    spp_col: str = "SPP_name",
+    rts_col: str = "RTS_name",
+    compute_residuals: bool = True,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    Filter RTS data (already matched to SPP resources) to a subset of resources.
+
+    Parameters:
+      actuals: actuals DataFrame with ID_RESOURCE column (RTS names)
+      forecasts: forecasts DataFrame with ID_RESOURCE column (RTS names)
+      mapping_df: mapping from find_and_plot_rts_to_spp_constellation with SPP_name and RTS_name
+      spp_names_to_keep: list of SPP_name values to keep
+      out_dir: output directory for parquet files
+      tag: tag for output filenames (e.g., "rts3")
+      compute_residuals: if True, also compute and write residuals parquet
+
+    Returns: (actuals_subset, forecasts_subset, mapping_subset)
+    Writes:
+      - actuals_filtered_{tag}.parquet
+      - forecasts_filtered_{tag}.parquet
+      - residuals_filtered_{tag}.parquet (if compute_residuals=True)
+      - rts_to_spp_mapping_{tag}.csv
+    """
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Filter mapping to keep only selected SPP resources
+    keep_set = {str(x) for x in spp_names_to_keep}
+    mapping_subset = mapping_df[mapping_df[spp_col].astype(str).isin(keep_set)].copy()
+
+    if len(mapping_subset) == 0:
+        raise ValueError(f"No resources matched from {spp_names_to_keep}")
+
+    # Get corresponding RTS names
+    rts_names_to_keep = set(mapping_subset[rts_col].astype(str).unique())
+
+    # Filter actuals and forecasts to these RTS names
+    a_subset = actuals[actuals[id_col].astype(str).isin(rts_names_to_keep)].copy()
+    f_subset = forecasts[forecasts[id_col].astype(str).isin(rts_names_to_keep)].copy()
+
+    # Write parquets
+    actuals_path = out_dir / f"actuals_filtered_{tag}.parquet"
+    forecasts_path = out_dir / f"forecasts_filtered_{tag}.parquet"
+    mapping_path = out_dir / f"rts_to_spp_mapping_{tag}.csv"
+
+    a_subset.to_parquet(actuals_path, index=False)
+    f_subset.to_parquet(forecasts_path, index=False)
+    mapping_subset.to_csv(mapping_path, index=False)
+
+    print(f"\nWrote {tag} subset files:")
+    print(f" - {actuals_path} ({len(a_subset)} rows)")
+    print(f" - {forecasts_path} ({len(f_subset)} rows)")
+
+    # Compute and write residuals if requested
+    if compute_residuals:
+        residuals_subset = compute_residuals_from_ensemble_mean(a_subset, f_subset)
+        residuals_path = out_dir / f"residuals_filtered_{tag}.parquet"
+        residuals_subset.to_parquet(residuals_path, index=False)
+        print(f" - {residuals_path} ({len(residuals_subset)} rows)")
+
+    print(f" - {mapping_path}")
+    print(f"Resources: {sorted(rts_names_to_keep)}")
+
+    return a_subset, f_subset, mapping_subset
+
+
+# -----------------------------
+# Residual computation
+# -----------------------------
+def compute_residuals_from_ensemble_mean(
+    actuals: pd.DataFrame,
+    forecasts: pd.DataFrame,
+    *,
+    time_col: str = "TIME_HOURLY",
+    id_col: str = "ID_RESOURCE",
+    actual_col: str = "ACTUAL",
+    forecast_col: str = "FORECAST",
+) -> pd.DataFrame:
+    """
+    Compute residuals = actuals - mean(forecast ensemble).
+
+    Returns DataFrame with same structure as actuals, but with:
+    - ACTUAL: original actual value (preserved)
+    - MEAN_FORECAST: mean across ensemble members
+    - RESIDUAL: ACTUAL - MEAN_FORECAST
+    """
+    # Compute mean forecast per (time, resource)
+    forecast_mean = (
+        forecasts.groupby([time_col, id_col], as_index=False)[forecast_col]
+        .mean()
+        .rename(columns={forecast_col: "MEAN_FORECAST"})
+    )
+
+    # Merge with actuals
+    result = actuals.merge(forecast_mean, on=[time_col, id_col], how="left")
+
+    # Compute residual
+    result["RESIDUAL"] = result[actual_col] - result["MEAN_FORECAST"]
+
+    return result
+
+
+# -----------------------------
+# Capacity scaling helpers
+# -----------------------------
+def compute_scale_factors(
+    actuals: pd.DataFrame,
+    mapping_df: pd.DataFrame,
+    gen_path: str | Path,
+    *,
+    id_col: str = "ID_RESOURCE",
+    actual_col: str = "ACTUAL",
+    rts_col: str = "RTS_name",
+) -> dict[str, float]:
+    """
+    Compute per-resource scale factors: RTS_Pmax / max(SPP_actuals).
+
+    Parameters
+    ----------
+    actuals : DataFrame
+        Actuals with ID_RESOURCE already renamed to RTS names.
+    mapping_df : DataFrame
+        Mapping with RTS_name column.
+    gen_path : Path
+        Path to gen.csv for RTS Pmax lookup.
+
+    Returns
+    -------
+    scale_factors : dict[rts_name -> float]
+    """
+    gens_df = pd.read_csv(gen_path)
+    rts_pmax = dict(zip(gens_df["GEN UID"].astype(str), gens_df["PMax MW"]))
+
+    scale_factors = {}
+    for rts_name in mapping_df[rts_col].astype(str).unique():
+        # RTS nameplate capacity
+        if rts_name not in rts_pmax:
+            print(f"WARNING: {rts_name} not found in gen.csv, skipping scale factor")
+            continue
+        nameplate = rts_pmax[rts_name]
+
+        # Max observed SPP actual for this resource
+        mask = actuals[id_col].astype(str) == rts_name
+        spp_max = actuals.loc[mask, actual_col].max()
+
+        if spp_max <= 0:
+            print(f"WARNING: max(ACTUAL) for {rts_name} is {spp_max}, using scale=1.0")
+            scale_factors[rts_name] = 1.0
+        else:
+            scale_factors[rts_name] = nameplate / spp_max
+
+    return scale_factors
+
+
+def apply_scale_factors(
+    actuals: pd.DataFrame,
+    forecasts: pd.DataFrame,
+    scale_factors: dict[str, float],
+    *,
+    id_col: str = "ID_RESOURCE",
+    actual_col: str = "ACTUAL",
+    forecast_col: str = "FORECAST",
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Multiply ACTUAL and FORECAST columns by per-resource scale factor.
+
+    Returns copies of actuals and forecasts with scaled values.
+    """
+    a = actuals.copy()
+    f = forecasts.copy()
+
+    for rts_name, sf in scale_factors.items():
+        a_mask = a[id_col].astype(str) == rts_name
+        f_mask = f[id_col].astype(str) == rts_name
+        a.loc[a_mask, actual_col] = a.loc[a_mask, actual_col] * sf
+        f.loc[f_mask, forecast_col] = f.loc[f_mask, forecast_col] * sf
+
+    return a, f
+
+
+# -----------------------------
 # One-shot: match -> filter -> rename -> write cache
 # -----------------------------
 @dataclass(frozen=True)
@@ -474,6 +666,8 @@ def cache_matched_rts_named_data(
     show_map: bool = False,
     zoom: float = 6.0,
     tag: str = "rts4",
+    model_prefix_filter: str | None = "SUBMODEL",
+    capacity_scale: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Uses your existing find_and_plot_rts_to_spp_constellation(...) to get a 4-point match,
@@ -513,6 +707,22 @@ def cache_matched_rts_named_data(
         a4, f4, mapping_df, keep_original_id=True
     )
 
+    # ---- MODEL filter (e.g., keep only SUBMODEL* rows) ----
+    if model_prefix_filter is not None:
+        n_before = len(f4_rts)
+        f4_rts = f4_rts[f4_rts["MODEL"].str.startswith(model_prefix_filter)].copy()
+        print(f"Filtered MODEL to '{model_prefix_filter}*': {n_before} -> {len(f4_rts)} rows")
+
+    # ---- capacity scaling (RTS_Pmax / max(SPP_actuals)) ----
+    if capacity_scale:
+        scale_factors = compute_scale_factors(
+            a4_rts, mapping_df, paths.gen_path
+        )
+        a4_rts, f4_rts = apply_scale_factors(a4_rts, f4_rts, scale_factors)
+        mapping_df = mapping_df.copy()
+        mapping_df["scale_factor"] = mapping_df["RTS_name"].map(scale_factors)
+        print(f"Applied capacity scale factors: {scale_factors}")
+
     # ---- write cache ----
     actuals_path = out_dir / f"actuals_filtered_{tag}.parquet"
     forecasts_path = out_dir / f"forecasts_filtered_{tag}.parquet"
@@ -522,9 +732,15 @@ def cache_matched_rts_named_data(
     f4_rts.to_parquet(forecasts_path, index=False)
     mapping_df.to_csv(mapping_path, index=False)
 
+    # ---- compute and write residuals ----
+    residuals = compute_residuals_from_ensemble_mean(a4_rts, f4_rts)
+    residuals_path = out_dir / f"residuals_filtered_{tag}.parquet"
+    residuals.to_parquet(residuals_path, index=False)
+
     print("\nWrote cached files:")
     print(" -", actuals_path)
     print(" -", forecasts_path)
+    print(" -", residuals_path)
     print(" -", mapping_path)
     print(f"Geometric error (meters): {result['score']:.2f}")
 
@@ -548,6 +764,7 @@ if __name__ == "__main__":
 
     out_dir = _DATA_DIR
 
+    # --- v1: original (no MODEL filter, no scaling) ---
     a4_rts, f4_rts, mapping_df = cache_matched_rts_named_data(
         actuals=df_actuals,
         forecasts=df_forecasts,
@@ -555,4 +772,42 @@ if __name__ == "__main__":
         out_dir=out_dir,
         tag="rts4_constellation_v1",
         show_map=False,
+        model_prefix_filter=None,
+        capacity_scale=False,
+    )
+
+    # Create rts3 subset (exclude 303_WIND_1 / OKGE.SWCV.CV)
+    rts3_spp_names = [
+        "OKGE.GRANTPLNS.WIND.1",
+        "OKGE.SDWE.SDWE",
+        "MIDW.KACY.ALEX",
+    ]
+    a3_rts, f3_rts, mapping_df_3 = filter_rts_data_to_subset(
+        actuals=a4_rts,
+        forecasts=f4_rts,
+        mapping_df=mapping_df,
+        spp_names_to_keep=rts3_spp_names,
+        out_dir=out_dir,
+        tag="rts3_constellation_v1",
+    )
+
+    # --- v2: SUBMODEL filter + capacity scaling ---
+    a4_rts_v2, f4_rts_v2, mapping_df_v2 = cache_matched_rts_named_data(
+        actuals=df_actuals,
+        forecasts=df_forecasts,
+        paths=paths,
+        out_dir=out_dir,
+        tag="rts4_constellation_v2",
+        show_map=False,
+        model_prefix_filter="SUBMODEL",
+        capacity_scale=True,
+    )
+
+    a3_rts_v2, f3_rts_v2, mapping_df_3_v2 = filter_rts_data_to_subset(
+        actuals=a4_rts_v2,
+        forecasts=f4_rts_v2,
+        mapping_df=mapping_df_v2,
+        spp_names_to_keep=rts3_spp_names,
+        out_dir=out_dir,
+        tag="rts3_constellation_v2",
     )

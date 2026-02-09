@@ -56,6 +56,10 @@ M_PENALTY = 1e4
 # Sigma: covariance matrix for wind forecast errors
 UNCERTAINTY_RHO = 2.0
 
+# SPP forecast override for wind Pmax (set to None to use DAY_AHEAD_wind.csv)
+SPP_FORECASTS_PARQUET = Path("uncertainty_sets_refactored/data/forecasts_filtered_rts4_constellation_v2.parquet")
+SPP_START_IDX = 0
+
 
 # ---------------------------------------------------------------------------
 # Uncertainty set construction
@@ -346,6 +350,8 @@ def run_rts_aruc(
     dam_results: Optional[Dict[str, Any]] = None,
     uncertainty_provider_path: Optional[Union[Path, str]] = None,
     provider_start_idx: int = 0,
+    spp_forecasts_parquet: Optional[Path] = SPP_FORECASTS_PARQUET,
+    spp_start_idx: int = SPP_START_IDX,
 ) -> Dict[str, Any]:
     """
     Full pipeline for ARUC-LDR:
@@ -396,6 +402,8 @@ def run_rts_aruc(
         ts_dir=ts_dir,
         start_time=start_time,
         horizon_hours=horizon_hours,
+        spp_forecasts_parquet=spp_forecasts_parquet,
+        spp_start_idx=spp_start_idx,
     )
     print("  Done. Data shapes:")
     print(f"    n_gens   = {data.n_gens}")

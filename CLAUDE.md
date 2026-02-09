@@ -50,6 +50,7 @@ RTS_Data/SourceData/*.csv  →  io_rts.py  →  DAMData (Pydantic model)
 | `aruc_model.py` | Adaptive robust UC with linear decision rules |
 | `run_rts_dam.py` | End-to-end deterministic DAM pipeline |
 | `run_rts_aruc.py` | End-to-end robust ARUC pipeline |
+| `run_rts_daruc.py` | Two-step DARUC: deterministic DAM → robust reliability commitments |
 
 ### Uncertainty Set Analysis (`uncertainty_sets_refactored/`)
 
@@ -191,11 +192,40 @@ python sweep_and_viz_feature_set.py \
 - `BASELINE_COMPARISON_FIX.md` - Why baseline is always `[1,1,...]`
 - `TRAIN_TEST_SPLIT_CHANGE.md` - Random vs temporal holdout rationale
 
+### SPP Forecast Integration
+
+The DAM/ARUC/DARUC models can replace the default `DAY_AHEAD_wind.csv` forecasts with scaled SPP ensemble mean forecasts. This is controlled by two parameters on `build_damdata_from_rts()` and each runner script:
+
+- `spp_forecasts_parquet`: Path to v2 forecasts parquet (default: `uncertainty_sets_refactored/data/forecasts_filtered_rts4_constellation_v2.parquet`). Set to `None` to use original `DAY_AHEAD_wind.csv`.
+- `spp_start_idx`: Positional index into the SPP time series for time alignment (default: 0).
+
+**V2 parquet pipeline** (`mapping.py`):
+1. **SUBMODEL filter** — keeps only the 51 SUBMODEL#00–#50 ensemble members, drops 4 MODEL# variants
+2. **Capacity scaling** — multiplies ACTUAL and FORECAST by `RTS_Pmax / max(SPP_actuals)` per resource
+
+Scale factors (v2 mapping CSV):
+
+| RTS Generator | SPP Site | Scale Factor | RTS Pmax |
+|---|---|---|---|
+| 309_WIND_1 | OKGE.GRANTPLNS.WIND.1 | 1.42 | 148.3 MW |
+| 317_WIND_1 | OKGE.SDWE.SDWE | 4.51 | 799.1 MW |
+| 303_WIND_1 | OKGE.SWCV.CV | 4.19 | 847.0 MW |
+| 122_WIND_1 | MIDW.KACY.ALEX | 29.14 | 713.5 MW |
+
+**Regenerating v2 parquets:**
+```bash
+cd uncertainty_sets_refactored && python mapping.py
+```
+This writes v2 files alongside existing v1 files — no existing scripts are affected.
+
+**Wind block capacity fix:** Wind generators in gen.csv have `Output_pct_1/2/3 = 0` (no heat rate curve), which previously caused `block_cap = [0,0,0]` and forced zero dispatch. `io_rts.py` now sets `block_cap[i,0] = Pmax[i]` for wind generators with zero marginal cost, allowing dispatch up to the time-varying `Pmax_2d` forecast.
+
 ### Data Location
 
 - **Static data:** `RTS_Data/SourceData/` (bus.csv, gen.csv, branch.csv)
 - **Time series:** `RTS_Data/timeseries_data_files/` (Load/, WIND/, PV/, HYDRO/)
-- **Outputs:** `dam_outputs/`, `aruc_outputs/` (generated at runtime)
+- **SPP forecasts (v2):** `uncertainty_sets_refactored/data/*_v2.parquet` (scaled, SUBMODEL-filtered)
+- **Outputs:** `dam_outputs/`, `aruc_outputs/`, `daruc_outputs/` (generated at runtime)
 
 ## Key Concepts
 

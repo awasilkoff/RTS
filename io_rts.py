@@ -111,6 +111,104 @@ def build_wind_pmax_array(
     return pmax_wind
 
 
+def build_wind_pmax_from_spp_ensemble(
+    forecasts_parquet: str | Path,
+    gen_ids: list[str],
+    gen_type: list[str],
+    static_pmax: np.ndarray,
+    n_hours: int,
+    start_idx: int = 0,
+) -> np.ndarray:
+    """
+    Build time-varying wind Pmax from SPP ensemble mean forecast.
+
+    Returns (I, T) array: ensemble mean per wind gen, 0 for non-wind.
+    Clips to static_pmax to prevent exceeding nameplate.
+    Uses positional indexing (start_idx) for time alignment.
+
+    Parameters
+    ----------
+    forecasts_parquet : Path
+        Path to scaled/filtered forecasts parquet (v2).
+    gen_ids : list[str]
+        Ordered generator IDs.
+    gen_type : list[str]
+        Generator types (length I).
+    static_pmax : np.ndarray
+        Static Pmax from gen.csv (length I or (I,) or (I,T) — uses [i] or [i,0]).
+    n_hours : int
+        Number of hours (T) for the horizon.
+    start_idx : int
+        Starting row index in the sorted time series.
+
+    Returns
+    -------
+    pmax_wind : np.ndarray
+        (I, T) array.
+    """
+    I = len(gen_ids)
+    T = n_hours
+    pmax_wind = np.zeros((I, T), dtype=float)
+
+    is_wind = [gt.upper() == "WIND" for gt in gen_type]
+    wind_gen_ids = {gen_ids[i] for i in range(I) if is_wind[i]}
+
+    if not wind_gen_ids:
+        return pmax_wind
+
+    # Load forecasts
+    df = pd.read_parquet(forecasts_parquet)
+
+    # Keep only wind resources that match our gen_ids
+    df = df[df["ID_RESOURCE"].isin(wind_gen_ids)].copy()
+
+    if df.empty:
+        print("WARNING: No matching wind resources in SPP forecasts parquet")
+        return pmax_wind
+
+    # Compute ensemble mean per (time, resource)
+    df["TIME_HOURLY"] = pd.to_datetime(df["TIME_HOURLY"])
+    mean_fc = (
+        df.groupby(["TIME_HOURLY", "ID_RESOURCE"], as_index=False)["FORECAST"]
+        .mean()
+    )
+
+    # Pivot to wide: rows=time, cols=resource
+    pivot = mean_fc.pivot(index="TIME_HOURLY", columns="ID_RESOURCE", values="FORECAST")
+    pivot = pivot.sort_index()
+
+    # Slice by positional index
+    if start_idx + T > len(pivot):
+        raise ValueError(
+            f"SPP forecasts have {len(pivot)} timesteps but need "
+            f"start_idx={start_idx} + n_hours={T} = {start_idx + T}"
+        )
+    pivot_slice = pivot.iloc[start_idx : start_idx + T]
+
+    # Fill (I, T) array
+    # Get static pmax per generator (handle 1D or 2D)
+    static_pmax_arr = np.asarray(static_pmax)
+    for i in range(I):
+        if not is_wind[i]:
+            continue
+        gen_id = gen_ids[i]
+        if gen_id not in pivot_slice.columns:
+            print(f"WARNING: {gen_id} not in SPP forecasts, using 0")
+            continue
+
+        vals = pivot_slice[gen_id].to_numpy(dtype=float)
+
+        # Get nameplate for clipping
+        if static_pmax_arr.ndim == 1:
+            cap = static_pmax_arr[i]
+        else:
+            cap = static_pmax_arr[i, 0]
+
+        pmax_wind[i, :] = np.clip(vals, 0, cap)
+
+    return pmax_wind
+
+
 def load_rts_source_tables(source_dir: str | Path) -> Dict[str, pd.DataFrame]:
     """
     Load RTS-GMLC SourceData tables into pandas DataFrames.
@@ -258,6 +356,8 @@ def build_damdata_from_rts(
     ts_dir: str | Path,
     start_time: pd.Timestamp,
     horizon_hours: int = 48,
+    spp_forecasts_parquet: str | Path | None = None,
+    spp_start_idx: int = 0,
 ) -> DAMData:
     """
     High-level function:
@@ -354,19 +454,27 @@ def build_damdata_from_rts(
         init_down_time[i] = row.get("InitialDownTime", 0.0)
 
         # 4) Cost blocks
-        block_cap[i, 0] = np.clip(row.get("Output_pct_1", 0), 0, 1) * Pmax[i]
-        block_cap[i, 1] = (
-            np.clip(row.get("Output_pct_2", 0) - row.get("Output_pct_1", 0), 0, 1)
-            * Pmax[i]
-        )
-        block_cap[i, 2] = (
-            np.clip(row.get("Output_pct_3", 0) - row.get("Output_pct_2", 0), 0, 1)
-            * Pmax[i]
-        )
+        if gen_type[i] == "WIND":
+            # Wind: single block covering full capacity, zero marginal cost.
+            # Time-varying availability enforced by Pmax_2d constraint.
+            block_cap[i, 0] = Pmax[i]
+            block_cap[i, 1] = 0.0
+            block_cap[i, 2] = 0.0
+            block_cost[i, :] = 0.0
+        else:
+            block_cap[i, 0] = np.clip(row.get("Output_pct_1", 0), 0, 1) * Pmax[i]
+            block_cap[i, 1] = (
+                np.clip(row.get("Output_pct_2", 0) - row.get("Output_pct_1", 0), 0, 1)
+                * Pmax[i]
+            )
+            block_cap[i, 2] = (
+                np.clip(row.get("Output_pct_3", 0) - row.get("Output_pct_2", 0), 0, 1)
+                * Pmax[i]
+            )
 
-        block_cost[i, 0] = row.get("HR_incr_1") * row["Fuel Price $/MMBTU"] / 1000
-        block_cost[i, 1] = row.get("HR_incr_2") * row["Fuel Price $/MMBTU"] / 1000
-        block_cost[i, 2] = row.get("HR_incr_3") * row["Fuel Price $/MMBTU"] / 1000
+            block_cost[i, 0] = row.get("HR_incr_1") * row["Fuel Price $/MMBTU"] / 1000
+            block_cost[i, 1] = row.get("HR_incr_2") * row["Fuel Price $/MMBTU"] / 1000
+            block_cost[i, 2] = row.get("HR_incr_3") * row["Fuel Price $/MMBTU"] / 1000
 
     # 5) Load / net injection array d[n,t]
     # 0) Build full time-series once
@@ -399,17 +507,30 @@ def build_damdata_from_rts(
     # For now, ignore wind_df in d; later you can subtract fixed injections
     # 6) Build time-varying Pmax for wind generators
     # This is CRITICAL for the ARUC model!
-    wind_window = wind_df.loc[
-        (wind_df.index >= start_time) & (wind_df.index < end_time)
-    ].copy()
+    if spp_forecasts_parquet is not None:
+        # Use SPP ensemble mean forecast (scaled to RTS capacity)
+        print(f"  Using SPP ensemble mean for wind Pmax: {spp_forecasts_parquet}")
+        pmax_wind = build_wind_pmax_from_spp_ensemble(
+            forecasts_parquet=spp_forecasts_parquet,
+            gen_ids=gen_ids,
+            gen_type=gen_type,
+            static_pmax=Pmax,
+            n_hours=T,
+            start_idx=spp_start_idx,
+        )
+    else:
+        # Original: read DAY_AHEAD_wind.csv
+        wind_window = wind_df.loc[
+            (wind_df.index >= start_time) & (wind_df.index < end_time)
+        ].copy()
 
-    pmax_wind = build_wind_pmax_array(
-        wind_df=wind_window,
-        gens_df=gens_df,
-        gen_ids=gen_ids,
-        time_index=time_index,
-        gen_type=gen_type,
-    )
+        pmax_wind = build_wind_pmax_array(
+            wind_df=wind_window,
+            gens_df=gens_df,
+            gen_ids=gen_ids,
+            time_index=time_index,
+            gen_type=gen_type,
+        )
 
     # For thermal units, use static Pmax
     # For wind units, use time-varying forecast

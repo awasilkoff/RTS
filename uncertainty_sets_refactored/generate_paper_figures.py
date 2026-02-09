@@ -759,7 +759,7 @@ def fig6_calibration_curve(
             alpha_target=float(alpha),
             binning="y_pred",
             n_bins=1,  # Global conformal - single bin
-            safety_margin=0.015,
+            cal_frac=0.35,
         )
         calibration_results.append(
             {
@@ -888,7 +888,7 @@ def fig6b_calibration_no_tolerance(
             alpha_target=float(alpha),
             binning="y_pred",
             n_bins=1,
-            safety_margin=0.015,
+            cal_frac=0.35,
         )
         calibration_results.append(
             {
@@ -996,7 +996,7 @@ def fig6c_calibration_points_only(
             alpha_target=float(alpha),
             binning="y_pred",
             n_bins=1,
-            safety_margin=0.015,
+            cal_frac=0.35,
         )
         calibration_results.append(
             {
@@ -1093,7 +1093,7 @@ def fig7_conformal_corrections(
             alpha_target=float(alpha),
             binning="y_pred",
             n_bins=1,  # Global conformal
-            safety_margin=0.015,
+            cal_frac=0.35,
         )
         results.append(
             {
@@ -1176,7 +1176,6 @@ def fig7b_normalized_lower_bound(
     df_sorted = df_sorted[df_sorted["y"].notna()].reset_index(drop=True)
     n_total = len(df_sorted)
     n_test = int(0.25 * n_total)
-    n_cal = int(0.30 * n_total)
     test_start = n_total - n_test
     ens_mean_test = df_sorted["ens_mean"].values[test_start:]
     ens_std_test = df_sorted["ens_std"].values[test_start:]
@@ -1191,7 +1190,7 @@ def fig7b_normalized_lower_bound(
             alpha_target=float(alpha),
             binning="y_pred",
             n_bins=1,
-            safety_margin=0.015,
+            cal_frac=0.35,
         )
         # How many std devs below the mean forecast is the final lower bound?
         #   n_std_below = (ens_mean - y_pred_conf) / ens_std
@@ -1295,7 +1294,7 @@ def fig7c_lower_bound_decomposition(
             alpha_target=float(alpha),
             binning="y_pred",
             n_bins=1,
-            safety_margin=0.015,
+            cal_frac=0.35,
         )
         q_hat = bundle.q_hat_global_r
         y_pred_base = df_test["y_pred_base"].values

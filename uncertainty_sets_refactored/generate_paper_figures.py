@@ -1795,28 +1795,14 @@ def generate_all_figures():
         print(f"  Error: {e}")
 
     # Figure 5: 16D comparison bar chart
-    print("\n[5/15] 16D NLL comparison (bar chart)...")
-    try:
-        fig5_nll_16d_comparison()
-        figures_generated.append("fig5_nll_16d")
-    except Exception as e:
-        print(f"  Error: {e}")
+    # print("\n[5/15] 16D NLL comparison (bar chart)...")  # SKIPPED
+    # fig5_nll_16d_comparison()
 
-    # Figure 5b: 16D comparison box plot
-    print("\n[5b/15] 16D NLL comparison (box plot)...")
-    try:
-        fig5b_nll_boxplot()
-        figures_generated.append("fig5b_nll_boxplot")
-    except Exception as e:
-        print(f"  Error: {e}")
+    # print("\n[5b/15] 16D NLL comparison (box plot)...")  # SKIPPED
+    # fig5b_nll_boxplot()
 
-    # Figure 6: Global conformal calibration curve
-    print("\n[6/15] Global conformal calibration curve...")
-    try:
-        fig6_calibration_curve()
-        figures_generated.append("fig6_calibration")
-    except Exception as e:
-        print(f"  Error: {e}")
+    # print("\n[6/15] Global conformal calibration curve...")  # SKIPPED (use 6b or 6c)
+    # fig6_calibration_curve()
 
     # Figure 6b: Global conformal calibration (no tolerance band)
     print("\n[6b/15] Global conformal calibration (no tolerance)...")
@@ -1867,12 +1853,8 @@ def generate_all_figures():
         print(f"  Error: {e}")
 
     # Figure 9: Omega bar chart
-    print("\n[9/15] Omega bar chart (16D)...")
-    try:
-        fig9_omega_bar_chart()
-        figures_generated.append("fig9_omega_bar_chart")
-    except Exception as e:
-        print(f"  Error: {e}")
+    # print("\n[9/15] Omega bar chart (16D)...")  # SKIPPED
+    # fig9_omega_bar_chart()
 
     # Figure 10: Ellipse overlay
     print("\n[10/15] 2D ellipse overlay...")

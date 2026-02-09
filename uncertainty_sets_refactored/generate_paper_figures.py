@@ -428,19 +428,18 @@ def fig3_nll_vs_k(
 
         fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, 2.5))
 
-        # Mean with std error bars
-        ax.errorbar(
-            k_values, nll_mean, yerr=nll_std,
-            fmt="o-", linewidth=2, markersize=5,
-            color=COLORS["knn"], capsize=3, capthick=1.2,
-            label="Mean +/- 1 std",
+        # Mean line with markers
+        ax.plot(
+            k_values, nll_mean,
+            "o-", linewidth=2, markersize=5,
+            color=COLORS["knn"],
         )
 
-        # Min-max shaded region
+        # ±1σ shaded band (always visible even when narrow)
         ax.fill_between(
-            k_values, nll_min, nll_max,
-            alpha=0.15, color=COLORS["knn"],
-            label="Min-Max",
+            k_values, nll_mean - nll_std, nll_mean + nll_std,
+            alpha=0.25, color=COLORS["knn"],
+            label="Mean ± 1σ",
         )
 
         # Mark best mean
@@ -529,19 +528,18 @@ def fig4_nll_vs_tau(
 
         fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, 2.5))
 
-        # Mean with std error bars
-        ax.errorbar(
-            tau_values, nll_mean, yerr=nll_std,
-            fmt="o-", linewidth=2, markersize=5,
-            color=COLORS["learned"], capsize=3, capthick=1.2,
-            label="Mean ± 1σ",
+        # Mean line with markers
+        ax.plot(
+            tau_values, nll_mean,
+            "o-", linewidth=2, markersize=5,
+            color=COLORS["learned"],
         )
 
-        # Min-max shaded region
+        # ±1σ shaded band (always visible even when narrow)
         ax.fill_between(
-            tau_values, nll_min, nll_max,
-            alpha=0.15, color=COLORS["learned"],
-            label="Min–Max",
+            tau_values, nll_mean - nll_std, nll_mean + nll_std,
+            alpha=0.25, color=COLORS["learned"],
+            label="Mean ± 1σ",
         )
 
         # Mark best mean

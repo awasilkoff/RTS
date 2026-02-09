@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import gurobipy as gp
@@ -73,6 +73,7 @@ def build_aruc_ldr_model(
     sqrt_Sigma: Union[np.ndarray, None] = None,
     M_p: float = 1e5,
     model_name: str = "ARUC_LDR",
+    dam_commitment: Optional[Dict[str, np.ndarray]] = None,
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Adaptive robust UC with linear decision rules:
@@ -101,6 +102,13 @@ def build_aruc_ldr_model(
         Big-M penalty for power balance slack
     model_name : str
         Gurobi model name
+    dam_commitment : dict, optional
+        DAM commitment solution for DARUC mode. Keys:
+        - "u": (I, T) array of binary commitment status
+        - "v": (I, T) array of startup indicators
+        - "w": (I, T) array of shutdown indicators
+        When provided, adds constraints u >= u_DAM (can only add commitments,
+        never decommit) and tracks deviations u' = u - u_DAM.
 
     Returns
     -------
@@ -358,6 +366,37 @@ def build_aruc_ldr_model(
         #         m.addConstr(u[i, t] == 0, name=f"init_mdt_i{i}_t{t}")
 
     # ------------------------------------------------------------------
+    # DARUC constraints (if DAM commitment is provided)
+    # ------------------------------------------------------------------
+    if dam_commitment is not None:
+        u_dam = dam_commitment["u"]  # (I, T) array
+        v_dam = dam_commitment["v"]  # (I, T)
+        w_dam = dam_commitment["w"]  # (I, T)
+
+        # Deviation tracking variables
+        u_prime = m.addVars(I, T, lb=0.0, name="u_prime")  # u' >= 0
+        v_prime = m.addVars(I, T, lb=-GRB.INFINITY, name="v_prime")
+        w_prime = m.addVars(I, T, lb=-GRB.INFINITY, name="w_prime")
+
+        for i in range(I):
+            for t in range(T):
+                # u' = u - u_DAM  (>= 0 enforced by lb)
+                m.addConstr(
+                    u_prime[i, t] == u[i, t] - float(u_dam[i, t]),
+                    name=f"u_prime_i{i}_t{t}",
+                )
+                # v' = v - v_DAM
+                m.addConstr(
+                    v_prime[i, t] == v[i, t] - float(v_dam[i, t]),
+                    name=f"v_prime_i{i}_t{t}",
+                )
+                # w' = w - w_DAM
+                m.addConstr(
+                    w_prime[i, t] == w[i, t] - float(w_dam[i, t]),
+                    name=f"w_prime_i{i}_t{t}",
+                )
+
+    # ------------------------------------------------------------------
     # Robust constraints
     # ------------------------------------------------------------------
 
@@ -488,8 +527,11 @@ def build_aruc_ldr_model(
                 name=f"wind_max_rob_i{i}_t{t}",
             )
 
-    # Basic Gurobi params
+    # Gurobi params — numeric tuning for MISOCP with wide coefficient range
     m.Params.OutputFlag = 1
+    m.Params.NumericFocus = 2       # Extra care with numerics (0-3)
+    m.Params.BarHomogeneous = 1     # More robust barrier (handles ill-conditioned SOC)
+    m.Params.ScaleFlag = 2          # Aggressive scaling
 
     vars_dict: Dict[str, object] = {
         "u": u,
@@ -506,6 +548,11 @@ def build_aruc_ldr_model(
         "z_wind": z_wind,
         "y_wind": y_wind,
     }
+
+    if dam_commitment is not None:
+        vars_dict["u_prime"] = u_prime
+        vars_dict["v_prime"] = v_prime
+        vars_dict["w_prime"] = w_prime
 
     return m, vars_dict
 

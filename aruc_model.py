@@ -263,6 +263,32 @@ def build_aruc_ldr_model(
             sqrt_Sigma_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
             rho_t = rho[t] if time_varying else rho
 
+            # ----------------------------------------------------------
+            # Wind generators: skip generic Pmax/Pmin/block robust
+            # constraints.  Their physical upper bound p(r) <= Pbar + r_k
+            # moves with the realization and is handled by the dedicated
+            # wind availability SOC (section 3 below).  The generic
+            # robust Pmax enforces the FIXED ceiling p(r) <= Pbar, which
+            # combined with wind availability yields Z diagonal = 0.5
+            # instead of the correct ~1.0.
+            # ----------------------------------------------------------
+            if is_wind[i]:
+                # Block capacity (nominal, not robust)
+                for b in range(B):
+                    m.addConstr(
+                        p0_block[i, t, b] <= block_cap[i, b] * u[i, t],
+                        name=f"p0_block_cap_i{i}_t{t}_b{b}",
+                    )
+                # Nominal block aggregation: p0 = sum_b p0_block
+                m.addConstr(
+                    p0[i, t]
+                    <= gp.quicksum(p0_block[i, t, b] for b in range(B)),
+                    name=f"p0_agg_nom_i{i}_t{t}",
+                )
+                continue
+
+            # --- Non-wind (thermal) generators: full robust constraints ---
+
             # Define y_gen[i,t,k] = (L @ Z_{i,t})_k = sum_j L[k,j] * Z[i,t,j]
             for k_idx in range(K):
                 expr = gp.LinExpr()
@@ -282,7 +308,7 @@ def build_aruc_ldr_model(
                 name=f"soc_gen_i{i}_t{t}",
             )
 
-            # Block capacity limits (unchanged)
+            # Block capacity limits
             for b in range(B):
                 m.addConstr(
                     p0_block[i, t, b] <= block_cap[i, b] * u[i, t],
@@ -303,16 +329,10 @@ def build_aruc_ldr_model(
             )
 
             # Robust Pmin: Pmin * u <= a - rho*||Z L||
-            # Skip for wind: Pmin=0 is trivially satisfied by p0 >= 0 (variable
-            # bound).  The robust version creates an artificial floor
-            # p0 >= rho*||LZ|| that conflicts with low-forecast periods and
-            # forces Z diagonal well below 1.  Worst-case p(r)<0 events are
-            # absorbed by the power-balance slack s_p.
-            if not is_wind[i]:
-                m.addConstr(
-                    Pmin[i] * u[i, t] <= p0[i, t] - rho_t * z_gen[i, t],
-                    name=f"p0_min_rob_i{i}_t{t}",
-                )
+            m.addConstr(
+                Pmin[i] * u[i, t] <= p0[i, t] - rho_t * z_gen[i, t],
+                name=f"p0_min_rob_i{i}_t{t}",
+            )
 
     # Ramps on nominal dispatch (paper formulation uses nominal ramps)
     for i in range(I):

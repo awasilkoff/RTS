@@ -17,12 +17,16 @@ import pandas as pd
 from run_rts_daruc import run_rts_daruc
 
 
-def analyze_Z(Z_df: pd.DataFrame, data, out_dir: Path):
+def analyze_Z(Z_df: pd.DataFrame, data, out_dir: Path, rho=None):
     """Analyze Z matrix structure: row sums, wind vs non-wind, per-period."""
     gen_ids = list(Z_df.index)
     gen_type = data.gen_type
     time_labels = Z_df.columns.get_level_values("time").unique()
     K = Z_df.columns.get_level_values("k").unique().size
+
+    # Build per-period rho lookup
+    rho_arr = np.atleast_1d(rho) if rho is not None else None
+    time_varying_rho = rho_arr is not None and rho_arr.shape[0] > 1
 
     rows = []
     for t in time_labels:
@@ -63,14 +67,23 @@ def analyze_Z(Z_df: pd.DataFrame, data, out_dir: Path):
     print("Z MATRIX ANALYSIS")
     print("=" * 70)
 
-    for t in time_labels:
+    for t_idx, t in enumerate(time_labels):
         Z_t = Z_df[t].values
         col_sums = Z_t.sum(axis=0)  # sum over all generators for each k
         wind_mask = np.array([gt.upper() == "WIND" for gt in gen_type])
         wind_col_sums = Z_t[wind_mask].sum(axis=0)
         nonwind_col_sums = Z_t[~wind_mask].sum(axis=0)
 
-        print(f"\n  Period {t}:")
+        # Get rho for this period
+        if time_varying_rho:
+            rho_t = rho_arr[t_idx]
+        elif rho_arr is not None:
+            rho_t = float(rho_arr[0])
+        else:
+            rho_t = None
+        rho_str = f"  rho={rho_t:.4f}" if rho_t is not None else ""
+
+        print(f"\n  Period {t}:{rho_str}")
         print(f"    Column sums (all gens):  {col_sums}")
         print(f"    Column sums (wind only): {wind_col_sums}")
         print(f"    Column sums (non-wind):  {nonwind_col_sums}")
@@ -146,7 +159,7 @@ if __name__ == "__main__":
     np.save(out_dir / "rho.npy", np.atleast_1d(outputs["rho"]))
 
     # Z analysis
-    z_analysis = analyze_Z(daruc_results["Z"], data, out_dir)
+    z_analysis = analyze_Z(daruc_results["Z"], data, out_dir, rho=outputs["rho"])
 
     print(f"\nDARUC objective: {daruc_results['obj']:,.2f}")
     print(f"Time-varying: {outputs['time_varying']}")

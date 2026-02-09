@@ -413,44 +413,86 @@ def fig3_nll_vs_k(
 ) -> plt.Figure:
     """
     Plot NLL as function of k for k-NN covariance.
+
+    Uses multi-split stats (mean +/- std, min-max shading) if available,
+    falls back to single-split knn_k_sweep_summary.csv otherwise.
     """
     if output_path is None:
         output_path = OUTPUT_DIR / "figures" / "fig3_nll_vs_k"
 
-    # Load k-NN sweep data
-    df = _load_knn_sweep()
+    # Try multi-split data first
+    multi_stats_path = KNN_SWEEP_DIR / "multi_split_k_stats.csv"
+    if multi_stats_path.exists():
+        stats = pd.read_csv(multi_stats_path)
 
-    fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, 2.5))
+        k_values = stats["k"].values
+        nll_mean = stats["nll_mean"].values
+        nll_std = stats["nll_std"].values
+        nll_min = stats["nll_min"].values
+        nll_max = stats["nll_max"].values
 
-    ax.plot(
-        df["k"],
-        df["nll"],
-        "o-",
-        linewidth=2,
-        markersize=6,
-        color=COLORS["knn"],
-        label="k-NN",
-    )
+        fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, 2.5))
 
-    # Mark minimum
-    min_idx = df["nll"].idxmin()
-    best_k = df.loc[min_idx, "k"]
-    best_nll = df.loc[min_idx, "nll"]
-    ax.scatter(
-        [best_k],
-        [best_nll],
-        s=150,
-        c=COLORS["knn"],
-        marker="*",
-        zorder=5,
-        edgecolors="black",
-        linewidths=1,
-        label=f"Best: k={best_k}",
-    )
+        # Mean with std error bars
+        ax.errorbar(
+            k_values, nll_mean, yerr=nll_std,
+            fmt="o-", linewidth=2, markersize=5,
+            color=COLORS["knn"], capsize=3, capthick=1.2,
+            label="Mean +/- 1 std",
+        )
+
+        # Min-max shaded region
+        ax.fill_between(
+            k_values, nll_min, nll_max,
+            alpha=0.15, color=COLORS["knn"],
+            label="Min-Max",
+        )
+
+        # Mark best mean
+        best_idx = np.argmin(nll_mean)
+        ax.scatter(
+            [k_values[best_idx]], [nll_mean[best_idx]],
+            s=150, c=COLORS["knn"], marker="*",
+            zorder=10, edgecolors="black", linewidths=1,
+            label=f"Best: k={k_values[best_idx]}",
+        )
+
+        print(f"  Multi-split data: {len(k_values)} k values")
+    else:
+        # Fallback: single-split sweep
+        print(f"  Multi-split data not found at {multi_stats_path}, using single-split fallback")
+        df = _load_knn_sweep()
+
+        fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, 2.5))
+
+        ax.plot(
+            df["k"],
+            df["nll"],
+            "o-",
+            linewidth=2,
+            markersize=6,
+            color=COLORS["knn"],
+            label="k-NN",
+        )
+
+        # Mark minimum
+        min_idx = df["nll"].idxmin()
+        best_k = df.loc[min_idx, "k"]
+        best_nll = df.loc[min_idx, "nll"]
+        ax.scatter(
+            [best_k],
+            [best_nll],
+            s=150,
+            c=COLORS["knn"],
+            marker="*",
+            zorder=5,
+            edgecolors="black",
+            linewidths=1,
+            label=f"Best: k={best_k}",
+        )
 
     ax.set_xlabel("k (Number of Neighbors)")
     ax.set_ylabel("Mean NLL")
-    # ax.set_title(...)  # caption in paper
     ax.set_xscale("log")
     ax.legend(fontsize=7, loc="upper left")
     ax.grid(True, alpha=0.3)

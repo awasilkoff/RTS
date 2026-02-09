@@ -303,10 +303,16 @@ def build_aruc_ldr_model(
             )
 
             # Robust Pmin: Pmin * u <= a - rho*||Z L||
-            m.addConstr(
-                Pmin[i] * u[i, t] <= p0[i, t] - rho_t * z_gen[i, t],
-                name=f"p0_min_rob_i{i}_t{t}",
-            )
+            # Skip for wind: Pmin=0 is trivially satisfied by p0 >= 0 (variable
+            # bound).  The robust version creates an artificial floor
+            # p0 >= rho*||LZ|| that conflicts with low-forecast periods and
+            # forces Z diagonal well below 1.  Worst-case p(r)<0 events are
+            # absorbed by the power-balance slack s_p.
+            if not is_wind[i]:
+                m.addConstr(
+                    Pmin[i] * u[i, t] <= p0[i, t] - rho_t * z_gen[i, t],
+                    name=f"p0_min_rob_i{i}_t{t}",
+                )
 
     # Ramps on nominal dispatch (paper formulation uses nominal ramps)
     for i in range(I):

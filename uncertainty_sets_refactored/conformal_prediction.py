@@ -74,7 +74,7 @@ def weighted_quantile(
 
     # Find first index where cumsum >= q
     # Handle edge cases: if all cumsum < q, return max value
-    idx_q = np.searchsorted(cumsum_weights, q, side='left')
+    idx_q = np.searchsorted(cumsum_weights, q, side="left")
     if idx_q >= len(values_sorted):
         idx_q = len(values_sorted) - 1
 
@@ -118,12 +118,12 @@ def _compute_kernel_distances(
     # Weighted squared distances
     w = np.sqrt(np.maximum(omega, 0.0))  # Apply sqrt for numerical stability
     Xq_w = X_query * w[np.newaxis, :]  # (Nq, K)
-    Xr_w = X_ref * w[np.newaxis, :]     # (Nr, K)
+    Xr_w = X_ref * w[np.newaxis, :]  # (Nr, K)
 
     # ||Xq_w||^2 + ||Xr_w||^2 - 2*(Xq_w @ Xr_w.T)
-    Xq_sq = np.sum(Xq_w ** 2, axis=1, keepdims=True)  # (Nq, 1)
-    Xr_sq = np.sum(Xr_w ** 2, axis=1, keepdims=True)  # (Nr, 1)
-    D = Xq_sq + Xr_sq.T - 2.0 * (Xq_w @ Xr_w.T)      # (Nq, Nr)
+    Xq_sq = np.sum(Xq_w**2, axis=1, keepdims=True)  # (Nq, 1)
+    Xr_sq = np.sum(Xr_w**2, axis=1, keepdims=True)  # (Nr, 1)
+    D = Xq_sq + Xr_sq.T - 2.0 * (Xq_w @ Xr_w.T)  # (Nq, Nr)
     D = np.maximum(D, 0.0)  # Numerical safety
 
     # Gaussian kernel: K(d/tau) = exp(-d/tau)
@@ -308,7 +308,7 @@ class WeightedConformalLowerBundle:
         # Base quantile prediction
         X = df[self.feature_cols]
         y_pred = self.model.predict(X)
-        df['y_pred_base'] = np.asarray(y_pred, dtype=float)
+        df["y_pred_base"] = np.asarray(y_pred, dtype=float)
 
         # Extract kernel features for query points
         X_query = df[self.kernel_feature_cols].to_numpy(dtype=float)
@@ -326,18 +326,19 @@ class WeightedConformalLowerBundle:
             min_scale=self.min_scale,
             safety_margin=self.safety_margin,
         )
-        df['q_hat_local'] = q_hat_local
+        df["q_hat_local"] = q_hat_local
 
         # Sanitize scale
         scale = _sanitize_scale(
-            df[self.scale_col].to_numpy(dtype=float),
-            min_scale=self.min_scale
+            df[self.scale_col].to_numpy(dtype=float), min_scale=self.min_scale
         )
-        df['scale_sanitized'] = scale
+        df["scale_sanitized"] = scale
 
         # Conformal margin and final bound
-        df['margin'] = df['q_hat_local'].to_numpy(dtype=float) * scale
-        df['y_pred_conf'] = df['y_pred_base'].to_numpy(dtype=float) - df['margin'].to_numpy(dtype=float)
+        df["margin"] = df["q_hat_local"].to_numpy(dtype=float) * scale
+        df["y_pred_conf"] = df["y_pred_base"].to_numpy(dtype=float) - df[
+            "margin"
+        ].to_numpy(dtype=float)
 
         return df
 
@@ -352,20 +353,20 @@ def train_wind_lower_model_weighted_conformal(
     feature_cols: list[str],
     kernel_feature_cols: list[str],
     *,
-    target_col: str = 'y',
-    time_col: str = 'TIME_HOURLY',
+    target_col: str = "y",
+    time_col: str = "TIME_HOURLY",
     test_frac: float = 0.2,
     cal_frac: float = 0.2,
-    quantile_alpha: float = 0.10,
+    quantile_alpha: float | None = None,
     alpha_target: float = 0.90,
-    scale_col: str = 'ens_std',
+    scale_col: str = "ens_std",
     omega: np.ndarray | None = None,
     omega_path: str | None = None,
     tau: float = 5.0,
     min_scale: float = 1e-3,
     model_kwargs: dict | None = None,
     safety_margin: float = 0.0,
-    split_method: str = 'random',
+    split_method: str = "random",
     random_seed: int = 42,
 ) -> tuple[WeightedConformalLowerBundle, dict[str, Any], pd.DataFrame]:
     """
@@ -388,8 +389,10 @@ def train_wind_lower_model_weighted_conformal(
         Fraction of data for test set
     cal_frac : float, default=0.2
         Fraction of data for calibration set
-    quantile_alpha : float, default=0.10
-        Quantile level for base model (0.10 = 10th percentile)
+    quantile_alpha : float or None, default=None
+        Quantile level for base model. If None, defaults to 1 - alpha_target
+        (e.g., 0.05 for 95% coverage) so the base model naturally matches the
+        target coverage level.
     alpha_target : float, default=0.90
         Target conformal coverage (0.90 = 90% of actuals >= lower bound)
     scale_col : str, default='ens_std'
@@ -484,7 +487,7 @@ def train_wind_lower_model_weighted_conformal(
     s = _sanitize_scale(df[scale_col].to_numpy(dtype=float), min_scale=min_scale)
 
     # Split data
-    if split_method == 'time_ordered':
+    if split_method == "time_ordered":
         sl_train, sl_cal, sl_test = _time_ordered_split(
             len(df), test_frac=test_frac, cal_frac=cal_frac
         )
@@ -497,7 +500,7 @@ def train_wind_lower_model_weighted_conformal(
         s_cal = s[sl_cal]
         s_test = s[sl_test]
 
-    elif split_method == 'random':
+    elif split_method == "random":
         idx_train, idx_cal, idx_test = _random_split(
             len(df), test_frac=test_frac, cal_frac=cal_frac, random_seed=random_seed
         )
@@ -511,11 +514,17 @@ def train_wind_lower_model_weighted_conformal(
         s_test = s[idx_test]
 
     else:
-        raise ValueError(f"split_method must be 'time_ordered' or 'random', got '{split_method}'")
+        raise ValueError(
+            f"split_method must be 'time_ordered' or 'random', got '{split_method}'"
+        )
+
+    # Default: match base quantile to target coverage
+    if quantile_alpha is None:
+        quantile_alpha = 1.0 - alpha_target
 
     # Train quantile model
     kw = dict(
-        objective='quantile',
+        objective="quantile",
         alpha=quantile_alpha,
         n_estimators=1000,
         learning_rate=0.05,
@@ -552,11 +561,13 @@ def train_wind_lower_model_weighted_conformal(
     )
 
     # Test set predictions
-    df_test = pd.DataFrame({
-        'y': y_test,
-        'y_pred_base': y_pred_test,
-        'scale': s_test,
-    })
+    df_test = pd.DataFrame(
+        {
+            "y": y_test,
+            "y_pred_base": y_pred_test,
+            "scale": s_test,
+        }
+    )
 
     # Add kernel features for localized q_hat computation
     for i, col in enumerate(kernel_feature_cols):
@@ -576,27 +587,27 @@ def train_wind_lower_model_weighted_conformal(
         safety_margin=safety_margin,
     )
 
-    df_test['q_hat_local'] = q_hat_test
-    df_test['margin'] = q_hat_test * s_test
-    df_test['y_pred_conf'] = y_pred_test - df_test['margin'].to_numpy(dtype=float)
+    df_test["q_hat_local"] = q_hat_test
+    df_test["margin"] = q_hat_test * s_test
+    df_test["y_pred_conf"] = y_pred_test - df_test["margin"].to_numpy(dtype=float)
 
     # Metrics
-    y_pred_conf = df_test['y_pred_conf'].to_numpy(dtype=float)
+    y_pred_conf = df_test["y_pred_conf"].to_numpy(dtype=float)
 
     metrics = {
-        'rmse': float(np.sqrt(mean_squared_error(df_test['y'], y_pred_conf))),
-        'mae': float(mean_absolute_error(df_test['y'], y_pred_conf)),
-        'coverage': float((df_test['y'] >= y_pred_conf).mean()),
-        'pre_conformal_coverage': float((df_test['y'] >= y_pred_test).mean()),
-        'n_train': int(len(y_train)),
-        'n_cal': int(len(y_cal)),
-        'n_test': int(len(y_test)),
-        'split_method': split_method,
-        'tau': float(tau),
-        'q_hat_mean': float(q_hat_test.mean()),
-        'q_hat_std': float(q_hat_test.std()),
-        'q_hat_min': float(q_hat_test.min()),
-        'q_hat_max': float(q_hat_test.max()),
+        "rmse": float(np.sqrt(mean_squared_error(df_test["y"], y_pred_conf))),
+        "mae": float(mean_absolute_error(df_test["y"], y_pred_conf)),
+        "coverage": float((df_test["y"] >= y_pred_conf).mean()),
+        "pre_conformal_coverage": float((df_test["y"] >= y_pred_test).mean()),
+        "n_train": int(len(y_train)),
+        "n_cal": int(len(y_cal)),
+        "n_test": int(len(y_test)),
+        "split_method": split_method,
+        "tau": float(tau),
+        "q_hat_mean": float(q_hat_test.mean()),
+        "q_hat_std": float(q_hat_test.std()),
+        "q_hat_min": float(q_hat_test.min()),
+        "q_hat_max": float(q_hat_test.max()),
     }
 
     return bundle, metrics, df_test
@@ -876,8 +887,8 @@ def train_wind_lower_model_conformal_binned(
     target_col: str = "y",
     time_col: str = "TIME_HOURLY",
     test_frac: float = 0.25,
-    cal_frac: float = 0.25,
-    quantile_alpha: float = 0.10,
+    cal_frac: float = 0.3,
+    quantile_alpha: float | None = None,
     alpha_target: float = 0.90,
     scale_col: str = "ens_std",
     binning: BinningSpec = "y_pred",
@@ -983,6 +994,10 @@ def train_wind_lower_model_conformal_binned(
         raise ValueError(
             f"split_method must be 'time_ordered' or 'random', got '{split_method}'"
         )
+
+    # Default: match base quantile to target coverage
+    if quantile_alpha is None:
+        quantile_alpha = 1.0 - alpha_target
 
     # Train quantile model (LGBM)
     kw = dict(

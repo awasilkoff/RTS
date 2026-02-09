@@ -26,6 +26,7 @@ from utils import fit_standard_scaler
 # Apply global plotting config
 setup_plotting()
 from data_processing import build_XY_for_covariance_system_only
+from data_processing_extended import FEATURE_BUILDERS
 from covariance_optimization import (
     predict_mu_sigma_knn,
     predict_mu_sigma_topk_cross,
@@ -265,14 +266,22 @@ def load_data(
     train_frac: float = 0.75,
     standardize: bool = True,
     random_seed: int = 42,
+    feature_set: str = "high_dim_16d",
 ):
     """Load and prepare data for k-NN sweep."""
     actuals = pd.read_parquet(actuals_parquet)
     forecasts = pd.read_parquet(forecasts_parquet)
 
-    X, Y, times, x_cols, y_cols = build_XY_for_covariance_system_only(
-        forecasts, actuals, drop_any_nan_rows=True
-    )
+    build_fn = FEATURE_BUILDERS.get(feature_set)
+    if build_fn is not None:
+        X, Y, times, x_cols, y_cols = build_fn(
+            forecasts, actuals, drop_any_nan_rows=True
+        )
+    else:
+        # Fallback to system-only 2D
+        X, Y, times, x_cols, y_cols = build_XY_for_covariance_system_only(
+            forecasts, actuals, drop_any_nan_rows=True
+        )
 
     if standardize:
         scaler = fit_standard_scaler(X)
@@ -893,6 +902,7 @@ def run_knn_k_sweep(
     omega_k: int = 64,
     tau_values: list[float] = None,
     plot_3d: bool = False,
+    feature_set: str = "high_dim_16d",
 ):
     """
     Run complete k-NN k-value sweep and visualization.
@@ -947,7 +957,7 @@ def run_knn_k_sweep(
     # Load data
     print("Loading data...")
     X_train, Y_train, X_eval, Y_eval, x_cols, y_cols, _, _ = load_data(
-        forecasts_parquet, actuals_parquet
+        forecasts_parquet, actuals_parquet, feature_set=feature_set,
     )
 
     print(f"Training set: {X_train.shape[0]} samples")
@@ -1128,6 +1138,7 @@ def run_multi_split_k_sweep(
     base_seeds: list[int] = None,
     train_frac: float = 0.75,
     ridge: float = 1e-4,
+    feature_set: str = "high_dim_16d",
 ) -> pd.DataFrame:
     """
     Run k-NN k-value sweep with multiple random train/val splits.
@@ -1174,6 +1185,7 @@ def run_multi_split_k_sweep(
         X_train, Y_train, X_eval, Y_eval, x_cols, y_cols, _, _ = load_data(
             forecasts_parquet, actuals_parquet,
             train_frac=train_frac, random_seed=seed,
+            feature_set=feature_set,
         )
         print(f"  Train: {X_train.shape[0]}, Eval: {X_eval.shape[0]}")
 
@@ -1226,6 +1238,10 @@ if __name__ == "__main__":
         "--n-splits", type=int, default=5,
         help="Number of random train/val splits (for --multi-split)",
     )
+    parser.add_argument(
+        "--feature-set", type=str, default="high_dim_16d",
+        help="Feature set name (default: high_dim_16d)",
+    )
 
     args = parser.parse_args()
 
@@ -1236,6 +1252,7 @@ if __name__ == "__main__":
         run_multi_split_k_sweep(
             k_values=[32, 64, 128, 256, 512, 1024, 2048],
             n_splits=args.n_splits,
+            feature_set=args.feature_set,
         )
     else:
         results, df_summary = run_knn_k_sweep(
@@ -1248,4 +1265,5 @@ if __name__ == "__main__":
             omega_k=256,
             tau_values=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0, 2.0, 5.0, 10.0, 20.0],
             plot_3d=True,
+            feature_set=args.feature_set,
         )

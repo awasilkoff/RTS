@@ -462,60 +462,90 @@ def fig3_nll_vs_k(
 
 
 # ============================================================================
-# FIGURE 4: NLL vs tau Sweep
+# FIGURE 4: NLL vs tau Sweep (multi-seed)
 # ============================================================================
+TAU_DIAGNOSIS_DIR = VIZ_ARTIFACTS / "tau_omega_diagnosis"
+
+
 def fig4_nll_vs_tau(
-    feature_set_dir: Path = HIGH_DIM_16D_DIR,
     output_path: Path = None,
 ) -> plt.Figure:
     """
-    Plot learned omega NLL as function of tau.
+    Plot learned omega NLL as function of tau, with multi-seed error bars.
+
+    Reads multi_seed_stats.csv from tau_omega_diagnosis directory.
+    Falls back to single-seed sweep_results.csv if multi-seed data unavailable.
     """
     if output_path is None:
         output_path = OUTPUT_DIR / "figures" / "fig4_nll_vs_tau"
 
-    # Load sweep results
-    df = _load_sweep_results(feature_set_dir)
+    # Try multi-seed data first
+    stats_path = TAU_DIAGNOSIS_DIR / "multi_seed_stats.csv"
+    if stats_path.exists():
+        stats = pd.read_csv(stats_path)
 
-    # Get best scaler type
-    best_scaler = df.iloc[0]["scaler_type"]
-    df_filtered = df[df["scaler_type"] == best_scaler].copy()
+        tau_values = stats["tau"].values
+        nll_mean = stats["val_nll_mean"].values
+        nll_std = stats["val_nll_std"].values
+        nll_min = stats["val_nll_min"].values
+        nll_max = stats["val_nll_max"].values
 
-    # Group by tau
-    tau_nll = df_filtered.groupby("tau")["val_nll_learned"].min().reset_index()
-    tau_nll = tau_nll.sort_values("tau")
+        fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, 2.5))
 
-    fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, 2.5))
+        # Mean with std error bars
+        ax.errorbar(
+            tau_values, nll_mean, yerr=nll_std,
+            fmt="o-", linewidth=2, markersize=5,
+            color=COLORS["learned"], capsize=3, capthick=1.2,
+            label="Mean ± 1σ",
+        )
 
-    ax.plot(
-        tau_nll["tau"],
-        tau_nll["val_nll_learned"],
-        "o-",
-        linewidth=2,
-        markersize=6,
-        color=COLORS["learned"],
-        label="Learned ω",
-    )
+        # Min-max shaded region
+        ax.fill_between(
+            tau_values, nll_min, nll_max,
+            alpha=0.15, color=COLORS["learned"],
+            label="Min–Max",
+        )
 
-    # Mark minimum
-    best_idx = tau_nll["val_nll_learned"].idxmin()
-    best_tau = tau_nll.loc[best_idx, "tau"]
-    best_nll = tau_nll.loc[best_idx, "val_nll_learned"]
-    ax.scatter(
-        [best_tau],
-        [best_nll],
-        s=150,
-        c=COLORS["learned"],
-        marker="*",
-        zorder=5,
-        edgecolors="black",
-        linewidths=1,
-        label=f"Best: τ={best_tau}",
-    )
+        # Mark best mean
+        best_idx = np.argmin(nll_mean)
+        ax.scatter(
+            [tau_values[best_idx]], [nll_mean[best_idx]],
+            s=150, c=COLORS["learned"], marker="*",
+            zorder=10, edgecolors="black", linewidths=1,
+            label=f"Best: τ={tau_values[best_idx]}",
+        )
+
+        print(f"  Multi-seed data: {len(tau_values)} tau values")
+    else:
+        # Fallback: single-seed sweep results
+        print(f"  Multi-seed data not found at {stats_path}, using single-seed fallback")
+        df = _load_sweep_results(HIGH_DIM_16D_DIR)
+        best_scaler = df.iloc[0]["scaler_type"]
+        df_filtered = df[df["scaler_type"] == best_scaler].copy()
+        tau_nll = df_filtered.groupby("tau")["val_nll_learned"].min().reset_index()
+        tau_nll = tau_nll.sort_values("tau")
+
+        fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, 2.5))
+
+        ax.plot(
+            tau_nll["tau"], tau_nll["val_nll_learned"],
+            "o-", linewidth=2, markersize=6,
+            color=COLORS["learned"], label="Learned ω",
+        )
+
+        best_idx = tau_nll["val_nll_learned"].idxmin()
+        best_tau = tau_nll.loc[best_idx, "tau"]
+        best_nll = tau_nll.loc[best_idx, "val_nll_learned"]
+        ax.scatter(
+            [best_tau], [best_nll],
+            s=150, c=COLORS["learned"], marker="*",
+            zorder=5, edgecolors="black", linewidths=1,
+            label=f"Best: τ={best_tau}",
+        )
 
     ax.set_xlabel("τ (Kernel Bandwidth)")
     ax.set_ylabel("Validation NLL")
-    # ax.set_title(...)  # caption in paper
     ax.set_xscale("log")
     ax.legend(fontsize=7, loc="upper left")
     ax.grid(True, alpha=0.3)

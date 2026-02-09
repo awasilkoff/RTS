@@ -319,7 +319,7 @@ See `CONFORMAL_PREDICTION_README.md` section "IEEE Paper Figures" for LaTeX inte
 
 ## Commit Policy
 
-After completing a major change (new feature, bug fix, multi-file refactor), **automatically commit** with a descriptive message. Do not wait for the user to ask — commit proactively at natural completion points. This keeps the history clean and prevents losing work across sessions.
+After completing a major change (new feature, bug fix, multi-file refactor), **automatically commit and push** with a descriptive message. Do not wait for the user to ask — commit and push proactively at natural completion points. This keeps the history clean, prevents losing work across sessions, and maintains remote backups.
 
 ## Execution Policy
 For any script that will take >1 minute to run:

@@ -267,8 +267,16 @@ def load_data(
     standardize: bool = True,
     random_seed: int = 42,
     feature_set: str = "high_dim_16d",
+    use_residuals: bool = False,
 ):
-    """Load and prepare data for k-NN sweep."""
+    """Load and prepare data for k-NN sweep.
+
+    Parameters
+    ----------
+    use_residuals : bool
+        If True, Y becomes (actual - ensemble_mean_forecast) per resource
+        instead of raw actuals. This models the forecast error distribution.
+    """
     actuals = pd.read_parquet(actuals_parquet)
     forecasts = pd.read_parquet(forecasts_parquet)
 
@@ -282,6 +290,19 @@ def load_data(
         X, Y, times, x_cols, y_cols = build_XY_for_covariance_system_only(
             forecasts, actuals, drop_any_nan_rows=True
         )
+
+    if use_residuals:
+        # Compute per-resource ensemble mean forecast, aligned to Y's time index
+        fmean = (
+            forecasts.groupby(["TIME_HOURLY", "ID_RESOURCE"])["FORECAST"]
+            .mean()
+            .reset_index()
+            .pivot(index="TIME_HOURLY", columns="ID_RESOURCE", values="FORECAST")
+            .sort_index()
+        )
+        # Align columns to y_cols order, reindex to times
+        fmean = fmean[y_cols].reindex(times).values
+        Y = Y - fmean
 
     if standardize:
         scaler = fit_standard_scaler(X)
@@ -903,6 +924,7 @@ def run_knn_k_sweep(
     tau_values: list[float] = None,
     plot_3d: bool = False,
     feature_set: str = "high_dim_16d",
+    use_residuals: bool = False,
 ):
     """
     Run complete k-NN k-value sweep and visualization.
@@ -957,11 +979,16 @@ def run_knn_k_sweep(
     # Load data
     print("Loading data...")
     X_train, Y_train, X_eval, Y_eval, x_cols, y_cols, _, _ = load_data(
-        forecasts_parquet, actuals_parquet, feature_set=feature_set,
+        forecasts_parquet,
+        actuals_parquet,
+        feature_set=feature_set,
+        use_residuals=use_residuals,
     )
 
     print(f"Training set: {X_train.shape[0]} samples")
     print(f"Evaluation set: {X_eval.shape[0]} samples")
+    if use_residuals:
+        print("Target: residuals (actual - ensemble mean forecast)")
     print(f"Features: {x_cols}")
     print(f"Targets: {y_cols}\n")
 
@@ -1139,6 +1166,7 @@ def run_multi_split_k_sweep(
     train_frac: float = 0.75,
     ridge: float = 1e-4,
     feature_set: str = "high_dim_16d",
+    use_residuals: bool = False,
 ) -> pd.DataFrame:
     """
     Run k-NN k-value sweep with multiple random train/val splits.
@@ -1154,6 +1182,8 @@ def run_multi_split_k_sweep(
         Number of random train/val splits.
     base_seeds : list[int]
         Specific seeds to use. If None, uses range(n_splits).
+    use_residuals : bool
+        If True, model forecast error (actual - forecast mean) instead of raw actuals.
     """
     if k_values is None:
         k_values = [32, 64, 128, 256, 512, 1024, 2048]
@@ -1183,13 +1213,18 @@ def run_multi_split_k_sweep(
     for seed in base_seeds:
         print(f"--- Split seed={seed} ---")
         X_train, Y_train, X_eval, Y_eval, x_cols, y_cols, _, _ = load_data(
-            forecasts_parquet, actuals_parquet,
-            train_frac=train_frac, random_seed=seed,
+            forecasts_parquet,
+            actuals_parquet,
+            train_frac=train_frac,
+            random_seed=seed,
             feature_set=feature_set,
+            use_residuals=use_residuals,
         )
         print(f"  Train: {X_train.shape[0]}, Eval: {X_eval.shape[0]}")
 
-        results = sweep_k_values(X_train, Y_train, X_eval, Y_eval, k_values, ridge=ridge)
+        results = sweep_k_values(
+            X_train, Y_train, X_eval, Y_eval, k_values, ridge=ridge
+        )
 
         for k in k_values:
             all_rows.append({"seed": seed, "k": k, "nll": results[k]["nll"]})
@@ -1198,11 +1233,7 @@ def run_multi_split_k_sweep(
     df_raw = pd.DataFrame(all_rows)
 
     # Compute per-k statistics
-    stats = (
-        df_raw.groupby("k")["nll"]
-        .agg(["mean", "std", "min", "max"])
-        .reset_index()
-    )
+    stats = df_raw.groupby("k")["nll"].agg(["mean", "std", "min", "max"]).reset_index()
     stats.columns = ["k", "nll_mean", "nll_std", "nll_min", "nll_max"]
 
     # Save
@@ -1231,16 +1262,26 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="k-NN k-value sweep")
     parser.add_argument(
-        "--multi-split", action="store_true",
+        "--multi-split",
+        action="store_true",
         help="Run multi-split sweep (multiple random seeds for train/val split)",
     )
     parser.add_argument(
-        "--n-splits", type=int, default=5,
+        "--n-splits",
+        type=int,
+        default=5,
         help="Number of random train/val splits (for --multi-split)",
     )
     parser.add_argument(
-        "--feature-set", type=str, default="high_dim_16d",
+        "--feature-set",
+        type=str,
+        default="high_dim_16d",
         help="Feature set name (default: high_dim_16d)",
+    )
+    parser.add_argument(
+        "--use-residuals",
+        action="store_true",
+        help="Use residuals (actual - forecast mean) instead of raw actuals",
     )
 
     args = parser.parse_args()
@@ -1250,9 +1291,10 @@ if __name__ == "__main__":
 
     if args.multi_split:
         run_multi_split_k_sweep(
-            k_values=[32, 64, 128, 256, 512, 1024, 2048],
+            k_values=[8, 16, 32, 64, 128, 256, 512, 1024, 2048],
             n_splits=args.n_splits,
             feature_set=args.feature_set,
+            use_residuals=args.use_residuals,
         )
     else:
         results, df_summary = run_knn_k_sweep(
@@ -1263,7 +1305,22 @@ if __name__ == "__main__":
             omega_path=None,  # default_omega_path,
             omega_tau=0.5,
             omega_k=256,
-            tau_values=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0, 2.0, 5.0, 10.0, 20.0],
+            tau_values=[
+                0.1,
+                0.2,
+                0.3,
+                0.4,
+                0.5,
+                0.6,
+                0.7,
+                0.8,
+                1.0,
+                2.0,
+                5.0,
+                10.0,
+                20.0,
+            ],
             plot_3d=True,
             feature_set=args.feature_set,
+            use_residuals=args.use_residuals,
         )

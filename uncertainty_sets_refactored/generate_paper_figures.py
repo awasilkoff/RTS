@@ -452,7 +452,7 @@ def fig3_nll_vs_k(
     ax.set_ylabel("Mean NLL")
     # ax.set_title(...)  # caption in paper
     ax.set_xscale("log")
-    ax.legend(fontsize=7, loc="upper right")
+    ax.legend(fontsize=7, loc="upper left")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()

@@ -354,9 +354,9 @@ def fig2_3d_ellipsoid_comparison(
     fig = plt.figure(figsize=(IEEE_TWO_COL_WIDTH, 3.5))
 
     def _labels(ax):
-        ax.set_xlabel(WIND_LABELS[0], fontsize=7, labelpad=2)
-        ax.set_ylabel(WIND_LABELS[1], fontsize=7, labelpad=2)
-        ax.set_zlabel(WIND_LABELS[2], fontsize=7, labelpad=2)
+        ax.set_xlabel(f"{WIND_LABELS[0]} (MW)", fontsize=7, labelpad=2)
+        ax.set_ylabel(f"{WIND_LABELS[1]} (MW)", fontsize=7, labelpad=2)
+        ax.set_zlabel(f"{WIND_LABELS[2]} (MW)", fontsize=7, labelpad=2)
         ax.tick_params(labelsize=6)
 
     n_pts = 25
@@ -521,7 +521,7 @@ def fig2_3d_ellipsoid_comparison(
     ]
     ax2.legend(handles=legend_elements_r, loc="upper left", fontsize=7)
 
-    # Shared axis limits across both panels
+    # Shared per-axis limits across both panels (each wind resource gets own range)
     all_surfaces = [
         (X_g, Y_g, Z_g),
         (X_l, Y_l, Z_l),
@@ -530,13 +530,18 @@ def fig2_3d_ellipsoid_comparison(
     all_x = np.concatenate([s[0].ravel() for s in all_surfaces])
     all_y = np.concatenate([s[1].ravel() for s in all_surfaces])
     all_z = np.concatenate([s[2].ravel() for s in all_surfaces])
-    lo = min(all_x.min(), all_y.min(), all_z.min())
-    hi = max(all_x.max(), all_y.max(), all_z.max())
-    pad = (hi - lo) * 0.05
+
+    def _nice_lim(lo, hi, step=50):
+        """Round limits outward to nearest step for clean tick marks."""
+        return np.floor(lo / step) * step, np.ceil(hi / step) * step
+
+    xlim = _nice_lim(all_x.min(), all_x.max())
+    ylim = _nice_lim(all_y.min(), all_y.max())
+    zlim = _nice_lim(all_z.min(), all_z.max())
     for ax in [ax1, ax2]:
-        ax.set_xlim(lo - pad, hi + pad)
-        ax.set_ylim(lo - pad, hi + pad)
-        ax.set_zlim(lo - pad, hi + pad)
+        ax.set_xlim(*xlim)
+        ax.set_ylim(*ylim)
+        ax.set_zlim(*zlim)
 
     plt.tight_layout()
     _save_figure(fig, output_path)

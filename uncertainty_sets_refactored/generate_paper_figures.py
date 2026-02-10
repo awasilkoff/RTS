@@ -776,6 +776,156 @@ def fig4_nll_vs_tau(
 
 
 # ============================================================================
+# FIGURE 3b + 4b: Combined hyperparameter sweeps with baselines
+# ============================================================================
+def fig3b_4b_hyperparameter_sweeps(
+    feature_set_dir: Path = HIGH_DIM_16D_DIR,
+    output_path: Path = None,
+) -> plt.Figure:
+    """
+    Two-panel figure: (a) NLL vs k with baselines, (b) NLL vs tau with baselines.
+
+    Shares y-axis range across panels for direct visual comparison.
+    Panel (a) enhances fig3 with learned omega + global horizontal lines.
+    Panel (b) merges fig4 + fig11: multi-seed tau sweep with baselines.
+    """
+    if output_path is None:
+        output_path = OUTPUT_DIR / "figures" / "fig3b_4b_hyperparameter_sweeps"
+
+    fig, (ax_k, ax_tau) = plt.subplots(
+        1, 2, figsize=(IEEE_TWO_COL_WIDTH, 2.8), sharey=True,
+    )
+
+    # ------------------------------------------------------------------
+    # Panel (a): NLL vs k  (k-NN sweep + baselines)
+    # ------------------------------------------------------------------
+    multi_stats_path = KNN_SWEEP_DIR / "multi_split_k_stats.csv"
+    if multi_stats_path.exists():
+        stats = pd.read_csv(multi_stats_path)
+        k_vals = stats["k"].values
+        nll_mean_k = stats["nll_mean"].values
+        nll_std_k = stats["nll_std"].values
+    else:
+        knn_df = _load_knn_sweep()
+        k_vals = knn_df["k"].values
+        nll_mean_k = knn_df["nll"].values
+        nll_std_k = np.zeros_like(nll_mean_k)
+
+    ax_k.plot(
+        k_vals, nll_mean_k, "o-", linewidth=2, markersize=5,
+        color=COLORS["knn"], label="k-NN",
+    )
+    ax_k.fill_between(
+        k_vals, nll_mean_k - nll_std_k, nll_mean_k + nll_std_k,
+        alpha=0.25, color=COLORS["knn"],
+    )
+
+    # Mark best k
+    best_k_idx = np.argmin(nll_mean_k)
+    ax_k.scatter(
+        [k_vals[best_k_idx]], [nll_mean_k[best_k_idx]],
+        s=150, c=COLORS["knn"], marker="*", zorder=10,
+        edgecolors="black", linewidths=1,
+        label=f"Best: k={k_vals[best_k_idx]}",
+    )
+
+    # Baselines: learned omega and global
+    tau_stats_path = TAU_DIAGNOSIS_DIR / "multi_seed_stats.csv"
+    if tau_stats_path.exists():
+        tau_stats = pd.read_csv(tau_stats_path)
+        best_learned = tau_stats.loc[tau_stats["val_nll_mean"].idxmin()]
+        nll_learned_best = best_learned["val_nll_mean"]
+        best_tau = best_learned["tau"]
+    else:
+        df_sweep = _load_sweep_results(feature_set_dir)
+        mask = (df_sweep["omega_constraint"] == "none") & (df_sweep["omega_l2_reg"] == 0.0)
+        best_row = df_sweep[mask].sort_values("val_nll_learned").iloc[0]
+        nll_learned_best = best_row["val_nll_learned"]
+        best_tau = best_row["tau"]
+
+    df_sweep = _load_sweep_results(feature_set_dir)
+    nll_global = df_sweep.iloc[0]["val_nll_global"]
+
+    ax_k.axhline(
+        nll_learned_best, linestyle="--", linewidth=1.5,
+        color=COLORS["learned"], label=f"Learned ω (τ={best_tau:g})",
+    )
+    ax_k.axhline(
+        nll_global, linestyle=":", linewidth=1.5,
+        color=COLORS["global"], label="Global",
+    )
+
+    ax_k.set_xlabel("k (Number of Neighbors)")
+    ax_k.set_ylabel("Validation NLL")
+    ax_k.set_xscale("log")
+    ax_k.legend(fontsize=6, loc="upper left")
+    ax_k.grid(True, alpha=0.3)
+    ax_k.text(
+        0.02, 0.98, "(a)", transform=ax_k.transAxes,
+        fontsize=10, fontweight="bold", va="top",
+    )
+
+    # ------------------------------------------------------------------
+    # Panel (b): NLL vs tau  (learned omega sweep + baselines)
+    # ------------------------------------------------------------------
+    if tau_stats_path.exists():
+        tau_stats = pd.read_csv(tau_stats_path)
+        tau_vals = tau_stats["tau"].values
+        nll_mean_tau = tau_stats["val_nll_mean"].values
+        nll_std_tau = tau_stats["val_nll_std"].values
+    else:
+        df_sweep = _load_sweep_results(feature_set_dir)
+        mask = (df_sweep["omega_constraint"] == "none") & (df_sweep["omega_l2_reg"] == 0.0)
+        df_filt = df_sweep[mask].sort_values("tau")
+        tau_vals = df_filt["tau"].values
+        nll_mean_tau = df_filt["val_nll_learned"].values
+        nll_std_tau = np.zeros_like(nll_mean_tau)
+
+    ax_tau.plot(
+        tau_vals, nll_mean_tau, "o-", linewidth=2, markersize=5,
+        color=COLORS["learned"], label="Learned ω",
+    )
+    ax_tau.fill_between(
+        tau_vals, nll_mean_tau - nll_std_tau, nll_mean_tau + nll_std_tau,
+        alpha=0.25, color=COLORS["learned"],
+    )
+
+    # Mark best tau
+    best_tau_idx = np.argmin(nll_mean_tau)
+    ax_tau.scatter(
+        [tau_vals[best_tau_idx]], [nll_mean_tau[best_tau_idx]],
+        s=150, c=COLORS["learned"], marker="*", zorder=10,
+        edgecolors="black", linewidths=1,
+        label=f"Best: τ={tau_vals[best_tau_idx]:g}",
+    )
+
+    # Baselines: best k-NN and global
+    nll_knn_best = nll_mean_k[best_k_idx]
+    ax_tau.axhline(
+        nll_knn_best, linestyle="--", linewidth=1.5,
+        color=COLORS["knn"], label=f"k-NN (k={k_vals[best_k_idx]})",
+    )
+    ax_tau.axhline(
+        nll_global, linestyle=":", linewidth=1.5,
+        color=COLORS["global"], label="Global",
+    )
+
+    ax_tau.set_xlabel("τ (Kernel Bandwidth)")
+    ax_tau.set_xscale("log")
+    ax_tau.legend(fontsize=6, loc="upper left")
+    ax_tau.grid(True, alpha=0.3)
+    ax_tau.text(
+        0.02, 0.98, "(b)", transform=ax_tau.transAxes,
+        fontsize=10, fontweight="bold", va="top",
+    )
+
+    plt.tight_layout()
+    _save_figure(fig, output_path)
+
+    return fig
+
+
+# ============================================================================
 # FIGURE 5: NLL Comparison Bar Chart (16D)
 # ============================================================================
 def fig5_nll_16d_comparison(
@@ -2262,6 +2412,14 @@ def generate_all_figures():
     try:
         fig4_nll_vs_tau()
         figures_generated.append("fig4_nll_vs_tau")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+    # Figure 3b+4b: Combined hyperparameter sweeps with baselines and shared y-axis
+    print("\n[3b+4b] Hyperparameter sweeps with baselines (2-panel)...")
+    try:
+        fig3b_4b_hyperparameter_sweeps()
+        figures_generated.append("fig3b_4b_hyperparameter_sweeps")
     except Exception as e:
         print(f"  Error: {e}")
 

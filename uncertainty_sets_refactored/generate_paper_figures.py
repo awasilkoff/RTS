@@ -255,7 +255,7 @@ def fig2_3d_ellipsoid_comparison(
     feature_set_dir: Path = HIGH_DIM_16D_DIR,
     output_path: Path = None,
     sample_idx: int = 0,
-    knn_k: int = 512,
+    knn_k: int = 16,
     tau: float = 1.0,
     rho: float = 1.0,
     offset: float = 20.0,
@@ -2049,7 +2049,7 @@ def generate_all_figures():
     # Figure 2: 3D ellipsoid (Learned, k-NN k=64/512, Global)
     print("\n[2/15] 3D ellipsoid comparison (Learned, k-NN, Global)...")
     try:
-        fig2_3d_ellipsoid_comparison(knn_k=512, tau=1.0)
+        fig2_3d_ellipsoid_comparison(knn_k=16, tau=1.0)
         figures_generated.append("fig2_ellipsoid_3d")
     except Exception as e:
         print(f"  Error: {e}")

@@ -230,6 +230,18 @@ def build_aruc_ldr_model(
     s_p = m.addVars(T, vtype=GRB.CONTINUOUS, lb=0.0, name="s_p")
 
     # ------------------------------------------------------------------
+    # Fix commitment for zero-cost generators (SOLAR, HYDRO).
+    # These have Pmin=0, MUT=0, MDT=0 and all costs=0, so the commitment
+    # variable is degenerate (u=0 and u=1 give identical objective).
+    # Fixing u=1 eliminates solver arbitrariness and removes binaries.
+    # ------------------------------------------------------------------
+    for i in range(I):
+        if data.gen_type[i] in ("SOLAR", "HYDRO"):
+            for t in range(T):
+                u[i, t].lb = 1.0
+                u[i, t].ub = 1.0
+
+    # ------------------------------------------------------------------
     # Second-stage LDR variables: Z[i,t,k]
     # ------------------------------------------------------------------
     # Z encodes sensitivity of p(i,t) to each component of r:

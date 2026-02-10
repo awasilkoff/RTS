@@ -1926,7 +1926,7 @@ def table_nll_summary(
     output_path: Path = None,
 ) -> str:
     """
-    One-line LaTeX table: best learned omega (tau=0.1), best k-NN (k=16), global NLL.
+    LaTeX table: learned omega (tau=0.1), k-NN (k=16, k=512), and global NLL.
     """
     if output_path is None:
         output_path = OUTPUT_DIR / "tables" / "tab_nll_summary.tex"
@@ -1946,33 +1946,40 @@ def table_nll_summary(
     nll_learned = row["val_nll_learned"]
     nll_global = row["val_nll_global"]
 
-    # k-NN NLL (k=16) from multi-split stats
+    # k-NN NLL (k=16 and k=512) from multi-split stats
+    nll_knn16 = row["val_nll_euclidean_knn"]
+    nll_knn512 = None
     multi_stats_path = KNN_SWEEP_DIR / "multi_split_k_stats.csv"
     if multi_stats_path.exists():
         knn_stats = pd.read_csv(multi_stats_path)
         k16 = knn_stats[knn_stats["k"] == 16]
         if not k16.empty:
-            nll_knn = k16.iloc[0]["nll_mean"]
-        else:
-            nll_knn = row["val_nll_euclidean_knn"]
-    else:
-        nll_knn = row["val_nll_euclidean_knn"]
+            nll_knn16 = k16.iloc[0]["nll_mean"]
+        k512 = knn_stats[knn_stats["k"] == 512]
+        if not k512.empty:
+            nll_knn512 = k512.iloc[0]["nll_mean"]
 
     print(f"  Learned ω (τ=0.1): {nll_learned:.3f}")
-    print(f"  k-NN (k=16):       {nll_knn:.3f}")
+    print(f"  k-NN (k=16):       {nll_knn16:.3f}")
+    if nll_knn512 is not None:
+        print(f"  k-NN (k=512):      {nll_knn512:.3f}")
     print(f"  Global:             {nll_global:.3f}")
 
     latex = r"""\begin{table}[htbp]
 \caption{Validation NLL: Learned $\omega$ vs Baselines (16D Features)}
 \label{tab:nll_summary}
 \centering
-\begin{tabular}{lcc}
-\toprule
+\begin{tabular}{lc}
+\hline
+Method & NLL \\
+\hline
 """
-    latex += f"Learned $\\omega$ ($\\tau=0.1$) & $k$-NN ($k=16$) & Global \\\\\n"
-    latex += r"\midrule" + "\n"
-    latex += f"{nll_learned:.3f} & {nll_knn:.3f} & {nll_global:.3f} \\\\\n"
-    latex += r"""\bottomrule
+    latex += f"Learned $\\omega$ ($\\tau=0.1$) & {nll_learned:.3f} \\\\\n"
+    latex += f"$k$-NN ($k=16$) & {nll_knn16:.3f} \\\\\n"
+    if nll_knn512 is not None:
+        latex += f"$k$-NN ($k=512$) & {nll_knn512:.3f} \\\\\n"
+    latex += f"Global & {nll_global:.3f} \\\\\n"
+    latex += r"""\hline
 \end{tabular}
 \end{table}
 """

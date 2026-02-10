@@ -159,6 +159,14 @@ def build_aruc_ldr_model(
     wind_idx = np.where(is_wind)[0]
     n_wind = len(wind_idx)
 
+    # Only thermal and wind generators participate in uncertainty response (Z matrix).
+    # Solar/hydro have zero cost, so allowing them to absorb uncertainty via Z
+    # makes robust hedging free and eliminates cost differentiation between
+    # ARUC and DARUC.
+    is_z_eligible = np.array(
+        [gt.upper() in ("THERMAL", "WIND") for gt in data.gen_type]
+    )
+
     # Dimension of uncertainty vector r:
     # simplest: one r per wind generator (aggregate over time),
     # or one per wind gen and time. For now, assume K = n_wind.
@@ -288,7 +296,32 @@ def build_aruc_ldr_model(
                 )
                 continue
 
-            # --- Non-wind (thermal) generators: full robust constraints ---
+            # --- Solar/Hydro: no uncertainty response, nominal constraints only ---
+            if not is_z_eligible[i]:
+                for k in range(K):
+                    Z[i, t, k].lb = 0.0
+                    Z[i, t, k].ub = 0.0
+                m.addConstr(
+                    p0[i, t] <= Pmax_2d[i, t] * u[i, t],
+                    name=f"p0_max_nom_i{i}_t{t}",
+                )
+                m.addConstr(
+                    Pmin[i] * u[i, t] <= p0[i, t],
+                    name=f"p0_min_nom_i{i}_t{t}",
+                )
+                for b in range(B):
+                    m.addConstr(
+                        p0_block[i, t, b] <= block_cap[i, b] * u[i, t],
+                        name=f"p0_block_cap_i{i}_t{t}_b{b}",
+                    )
+                m.addConstr(
+                    p0[i, t]
+                    <= gp.quicksum(p0_block[i, t, b] for b in range(B)),
+                    name=f"p0_agg_nom_i{i}_t{t}",
+                )
+                continue
+
+            # --- Thermal generators: full robust constraints ---
 
             # Define y_gen[i,t,k] = (L @ Z_{i,t})_k = sum_j L[k,j] * Z[i,t,j]
             for k_idx in range(K):

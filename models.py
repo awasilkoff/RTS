@@ -218,10 +218,10 @@ class DAMData(BaseModel):
     @property
     def thermal_mask(self) -> np.ndarray:
         """
-        Boolean mask of generators considered 'thermal/static'.
+        Boolean mask of generators with gen_type == 'THERMAL'.
 
-        By default, anything with gen_type == 'THERMAL' is treated as thermal.
-        You can refine this logic later (e.g. include 'NUCLEAR', 'HYDRO' if you like).
+        Includes CT, CC, STEAM, NUCLEAR, and CSP generators.
+        Does NOT include WIND, SOLAR, or HYDRO.
         """
         types = np.array(self.gen_type, dtype=object)
         return types == "THERMAL"
@@ -229,10 +229,10 @@ class DAMData(BaseModel):
     @property
     def variable_mask(self) -> np.ndarray:
         """
-        Boolean mask of generators considered 'variable/forecast-driven'.
+        Boolean mask of non-thermal generators (WIND, SOLAR, HYDRO).
 
-        By default, anything with gen_type != 'THERMAL' is treated as variable
-        (e.g. 'WIND', 'SOLAR'). You can refine this logic later.
+        These are zero-cost or forecast-driven generators that do not
+        participate in cost-based commitment decisions.
         """
         return ~self.thermal_mask
 

@@ -424,7 +424,15 @@ def build_damdata_from_rts(
     # Populate in sorted order inside the loop
     for gen_id, row in gens_df.set_index("GEN UID").iterrows():
         i = gen_idx[gen_id]  # Sorted position
-        gen_type[i] = "WIND" if "WIND" in row["Unit Type"].upper() else "THERMAL"
+        unit_type_upper = row["Unit Type"].upper()
+        if "WIND" in unit_type_upper:
+            gen_type[i] = "WIND"
+        elif unit_type_upper in ("PV", "RTPV"):
+            gen_type[i] = "SOLAR"
+        elif unit_type_upper in ("HYDRO", "ROR"):
+            gen_type[i] = "HYDRO"
+        else:
+            gen_type[i] = "THERMAL"  # CT, CC, STEAM, NUCLEAR, CSP
 
         gen_to_bus[i] = bus_idx[row["Bus ID"]]
         Pmin[i] = row["PMin MW"]
@@ -454,8 +462,8 @@ def build_damdata_from_rts(
         init_down_time[i] = row.get("InitialDownTime", 0.0)
 
         # 4) Cost blocks
-        if gen_type[i] == "WIND":
-            # Wind: single block covering full capacity, zero marginal cost.
+        if gen_type[i] in ("WIND", "SOLAR", "HYDRO"):
+            # Renewables/hydro: single block covering full capacity, zero marginal cost.
             # Time-varying availability enforced by Pmax_2d constraint.
             block_cap[i, 0] = Pmax[i]
             block_cap[i, 1] = 0.0

@@ -76,6 +76,7 @@ def build_aruc_ldr_model(
     model_name: str = "ARUC_LDR",
     dam_commitment: Optional[Dict[str, np.ndarray]] = None,
     enforce_lines: bool = True,
+    mip_gap: float = 0.005,
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Adaptive robust UC with linear decision rules:
@@ -624,6 +625,7 @@ def build_aruc_ldr_model(
     m.Params.NumericFocus = 2       # Extra care with numerics (0-3)
     m.Params.BarHomogeneous = 1     # More robust barrier (handles ill-conditioned SOC)
     m.Params.ScaleFlag = 2          # Aggressive scaling
+    m.Params.MIPGap = mip_gap       # Default 0.5% — UC doesn't need 0.01% precision
 
     vars_dict: Dict[str, object] = {
         "u": u,

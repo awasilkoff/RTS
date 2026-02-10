@@ -64,6 +64,8 @@ def main():
                         help="Start index into NPZ time series")
     parser.add_argument("--rho-lines-frac", type=float, default=None,
                         help="Fraction of rho for line flow constraints, e.g. 0.25 (default: 1.0 = same as rho)")
+    parser.add_argument("--mip-gap", type=float, default=0.005,
+                        help="MIP optimality gap (default: 0.005 = 0.5%%)")
     parser.add_argument("--out-dir", type=str, default=None,
                         help="Output directory (auto-generated if not specified)")
     args = parser.parse_args()
@@ -103,6 +105,7 @@ def main():
         print(f"  Rho:      {args.rho}")
     if args.rho_lines_frac is not None:
         print(f"  Rho lines frac: {args.rho_lines_frac}")
+    print(f"  MIP gap:  {args.mip_gap:.4f} ({args.mip_gap*100:.2f}%)")
     print(f"  Network:  {'with line limits' if args.enforce_lines else 'copperplate'}")
     print(f"  Output:   {out_dir}")
     print("=" * 70)
@@ -122,6 +125,7 @@ def main():
         uncertainty_provider_path=args.uncertainty_npz,
         provider_start_idx=args.provider_start,
         rho_lines_frac=args.rho_lines_frac,
+        mip_gap=args.mip_gap,
     )
 
     daruc_results = daruc_outputs["daruc_results"]
@@ -149,6 +153,7 @@ def main():
         "hours": args.hours,
         "rho_input": args.rho,
         "rho_lines_frac": args.rho_lines_frac,
+        "mip_gap": args.mip_gap,
         "time_varying": daruc_outputs["time_varying"],
         "enforce_lines": args.enforce_lines,
         "start_time": str(start_time),
@@ -174,6 +179,7 @@ def main():
         uncertainty_provider_path=args.uncertainty_npz,
         provider_start_idx=args.provider_start,
         rho_lines_frac=args.rho_lines_frac,
+        mip_gap=args.mip_gap,
     )
 
     aruc_results = aruc_outputs["results"]
@@ -192,6 +198,7 @@ def main():
         "hours": args.hours,
         "rho_input": args.rho,
         "rho_lines_frac": args.rho_lines_frac,
+        "mip_gap": args.mip_gap,
         "time_varying": aruc_outputs["time_varying"],
         "enforce_lines": args.enforce_lines,
         "start_time": str(start_time),

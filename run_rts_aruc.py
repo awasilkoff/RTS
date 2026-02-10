@@ -354,6 +354,7 @@ def run_rts_aruc(
     spp_start_idx: int = SPP_START_IDX,
     enforce_lines: bool = True,
     rho_lines_frac: Optional[float] = None,
+    mip_gap: float = 0.005,
 ) -> Dict[str, Any]:
     """
     Full pipeline for ARUC-LDR:
@@ -452,6 +453,7 @@ def run_rts_aruc(
         M_p=m_penalty,
         model_name=model_name,
         enforce_lines=enforce_lines,
+        mip_gap=mip_gap,
     )
     print("  Model built. Starting optimization...")
 

@@ -69,6 +69,9 @@ HIGH_DIM_16D_DIR = VIZ_ARTIFACTS / "high_dim_16d"
 KNN_SWEEP_DIR = VIZ_ARTIFACTS / "knn_k_sweep"
 PAPER_FIGURES_DIR = VIZ_ARTIFACTS / "paper_figures"
 
+# Anonymized wind resource labels (Y columns are sorted: 122, 309, 317)
+WIND_LABELS = {0: "Wind 1", 1: "Wind 2", 2: "Wind 3"}
+
 
 def _ensure_output_dirs():
     """Create output directories."""
@@ -339,9 +342,9 @@ def fig2_3d_ellipsoid_comparison(
     fig = plt.figure(figsize=(IEEE_TWO_COL_WIDTH, 3.5))
 
     def _labels(ax):
-        ax.set_xlabel("Wind 1", fontsize=7, labelpad=2)
-        ax.set_ylabel("Wind 2", fontsize=7, labelpad=2)
-        ax.set_zlabel("Wind 3", fontsize=7, labelpad=2)
+        ax.set_xlabel(WIND_LABELS[0], fontsize=7, labelpad=2)
+        ax.set_ylabel(WIND_LABELS[1], fontsize=7, labelpad=2)
+        ax.set_zlabel(WIND_LABELS[2], fontsize=7, labelpad=2)
         ax.tick_params(labelsize=6)
 
     n_pts = 25
@@ -1455,7 +1458,7 @@ def fig8_ellipse_grid(
         axes = axes.reshape(1, -1)
 
     colors = ["#2A9D8F", "#E9C46A", "#E76F51"]
-    dims = (0, 1)  # First two dimensions
+    dims = (1, 2)  # Wind 2 and Wind 3 (more similar scale)
 
     # Use global mean as common center (from largest k, which approximates global)
     max_k = max(k_values)
@@ -1495,8 +1498,8 @@ def fig8_ellipse_grid(
             # Plot common center
             ax.scatter([mu2[0]], [mu2[1]], s=60, c="black", marker="o", zorder=5)
 
-            ax.set_xlabel(y_cols[dims[0]] if y_cols else f"Y[{dims[0]}]")
-            ax.set_ylabel(y_cols[dims[1]] if y_cols else f"Y[{dims[1]}]")
+            ax.set_xlabel(WIND_LABELS[dims[0]])
+            ax.set_ylabel(WIND_LABELS[dims[1]])
             ax.set_title(f"k={k}")
             ax.grid(True, alpha=0.3)
             ax.set_xlim(xlim_lo, xlim_hi)
@@ -1580,7 +1583,7 @@ def fig10_ellipse_overlay(
     k_values = [32, 512, N_train]  # last = global
     results = sweep_k_values(X_train, Y_train, X_eval, Y_eval, k_values)
 
-    dims = (0, 1)
+    dims = (1, 2)  # Wind 2 and Wind 3 (more similar scale)
     colors = ["#E76F51", "#2A9D8F", COLORS["global"]]  # Coral, Teal, Gray
     labels = ["k=32", "k=512", f"Global (k={N_train})"]
 
@@ -1601,8 +1604,8 @@ def fig10_ellipse_overlay(
     ax.scatter([mu_common[0]], [mu_common[1]], s=40, c="black", marker="o",
                edgecolors="black", linewidths=0.5, zorder=5)
 
-    ax.set_xlabel(y_cols[dims[0]] if y_cols else f"Y[{dims[0]}]")
-    ax.set_ylabel(y_cols[dims[1]] if y_cols else f"Y[{dims[1]}]")
+    ax.set_xlabel(WIND_LABELS[dims[0]])
+    ax.set_ylabel(WIND_LABELS[dims[1]])
     # ax.set_title(...)  # caption in paper
     ax.legend(fontsize=7, loc="upper right")
     ax.grid(True, alpha=0.3)

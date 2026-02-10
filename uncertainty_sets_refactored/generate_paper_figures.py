@@ -514,6 +514,23 @@ def fig2_3d_ellipsoid_comparison(
     ]
     ax2.legend(handles=legend_elements_r, loc="upper left", fontsize=7)
 
+    # Shared axis limits across both panels
+    all_surfaces = [
+        (X_g, Y_g, Z_g),
+        (X_l, Y_l, Z_l),
+        (X_k, Y_k, Z_k),
+    ]
+    all_x = np.concatenate([s[0].ravel() for s in all_surfaces])
+    all_y = np.concatenate([s[1].ravel() for s in all_surfaces])
+    all_z = np.concatenate([s[2].ravel() for s in all_surfaces])
+    lo = min(all_x.min(), all_y.min(), all_z.min())
+    hi = max(all_x.max(), all_y.max(), all_z.max())
+    pad = (hi - lo) * 0.05
+    for ax in [ax1, ax2]:
+        ax.set_xlim(lo - pad, hi + pad)
+        ax.set_ylim(lo - pad, hi + pad)
+        ax.set_zlim(lo - pad, hi + pad)
+
     plt.tight_layout()
     _save_figure(fig, output_path)
 

@@ -332,6 +332,10 @@ Do NOT execute long-running tasks directly.
 
 **Note:** Feature engineering experiments (`run_minmax_experiments.py`, `run_all_feature_sets.py`) take ~30 minutes with default parameters. Paper figure generation (`run_paper_figures.py`) takes ~2-3 minutes. These should be run manually by the user.
 
+## Formatting Preferences
+
+- **Command lines:** Always provide shell commands as single-line one-liners (no backslash continuations or multi-line formatting).
+
 ## Analysis Workflow
 
 After running feature set experiments:

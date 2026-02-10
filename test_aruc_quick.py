@@ -10,6 +10,7 @@ Usage:
     python test_aruc_quick.py
     python test_aruc_quick.py --hours 4 --rho 2.0 --no-lines
 """
+import json
 from pathlib import Path
 
 import numpy as np
@@ -65,9 +66,20 @@ if __name__ == "__main__":
     # Z analysis
     z_analysis = analyze_Z(results["Z"], data, out_dir, rho=outputs["rho"])
 
+    # Save summary for comparison scripts
+    summary = {
+        "objective": results["obj"],
+        "hours": args.hours,
+        "rho_input": args.rho,
+        "time_varying": outputs["time_varying"],
+        "enforce_lines": not args.no_lines,
+    }
+    with open(out_dir / "summary.json", "w") as f:
+        json.dump(summary, f, indent=2)
+
     print(f"\nARUC-LDR objective: {results['obj']:,.2f}")
     print(f"Time-varying: {outputs['time_varying']}")
     print(f"\nResults saved to {out_dir}/")
     print("  commitment_u.csv, dispatch_p0.csv, Z_coefficients.csv")
     print("  Z_analysis_full.csv, Z_analysis_per_gen.csv")
-    print("  Sigma.npy, rho.npy")
+    print("  Sigma.npy, rho.npy, summary.json")

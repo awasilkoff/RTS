@@ -9,6 +9,7 @@ Saves all results + Z matrix analysis to daruc_outputs/quick_test/.
 Usage:
     python test_daruc_quick.py
 """
+import json
 from pathlib import Path
 
 import numpy as np
@@ -161,9 +162,28 @@ if __name__ == "__main__":
     # Z analysis
     z_analysis = analyze_Z(daruc_results["Z"], data, out_dir, rho=outputs["rho"])
 
+    # Save DAM results for 3-way comparison
+    dam_results = outputs["dam_outputs"]["results"]
+    dam_results["u"].to_csv(out_dir / "dam_commitment_u.csv")
+    dam_results["p0"].to_csv(out_dir / "dam_dispatch_p0.csv")
+
+    # Save summary for comparison scripts
+    summary = {
+        "daruc_objective": daruc_results["obj"],
+        "dam_objective": dam_results["obj"],
+        "hours": args.hours,
+        "rho_input": args.rho,
+        "time_varying": outputs["time_varying"],
+        "enforce_lines": not args.no_lines,
+    }
+    with open(out_dir / "summary.json", "w") as f:
+        json.dump(summary, f, indent=2)
+
     print(f"\nDARUC objective: {daruc_results['obj']:,.2f}")
+    print(f"DAM objective:   {dam_results['obj']:,.2f}")
     print(f"Time-varying: {outputs['time_varying']}")
     print(f"\nResults saved to {out_dir}/")
     print("  commitment_u.csv, dispatch_p0.csv, Z_coefficients.csv")
+    print("  dam_commitment_u.csv, dam_dispatch_p0.csv")
     print("  Z_analysis_full.csv, Z_analysis_per_gen.csv")
-    print("  Sigma.npy, rho.npy, deviation_summary.csv")
+    print("  Sigma.npy, rho.npy, deviation_summary.csv, summary.json")

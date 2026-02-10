@@ -74,10 +74,14 @@ def main():
         out_dir = Path(args.out_dir)
     else:
         net = "lines" if args.enforce_lines else "copperplate"
+        if args.uncertainty_npz:
+            rho_tag = "rho_npz"
+        else:
+            rho_tag = f"rho{args.rho}"
         out_dir = Path(
             f"comparison_outputs/"
             f"m{args.start_month:02d}d{args.start_day:02d}_"
-            f"{args.hours}h_rho{args.rho}_{net}"
+            f"{args.hours}h_{rho_tag}_{net}"
         )
     out_dir.mkdir(parents=True, exist_ok=True)
     aruc_dir = out_dir / "aruc"
@@ -89,7 +93,10 @@ def main():
     print(f"ARUC vs DARUC COMPARISON")
     print(f"  Start:    {start_time}")
     print(f"  Horizon:  {args.hours}h")
-    print(f"  Rho:      {args.rho}")
+    if args.uncertainty_npz:
+        print(f"  Rho:      from NPZ ({args.uncertainty_npz})")
+    else:
+        print(f"  Rho:      {args.rho}")
     print(f"  Network:  {'with line limits' if args.enforce_lines else 'copperplate'}")
     print(f"  Output:   {out_dir}")
     print("=" * 70)

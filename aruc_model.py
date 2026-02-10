@@ -70,6 +70,7 @@ def build_aruc_ldr_model(
     data: DAMData,
     Sigma: np.ndarray,
     rho: Union[float, np.ndarray],
+    rho_lines: Union[float, np.ndarray, None] = None,
     sqrt_Sigma: Union[np.ndarray, None] = None,
     M_p: float = 1e5,
     model_name: str = "ARUC_LDR",
@@ -189,6 +190,12 @@ def build_aruc_ldr_model(
         )
         assert rho.shape == (T,), f"Expected rho shape ({T},), got {rho.shape}"
 
+        # Resolve rho_lines: default to rho if not specified
+        if rho_lines is None:
+            rho_lines = rho  # Same object — full backward compat
+        elif isinstance(rho_lines, (int, float)):
+            rho_lines = np.full(T, rho_lines)
+
         # Use provided sqrt_Sigma or compute
         if sqrt_Sigma is None:
             sqrt_Sigma = np.zeros_like(Sigma)
@@ -199,8 +206,14 @@ def build_aruc_ldr_model(
         assert Sigma.shape == (K, K), (
             f"Expected Sigma shape ({K}, {K}), got {Sigma.shape}"
         )
+        # Resolve rho_lines: default to rho if not specified
+        if rho_lines is None:
+            rho_lines = rho  # Same object — full backward compat
         if sqrt_Sigma is None:
             sqrt_Sigma = np.linalg.cholesky(Sigma)
+
+    if rho_lines is not rho:
+        print(f"  [ARUC] Using separate rho_lines for line constraints")
 
     # Map bus -> list of generators
     gens_at_bus = [[] for _ in range(N)]
@@ -498,7 +511,7 @@ def build_aruc_ldr_model(
             for t in range(T):
                 # Get time-specific values
                 sqrt_Sigma_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
-                rho_t = rho[t] if time_varying else rho
+                rho_lines_t = rho_lines[t] if time_varying else rho_lines
 
                 # 1) flow_nom_expr
                 flow_nom = gp.LinExpr()
@@ -538,11 +551,11 @@ def build_aruc_ldr_model(
 
                 # 5) Robust line limits
                 m.addConstr(
-                    flow_nom + rho_t * z_line[l, t] <= Fmax[l],
+                    flow_nom + rho_lines_t * z_line[l, t] <= Fmax[l],
                     name=f"line_max_rob_l{l}_t{t}",
                 )
                 m.addConstr(
-                    -flow_nom + rho_t * z_line[l, t] <= Fmax[l],
+                    -flow_nom + rho_lines_t * z_line[l, t] <= Fmax[l],
                     name=f"line_min_rob_l{l}_t{t}",
                 )
 

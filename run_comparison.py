@@ -62,6 +62,8 @@ def main():
                         help="Path to time-varying uncertainty NPZ")
     parser.add_argument("--provider-start", type=int, default=0,
                         help="Start index into NPZ time series")
+    parser.add_argument("--rho-lines", type=float, default=None,
+                        help="Separate rho for line flow constraints (default: same as --rho)")
     parser.add_argument("--out-dir", type=str, default=None,
                         help="Output directory (auto-generated if not specified)")
     args = parser.parse_args()
@@ -76,6 +78,8 @@ def main():
         net = "lines" if args.enforce_lines else "copperplate"
         if args.uncertainty_npz:
             rho_tag = "rho_npz"
+        elif args.rho_lines is not None:
+            rho_tag = f"rho{args.rho}_lines{args.rho_lines}"
         else:
             rho_tag = f"rho{args.rho}"
         out_dir = Path(
@@ -97,6 +101,8 @@ def main():
         print(f"  Rho:      from NPZ ({args.uncertainty_npz})")
     else:
         print(f"  Rho:      {args.rho}")
+    if args.rho_lines is not None:
+        print(f"  Rho lines: {args.rho_lines}")
     print(f"  Network:  {'with line limits' if args.enforce_lines else 'copperplate'}")
     print(f"  Output:   {out_dir}")
     print("=" * 70)
@@ -115,6 +121,7 @@ def main():
         enforce_lines=args.enforce_lines,
         uncertainty_provider_path=args.uncertainty_npz,
         provider_start_idx=args.provider_start,
+        rho_lines=args.rho_lines,
     )
 
     daruc_results = daruc_outputs["daruc_results"]
@@ -141,6 +148,7 @@ def main():
         "dam_objective": dam_results["obj"],
         "hours": args.hours,
         "rho_input": args.rho,
+        "rho_lines": args.rho_lines,
         "time_varying": daruc_outputs["time_varying"],
         "enforce_lines": args.enforce_lines,
         "start_time": str(start_time),
@@ -165,6 +173,7 @@ def main():
         enforce_lines=args.enforce_lines,
         uncertainty_provider_path=args.uncertainty_npz,
         provider_start_idx=args.provider_start,
+        rho_lines=args.rho_lines,
     )
 
     aruc_results = aruc_outputs["results"]
@@ -182,6 +191,7 @@ def main():
         "objective": aruc_results["obj"],
         "hours": args.hours,
         "rho_input": args.rho,
+        "rho_lines": args.rho_lines,
         "time_varying": aruc_outputs["time_varying"],
         "enforce_lines": args.enforce_lines,
         "start_time": str(start_time),

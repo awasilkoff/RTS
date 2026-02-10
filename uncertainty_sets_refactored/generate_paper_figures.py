@@ -30,7 +30,7 @@ Outputs saved to: data/viz_artifacts/paper_final/
         tab_nll_vs_tau.tex          - NLL at different tau values
         tab_nll_vs_k.tex            - NLL at different k values
         tab_omega_weights.tex       - Learned omega per feature set
-        tab_nll_summary.tex         - One-line: learned (tau=0.1) vs k-NN (k=16) vs global
+        tab_nll_summary.tex         - Learned (best tau) vs k-NN (k=16, k=512) vs global
     figure_metadata.json
 
 Required prerequisites:
@@ -263,7 +263,7 @@ def fig2_3d_ellipsoid_comparison(
     output_path: Path = None,
     sample_idx: int = 0,
     knn_k: int = 16,
-    tau: float = 0.1,
+    tau: float = 0.07,
     rho: float = 1.0,
     offset: float = 20.0,
 ) -> plt.Figure:
@@ -1926,28 +1926,35 @@ def table_nll_summary(
     output_path: Path = None,
 ) -> str:
     """
-    LaTeX table: learned omega (tau=0.1), k-NN (k=16, k=512), and global NLL.
+    LaTeX table: learned omega (best tau), k-NN (k=16, k=512), and global NLL.
+
+    Reads learned NLL from multi-seed tau sweep (tau_omega_diagnosis) if available,
+    otherwise falls back to single-seed sweep_results.csv.
     """
     if output_path is None:
         output_path = OUTPUT_DIR / "tables" / "tab_nll_summary.tex"
 
-    # Learned omega NLL (tau=0.1, unconstrained, no reg)
+    # Learned omega NLL — prefer multi-seed data (has finer tau grid)
+    best_tau = None
+    nll_learned = None
+    multi_seed_path = TAU_DIAGNOSIS_DIR / "multi_seed_stats.csv"
+    if multi_seed_path.exists():
+        tau_stats = pd.read_csv(multi_seed_path)
+        best_row = tau_stats.loc[tau_stats["val_nll_mean"].idxmin()]
+        best_tau = best_row["tau"]
+        nll_learned = best_row["val_nll_mean"]
+
+    # Global NLL from sweep_results (same across all tau)
     df = _load_sweep_results(feature_set_dir)
-    mask = (
-        (df["omega_constraint"] == "none")
-        & (df["omega_l2_reg"] == 0.0)
-        & (np.isclose(df["tau"], 0.1))
-    )
-    row = df[mask]
-    if row.empty:
-        print("  Warning: no row for tau=0.1, constraint=none, l2=0")
-        return ""
-    row = row.iloc[0]
-    nll_learned = row["val_nll_learned"]
-    nll_global = row["val_nll_global"]
+    if nll_learned is None:
+        mask = (df["omega_constraint"] == "none") & (df["omega_l2_reg"] == 0.0)
+        best = df[mask].sort_values("val_nll_learned").iloc[0]
+        best_tau = best["tau"]
+        nll_learned = best["val_nll_learned"]
+    nll_global = df.iloc[0]["val_nll_global"]
 
     # k-NN NLL (k=16 and k=512) from multi-split stats
-    nll_knn16 = row["val_nll_euclidean_knn"]
+    nll_knn16 = df.iloc[0]["val_nll_euclidean_knn"]
     nll_knn512 = None
     multi_stats_path = KNN_SWEEP_DIR / "multi_split_k_stats.csv"
     if multi_stats_path.exists():
@@ -1959,12 +1966,13 @@ def table_nll_summary(
         if not k512.empty:
             nll_knn512 = k512.iloc[0]["nll_mean"]
 
-    print(f"  Learned ω (τ=0.1): {nll_learned:.3f}")
-    print(f"  k-NN (k=16):       {nll_knn16:.3f}")
+    print(f"  Learned ω (τ={best_tau}): {nll_learned:.3f}")
+    print(f"  k-NN (k=16):        {nll_knn16:.3f}")
     if nll_knn512 is not None:
-        print(f"  k-NN (k=512):      {nll_knn512:.3f}")
-    print(f"  Global:             {nll_global:.3f}")
+        print(f"  k-NN (k=512):       {nll_knn512:.3f}")
+    print(f"  Global:              {nll_global:.3f}")
 
+    tau_str = f"{best_tau:g}"
     latex = r"""\begin{table}[htbp]
 \caption{Validation NLL: Learned $\omega$ vs Baselines (16D Features)}
 \label{tab:nll_summary}
@@ -1974,7 +1982,7 @@ def table_nll_summary(
 Method & NLL \\
 \hline
 """
-    latex += f"Learned $\\omega$ ($\\tau=0.1$) & {nll_learned:.3f} \\\\\n"
+    latex += f"Learned $\\omega$ ($\\tau={tau_str}$) & {nll_learned:.3f} \\\\\n"
     latex += f"$k$-NN ($k=16$) & {nll_knn16:.3f} \\\\\n"
     if nll_knn512 is not None:
         latex += f"$k$-NN ($k=512$) & {nll_knn512:.3f} \\\\\n"
@@ -2224,7 +2232,7 @@ def generate_all_figures():
     # Figure 2: 3D ellipsoid (Learned, k-NN k=16, Global)
     print("\n[2/15] 3D ellipsoid comparison (Learned, k-NN, Global)...")
     try:
-        fig2_3d_ellipsoid_comparison(knn_k=16, tau=0.1)
+        fig2_3d_ellipsoid_comparison(knn_k=16, tau=0.07)
         figures_generated.append("fig2_ellipsoid_3d")
     except Exception as e:
         print(f"  Error: {e}")
@@ -2233,7 +2241,7 @@ def generate_all_figures():
     print("\n[2e/15] 3D ellipsoid comparison (extreme hour)...")
     try:
         fig2_3d_ellipsoid_comparison(
-            knn_k=16, tau=0.1,
+            knn_k=16, tau=0.07,
             sample_idx=EXTREME_SAMPLE_IDX,
             output_path=OUTPUT_DIR / "figures" / "fig2_ellipsoid_3d_extreme",
         )

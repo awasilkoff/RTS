@@ -25,10 +25,12 @@ Outputs saved to: data/viz_artifacts/paper_final/
         fig8_ellipse_grid.pdf       - 2D ellipse grid with consistent axes
         fig9_omega_bar_chart.png    - Learned feature weights bar chart
         fig10_ellipse_overlay.pdf   - Ellipse overlay (k=32, 512, global)
+        fig11_tau_sweep_unconstrained.pdf - NLL vs tau (no constraint, no reg, 16D)
     tables/
         tab_nll_vs_tau.tex          - NLL at different tau values
         tab_nll_vs_k.tex            - NLL at different k values
         tab_omega_weights.tex       - Learned omega per feature set
+        tab_nll_summary.tex         - One-line: learned (tau=0.1) vs k-NN (k=16) vs global
     figure_metadata.json
 
 Required prerequisites:
@@ -1835,6 +1837,145 @@ def fig10_ellipse_overlay(
 
 
 # ============================================================================
+# FIGURE 11: Tau Sweep for Learned Omega (unconstrained, no regularization)
+# ============================================================================
+def fig11_tau_sweep_unconstrained(
+    feature_set_dir: Path = HIGH_DIM_16D_DIR,
+    output_path: Path = None,
+) -> plt.Figure:
+    """
+    NLL vs tau for learned omega with omega_constraint=none, L2 reg=0, 16D features.
+
+    Shows learned omega NLL alongside k-NN (k=16) and global baselines.
+    """
+    if output_path is None:
+        output_path = OUTPUT_DIR / "figures" / "fig11_tau_sweep_unconstrained"
+
+    df = _load_sweep_results(feature_set_dir)
+
+    # Filter to unconstrained, no regularization
+    mask = (df["omega_constraint"] == "none") & (df["omega_l2_reg"] == 0.0)
+    df_filtered = df[mask].sort_values("tau")
+
+    if df_filtered.empty:
+        print("  Warning: no rows with omega_constraint=none, omega_l2_reg=0")
+        return None
+
+    tau_values = df_filtered["tau"].values
+    nll_learned = df_filtered["val_nll_learned"].values
+    nll_knn = df_filtered["val_nll_euclidean_knn"].values
+    nll_global = df_filtered["val_nll_global"].values
+
+    fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, 2.5))
+
+    # Learned omega curve
+    ax.plot(
+        tau_values, nll_learned,
+        "o-", linewidth=2, markersize=5,
+        color=COLORS["learned"], label="Learned ω",
+    )
+
+    # k-NN baseline (horizontal — same value at all tau)
+    ax.axhline(
+        nll_knn[0], linestyle="--", linewidth=1.5,
+        color=COLORS["knn"], label="k-NN (k=16)",
+    )
+
+    # Global baseline (horizontal)
+    ax.axhline(
+        nll_global[0], linestyle=":", linewidth=1.5,
+        color=COLORS["global"], label="Global",
+    )
+
+    # Mark best tau
+    best_idx = np.argmin(nll_learned)
+    ax.scatter(
+        [tau_values[best_idx]], [nll_learned[best_idx]],
+        s=150, c=COLORS["learned"], marker="*",
+        zorder=10, edgecolors="black", linewidths=1,
+        label=f"Best: τ={tau_values[best_idx]}",
+    )
+
+    ax.set_xlabel("τ (Kernel Bandwidth)")
+    ax.set_ylabel("Validation NLL")
+    ax.set_xscale("log")
+    ax.legend(fontsize=7, loc="upper right")
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    _save_figure(fig, output_path)
+
+    return fig
+
+
+# ============================================================================
+# TABLE: Summary NLL comparison (one-line)
+# ============================================================================
+def table_nll_summary(
+    feature_set_dir: Path = HIGH_DIM_16D_DIR,
+    output_path: Path = None,
+) -> str:
+    """
+    One-line LaTeX table: best learned omega (tau=0.1), best k-NN (k=16), global NLL.
+    """
+    if output_path is None:
+        output_path = OUTPUT_DIR / "tables" / "tab_nll_summary.tex"
+
+    # Learned omega NLL (tau=0.1, unconstrained, no reg)
+    df = _load_sweep_results(feature_set_dir)
+    mask = (
+        (df["omega_constraint"] == "none")
+        & (df["omega_l2_reg"] == 0.0)
+        & (np.isclose(df["tau"], 0.1))
+    )
+    row = df[mask]
+    if row.empty:
+        print("  Warning: no row for tau=0.1, constraint=none, l2=0")
+        return ""
+    row = row.iloc[0]
+    nll_learned = row["val_nll_learned"]
+    nll_global = row["val_nll_global"]
+
+    # k-NN NLL (k=16) from multi-split stats
+    multi_stats_path = KNN_SWEEP_DIR / "multi_split_k_stats.csv"
+    if multi_stats_path.exists():
+        knn_stats = pd.read_csv(multi_stats_path)
+        k16 = knn_stats[knn_stats["k"] == 16]
+        if not k16.empty:
+            nll_knn = k16.iloc[0]["nll_mean"]
+        else:
+            nll_knn = row["val_nll_euclidean_knn"]
+    else:
+        nll_knn = row["val_nll_euclidean_knn"]
+
+    print(f"  Learned ω (τ=0.1): {nll_learned:.3f}")
+    print(f"  k-NN (k=16):       {nll_knn:.3f}")
+    print(f"  Global:             {nll_global:.3f}")
+
+    latex = r"""\begin{table}[htbp]
+\caption{Validation NLL: Learned $\omega$ vs Baselines (16D Features)}
+\label{tab:nll_summary}
+\centering
+\begin{tabular}{lcc}
+\toprule
+"""
+    latex += f"Learned $\\omega$ ($\\tau=0.1$) & $k$-NN ($k=16$) & Global \\\\\n"
+    latex += r"\midrule" + "\n"
+    latex += f"{nll_learned:.3f} & {nll_knn:.3f} & {nll_global:.3f} \\\\\n"
+    latex += r"""\bottomrule
+\end{tabular}
+\end{table}
+"""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w") as f:
+        f.write(latex)
+    print(f"  Saved LaTeX table: {output_path}")
+
+    return latex
+
+
+# ============================================================================
 # LATEX TABLE GENERATION
 # ============================================================================
 def table_nll_vs_tau(
@@ -2157,6 +2298,14 @@ def generate_all_figures():
     except Exception as e:
         print(f"  Error: {e}")
 
+    # Figure 11: Tau sweep (unconstrained, no regularization)
+    print("\n[11/15] Tau sweep (unconstrained, no reg, 16D)...")
+    try:
+        fig11_tau_sweep_unconstrained()
+        figures_generated.append("fig11_tau_sweep_unconstrained")
+    except Exception as e:
+        print(f"  Error: {e}")
+
     # -------------------------------------------------------------------------
     # TABLES
     # -------------------------------------------------------------------------
@@ -2185,6 +2334,14 @@ def generate_all_figures():
     try:
         table_omega_weights()
         tables_generated.append("tab_omega_weights")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+    # Table 4: NLL summary (one-line)
+    print("\n[4/4] NLL summary table (learned vs k-NN vs global)...")
+    try:
+        table_nll_summary()
+        tables_generated.append("tab_nll_summary")
     except Exception as e:
         print(f"  Error: {e}")
 

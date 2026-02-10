@@ -212,6 +212,8 @@ def run_rts_daruc(
     enforce_lines: bool = True,
     rho_lines_frac: Optional[float] = None,
     mip_gap: float = 0.005,
+    incremental_obj: bool = False,
+    dispatch_cost_scale: float = 0.01,
 ) -> Dict[str, Any]:
     """
     Two-step DARUC pipeline (Setup 1):
@@ -319,6 +321,8 @@ def run_rts_daruc(
         dam_commitment=dam_commitment,
         enforce_lines=enforce_lines,
         mip_gap=mip_gap,
+        incremental_obj=incremental_obj,
+        dispatch_cost_scale=dispatch_cost_scale,
     )
     print("  Model built. Starting optimization...")
 

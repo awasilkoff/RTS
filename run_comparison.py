@@ -66,6 +66,10 @@ def main():
                         help="Fraction of rho for line flow constraints, e.g. 0.25 (default: 1.0 = same as rho)")
     parser.add_argument("--mip-gap", type=float, default=0.005,
                         help="MIP optimality gap (default: 0.005 = 0.5%%)")
+    parser.add_argument("--incremental-obj", action="store_true",
+                        help="DARUC: only charge commitment costs for additional units, scale dispatch by --dispatch-cost-scale")
+    parser.add_argument("--dispatch-cost-scale", type=float, default=0.01,
+                        help="Dispatch cost scale factor for incremental objective (default: 0.01)")
     parser.add_argument("--out-dir", type=str, default=None,
                         help="Output directory (auto-generated if not specified)")
     args = parser.parse_args()
@@ -106,6 +110,8 @@ def main():
     if args.rho_lines_frac is not None:
         print(f"  Rho lines frac: {args.rho_lines_frac}")
     print(f"  MIP gap:  {args.mip_gap:.4f} ({args.mip_gap*100:.2f}%)")
+    if args.incremental_obj:
+        print(f"  DARUC obj: incremental (dispatch scale={args.dispatch_cost_scale})")
     print(f"  Network:  {'with line limits' if args.enforce_lines else 'copperplate'}")
     print(f"  Output:   {out_dir}")
     print("=" * 70)
@@ -126,6 +132,8 @@ def main():
         provider_start_idx=args.provider_start,
         rho_lines_frac=args.rho_lines_frac,
         mip_gap=args.mip_gap,
+        incremental_obj=args.incremental_obj,
+        dispatch_cost_scale=args.dispatch_cost_scale,
     )
 
     daruc_results = daruc_outputs["daruc_results"]
@@ -154,6 +162,8 @@ def main():
         "rho_input": args.rho,
         "rho_lines_frac": args.rho_lines_frac,
         "mip_gap": args.mip_gap,
+        "incremental_obj": args.incremental_obj,
+        "dispatch_cost_scale": args.dispatch_cost_scale if args.incremental_obj else None,
         "time_varying": daruc_outputs["time_varying"],
         "enforce_lines": args.enforce_lines,
         "start_time": str(start_time),

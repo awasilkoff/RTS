@@ -77,6 +77,8 @@ def build_aruc_ldr_model(
     dam_commitment: Optional[Dict[str, np.ndarray]] = None,
     enforce_lines: bool = True,
     mip_gap: float = 0.005,
+    incremental_obj: bool = False,
+    dispatch_cost_scale: float = 0.01,
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Adaptive robust UC with linear decision rules:
@@ -269,19 +271,36 @@ def build_aruc_ldr_model(
     Z = m.addVars(I, T, K, vtype=GRB.CONTINUOUS, lb=-GRB.INFINITY, name="Z")
 
     # ------------------------------------------------------------------
-    # Objective: expected or worst-case cost?
+    # Objective
     # ------------------------------------------------------------------
-    # For a first version, you can just use the nominal cost at p0 and u,v,w,
-    # ignoring Z in the objective (i.e. be conservative only in constraints).
     obj = gp.LinExpr()
 
-    for i in range(I):
-        for t in range(T):
-            obj.addTerms(C_NL[i], u[i, t])
-            obj.addTerms(C_SU[i], v[i, t])
-            obj.addTerms(C_SD[i], w[i, t])
-            for b in range(B):
-                obj.addTerms(block_cost[i, b], p0_block[i, t, b])
+    if incremental_obj and dam_commitment is not None:
+        # Incremental objective: only pay commitment costs for additional
+        # units (u_dam=0), scale dispatch costs down to break ties.
+        u_dam_arr = dam_commitment["u"]
+        print(f"  [ARUC] Incremental objective: commitment costs for "
+              f"additional units only, dispatch scaled by {dispatch_cost_scale}")
+        for i in range(I):
+            for t in range(T):
+                if u_dam_arr[i, t] < 0.5:  # not committed by DAM
+                    obj.addTerms(C_NL[i], u[i, t])
+                    obj.addTerms(C_SU[i], v[i, t])
+                    obj.addTerms(C_SD[i], w[i, t])
+                for b in range(B):
+                    obj.addTerms(
+                        dispatch_cost_scale * block_cost[i, b],
+                        p0_block[i, t, b],
+                    )
+    else:
+        # Full cost objective (standard)
+        for i in range(I):
+            for t in range(T):
+                obj.addTerms(C_NL[i], u[i, t])
+                obj.addTerms(C_SU[i], v[i, t])
+                obj.addTerms(C_SD[i], w[i, t])
+                for b in range(B):
+                    obj.addTerms(block_cost[i, b], p0_block[i, t, b])
 
     for t in range(T):
         obj.addTerms(M_p, s_p[t])

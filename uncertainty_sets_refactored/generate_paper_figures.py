@@ -261,7 +261,7 @@ def fig1_kernel_distance_comparison(
 def fig2_3d_ellipsoid_comparison(
     feature_set_dir: Path = HIGH_DIM_16D_DIR,
     output_path: Path = None,
-    sample_idx: int = EXTREME_SAMPLE_IDX,
+    sample_idx: int = 0,
     knn_k: int = 16,
     tau: float = 0.1,
     rho: float = 1.0,
@@ -1660,7 +1660,8 @@ def fig8_ellipse_grid(
         k_values = [16, 512, N_train]
 
     if sample_indices is None:
-        sample_indices = EXTREME_SAMPLES
+        n_eval = Y_eval.shape[0]
+        sample_indices = [0, n_eval // 4, n_eval // 2]
 
     # Compute ellipsoids
     results = sweep_k_values(X_train, Y_train, X_eval, Y_eval, k_values)
@@ -1782,7 +1783,7 @@ def fig9_omega_bar_chart(
 # ============================================================================
 def fig10_ellipse_overlay(
     output_path: Path = None,
-    sample_idx: int = EXTREME_SAMPLE_IDX,
+    sample_idx: int = 0,
     rho: float = 2.0,
 ) -> plt.Figure:
     """
@@ -2213,11 +2214,23 @@ def generate_all_figures():
     except Exception as e:
         print(f"  Error: {e}")
 
-    # Figure 2: 3D ellipsoid (Learned, k-NN k=64/512, Global)
+    # Figure 2: 3D ellipsoid (Learned, k-NN k=16, Global)
     print("\n[2/15] 3D ellipsoid comparison (Learned, k-NN, Global)...")
     try:
         fig2_3d_ellipsoid_comparison(knn_k=16, tau=0.1)
         figures_generated.append("fig2_ellipsoid_3d")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+    # Figure 2 extreme: same but at high-std sample point
+    print("\n[2e/15] 3D ellipsoid comparison (extreme hour)...")
+    try:
+        fig2_3d_ellipsoid_comparison(
+            knn_k=16, tau=0.1,
+            sample_idx=EXTREME_SAMPLE_IDX,
+            output_path=OUTPUT_DIR / "figures" / "fig2_ellipsoid_3d_extreme",
+        )
+        figures_generated.append("fig2_ellipsoid_3d_extreme")
     except Exception as e:
         print(f"  Error: {e}")
 
@@ -2295,6 +2308,17 @@ def generate_all_figures():
     except Exception as e:
         print(f"  Error: {e}")
 
+    # Figure 8 extreme: same grid at extreme sample points
+    print("\n[8e/15] 2D ellipse grid (extreme hours)...")
+    try:
+        fig8_ellipse_grid(
+            sample_indices=EXTREME_SAMPLES,
+            output_path=OUTPUT_DIR / "figures" / "fig8_ellipse_grid_extreme",
+        )
+        figures_generated.append("fig8_ellipse_grid_extreme")
+    except Exception as e:
+        print(f"  Error: {e}")
+
     # Figure 9: Omega bar chart
     # print("\n[9/15] Omega bar chart (16D)...")  # SKIPPED
     # fig9_omega_bar_chart()
@@ -2304,6 +2328,17 @@ def generate_all_figures():
     try:
         fig10_ellipse_overlay()
         figures_generated.append("fig10_ellipse_overlay")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+    # Figure 10 extreme: same overlay at extreme sample point
+    print("\n[10e/15] 2D ellipse overlay (extreme hour)...")
+    try:
+        fig10_ellipse_overlay(
+            sample_idx=EXTREME_SAMPLE_IDX,
+            output_path=OUTPUT_DIR / "figures" / "fig10_ellipse_overlay_extreme",
+        )
+        figures_generated.append("fig10_ellipse_overlay_extreme")
     except Exception as e:
         print(f"  Error: {e}")
 

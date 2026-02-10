@@ -111,6 +111,68 @@ def build_wind_pmax_array(
     return pmax_wind
 
 
+def build_solar_pmax_array(
+    pv_df: pd.DataFrame,
+    rtpv_df: pd.DataFrame,
+    gens_df: pd.DataFrame,
+    gen_ids: list,
+    time_index: list,
+    gen_type: np.ndarray,
+) -> np.ndarray:
+    """
+    Build time-varying Pmax for PV and RTPV generators.
+
+    Solar CSVs are already in absolute MW, so no capacity-factor conversion
+    is needed. Values are clipped to nameplate Pmax.
+
+    Parameters
+    ----------
+    pv_df : DataFrame
+        index = time, columns = PV generator names, values = MW availability.
+    rtpv_df : DataFrame
+        index = time, columns = RTPV generator names, values = MW availability.
+    gens_df : DataFrame
+        Generator metadata with 'GEN UID' and 'PMax MW'.
+    gen_ids : list
+        Ordered list of generator IDs.
+    time_index : list
+        Ordered list of times.
+    gen_type : np.ndarray
+        Array of generator types (length = len(gen_ids)).
+
+    Returns
+    -------
+    pmax_solar : np.ndarray
+        I x T array where pmax_solar[i,t] is the solar availability for
+        generator i at time t (or 0 for non-solar generators).
+    """
+    I = len(gen_ids)
+    T = len(time_index)
+    pmax_solar = np.zeros((I, T), dtype=float)
+
+    gens_lookup = gens_df.set_index("GEN UID")
+    is_solar = np.array([gt.upper() == "SOLAR" for gt in gen_type])
+
+    # Combine PV + RTPV into one lookup
+    solar_df = pd.concat([pv_df, rtpv_df], axis=1)
+
+    for i, gen_id in enumerate(gen_ids):
+        if not is_solar[i]:
+            continue
+
+        matching_cols = [c for c in solar_df.columns if gen_id in str(c)]
+        if not matching_cols:
+            print(f"WARNING: No solar time series for {gen_id}, using static Pmax")
+            pmax_solar[i, :] = gens_lookup.loc[gen_id, "PMax MW"]
+            continue
+
+        series = solar_df.loc[time_index, matching_cols[0]].to_numpy(dtype=float)
+        static_pmax = gens_lookup.loc[gen_id, "PMax MW"]
+        pmax_solar[i, :] = np.clip(series, 0, static_pmax)
+
+    return pmax_solar
+
+
 def build_wind_pmax_from_spp_ensemble(
     forecasts_parquet: str | Path,
     gen_ids: list[str],
@@ -229,32 +291,47 @@ def load_rts_source_tables(source_dir: str | Path) -> Dict[str, pd.DataFrame]:
 
 def load_rts_timeseries(
     ts_dir: str | Path,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
-    Load RTS-GMLC time series: load and (optionally) wind/solar.
+    Load RTS-GMLC time series: load, wind, PV, and RTPV.
 
     Returns
     -------
     load_df :
-        DataFrame indexed by ['bus_id', 't'], with column 'load_mw'.
+        DataFrame indexed by time, columns = regions, values = regional load MW.
     wind_df :
-        DataFrame indexed by ['gen_id', 't'], with column 'pmax_mw'
-        for dispatchable wind (can be empty if you want at first).
+        DataFrame indexed by time, columns = wind generators.
+    pv_df :
+        DataFrame indexed by time, columns = PV generators (MW).
+    rtpv_df :
+        DataFrame indexed by time, columns = RTPV generators (MW).
     """
     ts_path = Path(ts_dir)
 
     load_raw = pd.read_csv(ts_path / "Load" / "DAY_AHEAD_regional_Load.csv")
     load_raw = add_timestamp_column(load_raw)
-    # Example normalization:
-    # - assume columns: ["Year","Month","Day","Period","1","2","3"]
     load_df = load_raw.set_index(["time"]).sort_index()
     load_df = load_df.drop(columns={"Year", "Month", "Day", "Period"})
+
     # Wind:
     wind_raw = pd.read_csv(ts_path / "WIND" / "DAY_AHEAD_wind.csv")
     wind_raw = add_timestamp_column(wind_raw)
     wind_df = wind_raw.set_index(["time"]).sort_index()
     wind_df = wind_df.drop(columns={"Year", "Month", "Day", "Period"})
-    return load_df, wind_df
+
+    # Solar PV:
+    pv_raw = pd.read_csv(ts_path / "PV" / "DAY_AHEAD_pv.csv")
+    pv_raw = add_timestamp_column(pv_raw)
+    pv_df = pv_raw.set_index(["time"]).sort_index()
+    pv_df = pv_df.drop(columns={"Year", "Month", "Day", "Period"})
+
+    # Rooftop PV:
+    rtpv_raw = pd.read_csv(ts_path / "RTPV" / "DAY_AHEAD_rtpv.csv")
+    rtpv_raw = add_timestamp_column(rtpv_raw)
+    rtpv_df = rtpv_raw.set_index(["time"]).sort_index()
+    rtpv_df = rtpv_df.drop(columns={"Year", "Month", "Day", "Period"})
+
+    return load_df, wind_df, pv_df, rtpv_df
 
 
 import numpy as np
@@ -486,7 +563,7 @@ def build_damdata_from_rts(
 
     # 5) Load / net injection array d[n,t]
     # 0) Build full time-series once
-    load_df, wind_df = load_rts_timeseries(ts_dir)
+    load_df, wind_df, pv_df, rtpv_df = load_rts_timeseries(ts_dir)
 
     end_time = start_time + pd.Timedelta(hours=horizon_hours)
 
@@ -540,21 +617,36 @@ def build_damdata_from_rts(
             gen_type=gen_type,
         )
 
-    # For thermal units, use static Pmax
-    # For wind units, use time-varying forecast
-    is_wind = np.array([gt.upper() == "WIND" for gt in gen_type])
+    # 6b) Build time-varying Pmax for solar generators (PV + RTPV)
+    pv_window = pv_df.loc[
+        (pv_df.index >= start_time) & (pv_df.index < end_time)
+    ].copy()
+    rtpv_window = rtpv_df.loc[
+        (rtpv_df.index >= start_time) & (rtpv_df.index < end_time)
+    ].copy()
 
-    # Store as Pmax_t attribute (will be used by Pmax_2d() method)
-    # This requires modifying DAMData to accept time-varying Pmax
-    # For now, we'll store it and let DAMData handle it
+    pmax_solar = build_solar_pmax_array(
+        pv_df=pv_window,
+        rtpv_df=rtpv_window,
+        gens_df=gens_df,
+        gen_ids=gen_ids,
+        time_index=time_index,
+        gen_type=gen_type,
+    )
 
     # Create Pmax_t array: I x T
+    # Wind and solar use time-varying forecasts; thermal/hydro use static Pmax
+    is_wind = np.array([gt.upper() == "WIND" for gt in gen_type])
+    is_solar = np.array([gt.upper() == "SOLAR" for gt in gen_type])
+
     Pmax_t = np.zeros((I, T), dtype=float)
     for i in range(I):
         if is_wind[i]:
             Pmax_t[i, :] = pmax_wind[i, :]
+        elif is_solar[i]:
+            Pmax_t[i, :] = pmax_solar[i, :]
         else:
-            Pmax_t[i, :] = Pmax[i]  # Static capacity for thermal
+            Pmax_t[i, :] = Pmax[i]  # Static capacity for thermal/hydro
     # 6) Network: PTDF and Fmax
     PTDF, Fmax, bus_ids, line_ids = build_dc_ptdf(buses_df, lines_df)
     # 7) Build DAMData

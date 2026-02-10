@@ -24,7 +24,7 @@ Outputs saved to: data/viz_artifacts/paper_final/
         fig7c_lb_decomposition.pdf  - Stacked bar: base quantile + conformal correction
         fig8_ellipse_grid.pdf       - 2D ellipse grid with consistent axes
         fig9_omega_bar_chart.png    - Learned feature weights bar chart
-        fig10_ellipse_overlay.pdf   - Ellipse overlay (k=32, 512, global)
+        fig10_ellipse_overlay.pdf   - Ellipse overlay (k=16, 512, global)
         fig11_tau_sweep_unconstrained.pdf - NLL vs tau (no constraint, no reg, 16D)
     tables/
         tab_nll_vs_tau.tex          - NLL at different tau values
@@ -1787,7 +1787,7 @@ def fig10_ellipse_overlay(
     rho: float = 2.0,
 ) -> plt.Figure:
     """
-    Single sample ellipse overlay: k=32, k=512, and Global, all on one plot.
+    Single sample ellipse overlay: k=16, k=512, and Global, all on one plot.
     """
     from sweep_knn_k_values import ellipse_points_2d, load_data, sweep_k_values
 
@@ -1801,12 +1801,12 @@ def fig10_ellipse_overlay(
     )
 
     N_train = X_train.shape[0]
-    k_values = [32, 512, N_train]  # last = global
+    k_values = [16, 512, N_train]  # last = global
     results = sweep_k_values(X_train, Y_train, X_eval, Y_eval, k_values)
 
     dims = (1, 2)  # Wind 2 and Wind 3 (more similar scale)
     colors = ["#E76F51", "#2A9D8F", COLORS["global"]]  # Coral, Teal, Gray
-    labels = ["k=32", "k=512", f"Global (k={N_train})"]
+    labels = ["k=16", "k=512", f"Global (k={N_train})"]
 
     fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, IEEE_COL_WIDTH))
 

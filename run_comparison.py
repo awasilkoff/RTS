@@ -38,6 +38,7 @@ from compare_aruc_vs_daruc import (
     compute_cost_breakdown,
     fig_commitment_and_cost,
     fig_z_heatmaps,
+    fig_wind_curtailment,
     write_summary,
 )
 
@@ -253,12 +254,13 @@ def main():
         cost_aruc, cost_daruc, cost_dam, out_dir,
     )
     fig_z_heatmaps(aruc_loaded, daruc_loaded, common_times, out_dir)
+    fig_wind_curtailment(aruc_loaded, daruc_loaded, dam_loaded, common_times, data, out_dir)
 
     # Text summary
     print()
     write_summary(
         aruc_loaded, daruc_loaded, dam_loaded, common_times,
-        cost_aruc, cost_daruc, cost_dam, out_dir,
+        cost_aruc, cost_daruc, cost_dam, out_dir, data=data,
     )
 
     # Quick delta report

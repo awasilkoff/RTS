@@ -464,6 +464,135 @@ def fig_z_heatmaps(aruc: dict, daruc: dict, common_times: list[str], out_dir: Pa
 
 
 # ---------------------------------------------------------------------------
+# Wind curtailment helper
+# ---------------------------------------------------------------------------
+
+
+def compute_wind_curtailment(p0_df: pd.DataFrame, data, common_times: list[str]) -> dict:
+    """
+    Compute wind curtailment = available wind capacity − dispatched wind.
+
+    Returns dict with:
+      total_mwh: total curtailment in MWh over the horizon
+      pct: curtailment as % of available wind
+      per_farm: dict of {gen_id: avg curtailment MW}
+      timeseries: (T,) array of total curtailment per period
+      per_farm_timeseries: dict of {gen_id: (T,) array}
+    """
+    wind_mask = [gt.upper() == "WIND" for gt in data.gen_type]
+    wind_idx = [i for i, m in enumerate(wind_mask) if m]
+    wind_ids = [data.gen_ids[i] for i in wind_idx]
+
+    pmax_2d = data.Pmax_2d()  # (I, T)
+    T = len(common_times)
+
+    # Map common_times to column positions in the full time axis
+    time_list = list(data.time)
+    time_pos = [time_list.index(t) for t in common_times]
+
+    total_curtail_ts = np.zeros(T)
+    per_farm_ts = {}
+    per_farm_avg = {}
+
+    for wi, gid in zip(wind_idx, wind_ids):
+        avail = np.array([pmax_2d[wi, tp] for tp in time_pos])
+        dispatched = p0_df.loc[gid, common_times].values.astype(float)
+        curtail = np.maximum(0.0, avail - dispatched)
+        total_curtail_ts += curtail
+        per_farm_ts[gid] = curtail
+        per_farm_avg[gid] = float(curtail.mean())
+
+    total_avail = sum(
+        sum(pmax_2d[wi, tp] for tp in time_pos) for wi in wind_idx
+    )
+    total_mwh = float(total_curtail_ts.sum())
+    pct = 100.0 * total_mwh / total_avail if total_avail > 0 else 0.0
+
+    return {
+        "total_mwh": total_mwh,
+        "pct": pct,
+        "per_farm": per_farm_avg,
+        "timeseries": total_curtail_ts,
+        "per_farm_timeseries": per_farm_ts,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Figure: Wind curtailment
+# ---------------------------------------------------------------------------
+
+
+def fig_wind_curtailment(
+    aruc: dict, daruc: dict, dam: dict | None,
+    common_times: list[str], data, out_dir: Path,
+):
+    """Two-panel figure: (a) curtailment time series, (b) per-farm bar chart."""
+    formulations = []
+    colors = {}
+    if dam is not None:
+        formulations.append(("DAM", dam))
+        colors["DAM"] = "#2ca02c"
+    formulations.append(("DARUC", daruc))
+    colors["DARUC"] = "#ff7f0e"
+    formulations.append(("ARUC", aruc))
+    colors["ARUC"] = "#1f77b4"
+
+    curtail = {}
+    for name, res in formulations:
+        curtail[name] = compute_wind_curtailment(res["p0"], data, common_times)
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    # --- (a) Time series ---
+    ax = axes[0]
+    x = np.arange(len(common_times))
+    for name, _ in formulations:
+        ax.plot(x, curtail[name]["timeseries"], label=name,
+                color=colors[name], linewidth=1.5)
+    ax.set_xlabel("Hour", fontsize=9)
+    ax.set_ylabel("Wind Curtailment (MW)", fontsize=9)
+    ax.set_title("(a) Total wind curtailment over time", fontsize=10)
+    ax.legend(fontsize=8)
+    tick_step = max(1, len(common_times) // 8)
+    ax.set_xticks(range(0, len(common_times), tick_step))
+    ax.set_xticklabels(
+        [common_times[i].split(" ")[1][:5] if " " in common_times[i]
+         else str(i) for i in range(0, len(common_times), tick_step)],
+        fontsize=7, rotation=45,
+    )
+
+    # --- (b) Per-farm bar chart ---
+    ax = axes[1]
+    wind_ids = list(curtail[formulations[0][0]]["per_farm"].keys())
+    n_farms = len(wind_ids)
+    n_forms = len(formulations)
+    bar_w = 0.8 / n_forms
+    x_farms = np.arange(n_farms)
+
+    for idx, (name, _) in enumerate(formulations):
+        offset = (idx - (n_forms - 1) / 2) * bar_w
+        vals = [curtail[name]["per_farm"][gid] for gid in wind_ids]
+        ax.bar(x_farms + offset, vals, bar_w, label=name,
+               color=colors[name], alpha=0.85)
+
+    ax.set_xticks(x_farms)
+    ax.set_xticklabels([gid.replace("_WIND_1", "") for gid in wind_ids],
+                       fontsize=8, rotation=30)
+    ax.set_xlabel("Wind Farm", fontsize=9)
+    ax.set_ylabel("Avg Curtailment (MW)", fontsize=9)
+    ax.set_title("(b) Average curtailment per wind farm", fontsize=10)
+    ax.legend(fontsize=8)
+
+    fig.suptitle("Wind Curtailment Comparison", fontsize=12, y=0.98)
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+
+    for ext in ["pdf", "png"]:
+        fig.savefig(out_dir / f"fig_wind_curtailment.{ext}", dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  Saved fig_wind_curtailment.pdf/.png")
+
+
+# ---------------------------------------------------------------------------
 # Text summary
 # ---------------------------------------------------------------------------
 
@@ -472,6 +601,7 @@ def write_summary(
     aruc: dict, daruc: dict, dam: dict | None, common_times: list[str],
     cost_aruc: dict | None, cost_daruc: dict | None, cost_dam: dict | None,
     out_dir: Path,
+    data=None,
 ):
     """Write comparison summary to console and file."""
     lines = []
@@ -579,6 +709,20 @@ def write_summary(
             lines.append(f"    {row['gen_id']} ({row['gen_type']}): "
                          f"+{row['extra_committed_hours']}h (DAM={row['dam_committed_hours']}h)")
 
+    # Wind curtailment
+    if data is not None:
+        lines.append("\n--- Wind Curtailment ---")
+        header = f"  {'':10s}  {'Total (MWh)':>12s}  {'% Available':>12s}"
+        lines.append(header)
+        formulations = [("ARUC", aruc), ("DARUC", daruc)]
+        if dam is not None:
+            formulations.insert(0, ("DAM", dam))
+        for name, res in formulations:
+            c = compute_wind_curtailment(res["p0"], data, common_times)
+            lines.append(f"  {name:10s}  {c['total_mwh']:>12,.1f}  {c['pct']:>11.1f}%")
+            for gid, avg in c["per_farm"].items():
+                lines.append(f"    {gid}: {avg:.1f} MW avg")
+
     lines.append("\n" + "=" * 70)
 
     text = "\n".join(lines)
@@ -617,8 +761,9 @@ def main():
     common_times = _align_time(aruc, daruc, dam)
     print(f"  Common time periods: {len(common_times)}")
 
-    # Try to build DAMData for cost breakdown
+    # Try to build DAMData for cost breakdown + curtailment
     cost_aruc = cost_daruc = cost_dam = None
+    data = None
     try:
         from io_rts import build_damdata_from_rts
         print("Building DAMData for cost breakdown...")
@@ -641,10 +786,12 @@ def main():
     print("\nGenerating figures...")
     fig_commitment_and_cost(aruc, daruc, dam, common_times, cost_aruc, cost_daruc, cost_dam, out_dir)
     fig_z_heatmaps(aruc, daruc, common_times, out_dir)
+    if data is not None:
+        fig_wind_curtailment(aruc, daruc, dam, common_times, data, out_dir)
 
     # Text summary
     print()
-    write_summary(aruc, daruc, dam, common_times, cost_aruc, cost_daruc, cost_dam, out_dir)
+    write_summary(aruc, daruc, dam, common_times, cost_aruc, cost_daruc, cost_dam, out_dir, data=data)
 
     print(f"\nAll outputs saved to {out_dir}/")
 

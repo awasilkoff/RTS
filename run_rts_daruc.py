@@ -213,7 +213,7 @@ def run_rts_daruc(
     rho_lines_frac: Optional[float] = None,
     mip_gap: float = 0.005,
     incremental_obj: bool = False,
-    dispatch_cost_scale: float = 0.01,
+    dispatch_cost_scale: float = 0.1,
 ) -> Dict[str, Any]:
     """
     Two-step DARUC pipeline (Setup 1):

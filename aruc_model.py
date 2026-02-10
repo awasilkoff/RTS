@@ -78,7 +78,7 @@ def build_aruc_ldr_model(
     enforce_lines: bool = True,
     mip_gap: float = 0.005,
     incremental_obj: bool = False,
-    dispatch_cost_scale: float = 0.01,
+    dispatch_cost_scale: float = 0.1,
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Adaptive robust UC with linear decision rules:

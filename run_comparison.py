@@ -68,7 +68,7 @@ def main():
                         help="MIP optimality gap (default: 0.005 = 0.5%%)")
     parser.add_argument("--incremental-obj", action="store_true",
                         help="DARUC: only charge commitment costs for additional units, scale dispatch by --dispatch-cost-scale")
-    parser.add_argument("--dispatch-cost-scale", type=float, default=0.01,
+    parser.add_argument("--dispatch-cost-scale", type=float, default=0.1,
                         help="Dispatch cost scale factor for incremental objective (default: 0.01)")
     parser.add_argument("--out-dir", type=str, default=None,
                         help="Output directory (auto-generated if not specified)")

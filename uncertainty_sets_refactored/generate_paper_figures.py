@@ -74,6 +74,11 @@ PAPER_FIGURES_DIR = VIZ_ARTIFACTS / "paper_figures"
 # Anonymized wind resource labels (Y columns are sorted: 122, 309, 317)
 WIND_LABELS = {0: "Wind 1", 1: "Wind 2", 2: "Wind 3"}
 
+# Extreme eval-set indices (high SYS_STD, far from centroid in mean/std space)
+# Found via standardized Euclidean distance from centroid of eval set
+EXTREME_SAMPLE_IDX = 353      # Highest std: mean=122.7, std=74.1 MW
+EXTREME_SAMPLES = [353, 264, 482]  # High-std, high-mean+std corner, high-mean+std
+
 
 def _ensure_output_dirs():
     """Create output directories."""
@@ -256,7 +261,7 @@ def fig1_kernel_distance_comparison(
 def fig2_3d_ellipsoid_comparison(
     feature_set_dir: Path = HIGH_DIM_16D_DIR,
     output_path: Path = None,
-    sample_idx: int = 0,
+    sample_idx: int = EXTREME_SAMPLE_IDX,
     knn_k: int = 16,
     tau: float = 0.1,
     rho: float = 1.0,
@@ -1650,8 +1655,7 @@ def fig8_ellipse_grid(
         k_values = [16, 512, N_train]
 
     if sample_indices is None:
-        n_eval = Y_eval.shape[0]
-        sample_indices = [0, n_eval // 4, n_eval // 2]
+        sample_indices = EXTREME_SAMPLES
 
     # Compute ellipsoids
     results = sweep_k_values(X_train, Y_train, X_eval, Y_eval, k_values)
@@ -1773,7 +1777,7 @@ def fig9_omega_bar_chart(
 # ============================================================================
 def fig10_ellipse_overlay(
     output_path: Path = None,
-    sample_idx: int = 0,
+    sample_idx: int = EXTREME_SAMPLE_IDX,
     rho: float = 2.0,
 ) -> plt.Figure:
     """

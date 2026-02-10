@@ -163,9 +163,10 @@ if __name__ == "__main__":
     z_analysis = analyze_Z(daruc_results["Z"], data, out_dir, rho=outputs["rho"])
 
     # Save DAM results for 3-way comparison
+    # DAM uses key "p" (not "p0" like ARUC/DARUC)
     dam_results = outputs["dam_outputs"]["results"]
     dam_results["u"].to_csv(out_dir / "dam_commitment_u.csv")
-    dam_results["p0"].to_csv(out_dir / "dam_dispatch_p0.csv")
+    dam_results["p"].to_csv(out_dir / "dam_dispatch_p0.csv")
 
     # Save summary for comparison scripts
     summary = {

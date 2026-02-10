@@ -318,8 +318,13 @@ def fig2_3d_ellipsoid_comparison(
 
     # Compute learned omega ellipsoid
     learned_result = compute_learned_omega_baseline(
-        X_train, Y_train, X_eval, Y_eval,
-        omega=omega, tau=tau, k=128,
+        X_train,
+        Y_train,
+        X_eval,
+        Y_eval,
+        omega=omega,
+        tau=tau,
+        k=128,
     )
 
     # Compute global covariance
@@ -334,8 +339,8 @@ def fig2_3d_ellipsoid_comparison(
     Mu_common = Mu_global + offset
 
     # Colors: high-contrast, distinct hues
-    color_global = "#4361EE"   # Blue
-    color_knn = "#2A9D8F"      # Teal
+    color_global = "#4361EE"  # Blue
+    color_knn = "#2A9D8F"  # Teal
     color_learned = "#F77F00"  # Orange
 
     # Create side-by-side 3D figure
@@ -352,25 +357,90 @@ def fig2_3d_ellipsoid_comparison(
     # --- Left panel: Global vs Learned ---
     ax1 = fig.add_subplot(121, projection="3d")
 
-    X_g, Y_g, Z_g = ellipsoid_surface_3d(Mu_common, Sigma_global, rho=rho, n_points=n_pts)
-    ax1.plot_surface(X_g, Y_g, Z_g, color=color_global, alpha=0.15, edgecolor=color_global, linewidth=0.3)
-    ax1.plot_wireframe(X_g, Y_g, Z_g, color=color_global, alpha=0.35, linewidth=0.5, rstride=5, cstride=5)
+    X_g, Y_g, Z_g = ellipsoid_surface_3d(
+        Mu_common, Sigma_global, rho=rho, n_points=n_pts
+    )
+    ax1.plot_surface(
+        X_g,
+        Y_g,
+        Z_g,
+        color=color_global,
+        alpha=0.15,
+        edgecolor=color_global,
+        linewidth=0.3,
+    )
+    ax1.plot_wireframe(
+        X_g,
+        Y_g,
+        Z_g,
+        color=color_global,
+        alpha=0.35,
+        linewidth=0.5,
+        rstride=5,
+        cstride=5,
+    )
 
-    X_l, Y_l, Z_l = ellipsoid_surface_3d(Mu_common, Sigma_learned, rho=rho, n_points=n_pts)
-    ax1.plot_surface(X_l, Y_l, Z_l, color=color_learned, alpha=0.25, edgecolor=color_learned, linewidth=0.3)
-    ax1.plot_wireframe(X_l, Y_l, Z_l, color=color_learned, alpha=0.5, linewidth=0.6, rstride=5, cstride=5)
+    X_l, Y_l, Z_l = ellipsoid_surface_3d(
+        Mu_common, Sigma_learned, rho=rho, n_points=n_pts
+    )
+    ax1.plot_surface(
+        X_l,
+        Y_l,
+        Z_l,
+        color=color_learned,
+        alpha=0.25,
+        edgecolor=color_learned,
+        linewidth=0.3,
+    )
+    ax1.plot_wireframe(
+        X_l,
+        Y_l,
+        Z_l,
+        color=color_learned,
+        alpha=0.5,
+        linewidth=0.6,
+        rstride=5,
+        cstride=5,
+    )
 
     # Common center
-    ax1.scatter([Mu_common[0]], [Mu_common[1]], [Mu_common[2]], s=50, c="black", marker="o", edgecolors="black", linewidths=0.5, zorder=6)
+    ax1.scatter(
+        [Mu_common[0]],
+        [Mu_common[1]],
+        [Mu_common[2]],
+        s=50,
+        c="black",
+        marker="o",
+        edgecolors="black",
+        linewidths=0.5,
+        zorder=6,
+    )
 
     ax1.set_title("Global vs Learned ω", fontsize=9)
     _labels(ax1)
     ax1.view_init(elev=20, azim=45)
     # Manual legend
     from matplotlib.lines import Line2D
+
     legend_elements = [
-        Line2D([0], [0], marker="o", color="w", markerfacecolor=color_global, markersize=8, label="Global"),
-        Line2D([0], [0], marker="D", color="w", markerfacecolor=color_learned, markersize=8, label=f"Learned ω (τ={tau})"),
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="w",
+            markerfacecolor=color_global,
+            markersize=8,
+            label="Global",
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker="D",
+            color="w",
+            markerfacecolor=color_learned,
+            markersize=8,
+            label=f"Learned ω (τ={tau})",
+        ),
     ]
     ax1.legend(handles=legend_elements, loc="upper left", fontsize=7)
 
@@ -379,21 +449,68 @@ def fig2_3d_ellipsoid_comparison(
 
     Sigma_knn = knn_results[knn_k]["Sigma"][sample_idx]
     X_k, Y_k, Z_k = ellipsoid_surface_3d(Mu_common, Sigma_knn, rho=rho, n_points=n_pts)
-    ax2.plot_surface(X_k, Y_k, Z_k, color=color_knn, alpha=0.15, edgecolor=color_knn, linewidth=0.3)
-    ax2.plot_wireframe(X_k, Y_k, Z_k, color=color_knn, alpha=0.35, linewidth=0.5, rstride=5, cstride=5)
+    ax2.plot_surface(
+        X_k, Y_k, Z_k, color=color_knn, alpha=0.15, edgecolor=color_knn, linewidth=0.3
+    )
+    ax2.plot_wireframe(
+        X_k, Y_k, Z_k, color=color_knn, alpha=0.35, linewidth=0.5, rstride=5, cstride=5
+    )
 
-    ax2.plot_surface(X_l, Y_l, Z_l, color=color_learned, alpha=0.25, edgecolor=color_learned, linewidth=0.3)
-    ax2.plot_wireframe(X_l, Y_l, Z_l, color=color_learned, alpha=0.5, linewidth=0.6, rstride=5, cstride=5)
+    ax2.plot_surface(
+        X_l,
+        Y_l,
+        Z_l,
+        color=color_learned,
+        alpha=0.25,
+        edgecolor=color_learned,
+        linewidth=0.3,
+    )
+    ax2.plot_wireframe(
+        X_l,
+        Y_l,
+        Z_l,
+        color=color_learned,
+        alpha=0.5,
+        linewidth=0.6,
+        rstride=5,
+        cstride=5,
+    )
 
     # Common center
-    ax2.scatter([Mu_common[0]], [Mu_common[1]], [Mu_common[2]], s=50, c="black", marker="o", edgecolors="black", linewidths=0.5, zorder=6)
+    ax2.scatter(
+        [Mu_common[0]],
+        [Mu_common[1]],
+        [Mu_common[2]],
+        s=50,
+        c="black",
+        marker="o",
+        edgecolors="black",
+        linewidths=0.5,
+        zorder=6,
+    )
 
     ax2.set_title(f"k-NN (k={knn_k}) vs Learned ω", fontsize=9)
     _labels(ax2)
     ax2.view_init(elev=20, azim=45)
     legend_elements_r = [
-        Line2D([0], [0], marker="o", color="w", markerfacecolor=color_knn, markersize=8, label=f"k-NN (k={knn_k})"),
-        Line2D([0], [0], marker="D", color="w", markerfacecolor=color_learned, markersize=8, label=f"Learned ω (τ={tau})"),
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="w",
+            markerfacecolor=color_knn,
+            markersize=8,
+            label=f"k-NN (k={knn_k})",
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker="D",
+            color="w",
+            markerfacecolor=color_learned,
+            markersize=8,
+            label=f"Learned ω (τ={tau})",
+        ),
     ]
     ax2.legend(handles=legend_elements_r, loc="upper left", fontsize=7)
 
@@ -433,31 +550,44 @@ def fig3_nll_vs_k(
 
         # Mean line with markers
         ax.plot(
-            k_values, nll_mean,
-            "o-", linewidth=2, markersize=5,
+            k_values,
+            nll_mean,
+            "o-",
+            linewidth=2,
+            markersize=5,
             color=COLORS["knn"],
         )
 
         # ±1σ shaded band (always visible even when narrow)
         ax.fill_between(
-            k_values, nll_mean - nll_std, nll_mean + nll_std,
-            alpha=0.25, color=COLORS["knn"],
+            k_values,
+            nll_mean - nll_std,
+            nll_mean + nll_std,
+            alpha=0.25,
+            color=COLORS["knn"],
             label="Mean ± 1σ",
         )
 
         # Mark best mean
         best_idx = np.argmin(nll_mean)
         ax.scatter(
-            [k_values[best_idx]], [nll_mean[best_idx]],
-            s=150, c=COLORS["knn"], marker="*",
-            zorder=10, edgecolors="black", linewidths=1,
+            [k_values[best_idx]],
+            [nll_mean[best_idx]],
+            s=150,
+            c=COLORS["knn"],
+            marker="*",
+            zorder=10,
+            edgecolors="black",
+            linewidths=1,
             label=f"Best: k={k_values[best_idx]}",
         )
 
         print(f"  Multi-split data: {len(k_values)} k values")
     else:
         # Fallback: single-split sweep
-        print(f"  Multi-split data not found at {multi_stats_path}, using single-split fallback")
+        print(
+            f"  Multi-split data not found at {multi_stats_path}, using single-split fallback"
+        )
         df = _load_knn_sweep()
 
         fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, 2.5))
@@ -533,31 +663,44 @@ def fig4_nll_vs_tau(
 
         # Mean line with markers
         ax.plot(
-            tau_values, nll_mean,
-            "o-", linewidth=2, markersize=5,
+            tau_values,
+            nll_mean,
+            "o-",
+            linewidth=2,
+            markersize=5,
             color=COLORS["learned"],
         )
 
         # ±1σ shaded band (always visible even when narrow)
         ax.fill_between(
-            tau_values, nll_mean - nll_std, nll_mean + nll_std,
-            alpha=0.25, color=COLORS["learned"],
+            tau_values,
+            nll_mean - nll_std,
+            nll_mean + nll_std,
+            alpha=0.25,
+            color=COLORS["learned"],
             label="Mean ± 1σ",
         )
 
         # Mark best mean
         best_idx = np.argmin(nll_mean)
         ax.scatter(
-            [tau_values[best_idx]], [nll_mean[best_idx]],
-            s=150, c=COLORS["learned"], marker="*",
-            zorder=10, edgecolors="black", linewidths=1,
+            [tau_values[best_idx]],
+            [nll_mean[best_idx]],
+            s=150,
+            c=COLORS["learned"],
+            marker="*",
+            zorder=10,
+            edgecolors="black",
+            linewidths=1,
             label=f"Best: τ={tau_values[best_idx]}",
         )
 
         print(f"  Multi-seed data: {len(tau_values)} tau values")
     else:
         # Fallback: single-seed sweep results
-        print(f"  Multi-seed data not found at {stats_path}, using single-seed fallback")
+        print(
+            f"  Multi-seed data not found at {stats_path}, using single-seed fallback"
+        )
         df = _load_sweep_results(HIGH_DIM_16D_DIR)
         best_scaler = df.iloc[0]["scaler_type"]
         df_filtered = df[df["scaler_type"] == best_scaler].copy()
@@ -567,18 +710,27 @@ def fig4_nll_vs_tau(
         fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, 2.5))
 
         ax.plot(
-            tau_nll["tau"], tau_nll["val_nll_learned"],
-            "o-", linewidth=2, markersize=6,
-            color=COLORS["learned"], label="Learned ω",
+            tau_nll["tau"],
+            tau_nll["val_nll_learned"],
+            "o-",
+            linewidth=2,
+            markersize=6,
+            color=COLORS["learned"],
+            label="Learned ω",
         )
 
         best_idx = tau_nll["val_nll_learned"].idxmin()
         best_tau = tau_nll.loc[best_idx, "tau"]
         best_nll = tau_nll.loc[best_idx, "val_nll_learned"]
         ax.scatter(
-            [best_tau], [best_nll],
-            s=150, c=COLORS["learned"], marker="*",
-            zorder=5, edgecolors="black", linewidths=1,
+            [best_tau],
+            [best_nll],
+            s=150,
+            c=COLORS["learned"],
+            marker="*",
+            zorder=5,
+            edgecolors="black",
+            linewidths=1,
             label=f"Best: τ={best_tau}",
         )
 
@@ -1235,7 +1387,13 @@ def fig7b_normalized_lower_bound(
     df_tot = build_conformal_totals_df(actuals, forecasts)
 
     feature_cols = [
-        "ens_mean", "ens_std", "ens_min", "ens_max", "n_models", "hour", "dow",
+        "ens_mean",
+        "ens_std",
+        "ens_min",
+        "ens_max",
+        "n_models",
+        "hour",
+        "dow",
     ]
 
     # Replicate the same sort + split as train_wind_lower_model_conformal_binned
@@ -1269,11 +1427,13 @@ def fig7b_normalized_lower_bound(
         n_std_below = (ens_mean_test[valid] - y_pred_conf[valid]) / ens_std_test[valid]
         mean_n_std = float(np.mean(n_std_below))
 
-        results.append({
-            "alpha": alpha,
-            "mean_n_std_below": mean_n_std,
-            "q_hat": bundle.q_hat_global_r,
-        })
+        results.append(
+            {
+                "alpha": alpha,
+                "mean_n_std_below": mean_n_std,
+                "q_hat": bundle.q_hat_global_r,
+            }
+        )
         print(f"    α={alpha:.2f}: {mean_n_std:.3f} std below mean")
 
     # Create plot
@@ -1339,7 +1499,13 @@ def fig7c_lower_bound_decomposition(
     df_tot = build_conformal_totals_df(actuals, forecasts)
 
     feature_cols = [
-        "ens_mean", "ens_std", "ens_min", "ens_max", "n_models", "hour", "dow",
+        "ens_mean",
+        "ens_std",
+        "ens_min",
+        "ens_max",
+        "n_models",
+        "hour",
+        "dow",
     ]
 
     # Extract raw test-set ens_mean / ens_std (same split as conformal training)
@@ -1368,17 +1534,21 @@ def fig7c_lower_bound_decomposition(
         y_pred_base = df_test["y_pred_base"].values
 
         # Base quantile: how far below the mean the quantile prediction already is
-        base_component = float(np.mean(
-            (ens_mean_test[valid] - y_pred_base[valid]) / ens_std_test[valid]
-        ))
+        base_component = float(
+            np.mean((ens_mean_test[valid] - y_pred_base[valid]) / ens_std_test[valid])
+        )
         # Conformal correction adds q_hat std devs on top
-        results.append({
-            "alpha": alpha,
-            "base": base_component,
-            "conformal": q_hat,
-            "total": base_component + q_hat,
-        })
-        print(f"    α={alpha:.2f}: base={base_component:.3f}, conformal={q_hat:.3f}, total={base_component + q_hat:.3f}")
+        results.append(
+            {
+                "alpha": alpha,
+                "base": base_component,
+                "conformal": q_hat,
+                "total": base_component + q_hat,
+            }
+        )
+        print(
+            f"    α={alpha:.2f}: base={base_component:.3f}, conformal={q_hat:.3f}, total={base_component + q_hat:.3f}"
+        )
 
     # Stacked bar chart
     fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, 2.8))
@@ -1391,11 +1561,25 @@ def fig7c_lower_bound_decomposition(
     x = np.arange(len(alphas))
     width = 0.5
 
-    bars_base = ax.bar(x, bases, width, label="Base Quantile",
-                       color=COLORS["knn"], edgecolor="black", linewidth=0.5)
-    bars_conf = ax.bar(x, conforals, width, bottom=bases,
-                       label="Conformal Correction",
-                       color=COLORS["learned"], edgecolor="black", linewidth=0.5)
+    bars_base = ax.bar(
+        x,
+        bases,
+        width,
+        label="Base Quantile",
+        color=COLORS["knn"],
+        edgecolor="black",
+        linewidth=0.5,
+    )
+    bars_conf = ax.bar(
+        x,
+        conforals,
+        width,
+        bottom=bases,
+        label="Conformal Correction",
+        color=COLORS["learned"],
+        edgecolor="black",
+        linewidth=0.5,
+    )
 
     # Total labels on top
     for i, tot in enumerate(totals):
@@ -1422,25 +1606,29 @@ def fig8_ellipse_grid(
     k_values: list[int] = None,
     sample_indices: list[int] = None,
     rho: float = 2.0,
+    offset: float = 50.0,
 ) -> plt.Figure:
     """
-    2D ellipse comparison at k=64, 512, 2048.
+    2D ellipse comparison at k=16, 512, and Global.
 
     Creates a grid: rows = samples, columns = k values.
+    An offset is added to centers so axes stay non-negative.
     """
     from sweep_knn_k_values import ellipse_points_2d, load_data, sweep_k_values
 
     if output_path is None:
         output_path = OUTPUT_DIR / "figures" / "fig8_ellipse_grid"
 
-    if k_values is None:
-        k_values = [64, 512, 2048]
-
     # Load data
     X_train, Y_train, X_eval, Y_eval, x_cols, y_cols, _, _ = load_data(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet",
         DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet",
     )
+
+    N_train = X_train.shape[0]
+
+    if k_values is None:
+        k_values = [16, 512, N_train]
 
     if sample_indices is None:
         n_eval = Y_eval.shape[0]
@@ -1449,10 +1637,16 @@ def fig8_ellipse_grid(
     # Compute ellipsoids
     results = sweep_k_values(X_train, Y_train, X_eval, Y_eval, k_values)
 
-    # Create grid figure
+    # Build display labels for k values
+    k_labels = [f"Global (k={k})" if k == N_train else f"k={k}" for k in k_values]
+
+    # Create grid figure (tight: reduced per-panel size)
     n_samples = len(sample_indices)
     n_k = len(k_values)
-    fig, axes = plt.subplots(n_samples, n_k, figsize=(3.5 * n_k, 3.5 * n_samples))
+    fig, axes = plt.subplots(
+        n_samples, n_k,
+        figsize=(2.8 * n_k, 2.8 * n_samples),
+    )
 
     if n_samples == 1:
         axes = axes.reshape(1, -1)
@@ -1460,14 +1654,14 @@ def fig8_ellipse_grid(
     colors = ["#2A9D8F", "#E9C46A", "#E76F51"]
     dims = (1, 2)  # Wind 2 and Wind 3 (more similar scale)
 
-    # Use global mean as common center (from largest k, which approximates global)
+    # Use global mean as common center (from largest k)
     max_k = max(k_values)
+    offset_vec = np.array([offset, offset])
 
     # Pre-compute all ellipses to find consistent axis limits per row
     ellipses_data = {}
     for row, sample_idx in enumerate(sample_indices):
-        # Common center per row: use mean from the largest k
-        mu_common = results[max_k]["Mu"][sample_idx][[dims[0], dims[1]]]
+        mu_common = results[max_k]["Mu"][sample_idx][[dims[0], dims[1]]] + offset_vec
 
         row_xmin, row_xmax, row_ymin, row_ymax = np.inf, -np.inf, np.inf, -np.inf
         for col, k in enumerate(k_values):
@@ -1479,10 +1673,12 @@ def fig8_ellipse_grid(
             row_xmax = max(row_xmax, ex.max())
             row_ymin = min(row_ymin, ey.min())
             row_ymax = max(row_ymax, ey.max())
-        # Store limits with padding
         pad_x = (row_xmax - row_xmin) * 0.1
         pad_y = (row_ymax - row_ymin) * 0.1
-        ellipses_data[("lim", row)] = (row_xmin - pad_x, row_xmax + pad_x, row_ymin - pad_y, row_ymax + pad_y)
+        ellipses_data[("lim", row)] = (
+            row_xmin - pad_x, row_xmax + pad_x,
+            row_ymin - pad_y, row_ymax + pad_y,
+        )
 
     for row, sample_idx in enumerate(sample_indices):
         xlim_lo, xlim_hi, ylim_lo, ylim_hi = ellipses_data[("lim", row)]
@@ -1491,24 +1687,20 @@ def fig8_ellipse_grid(
             ax = axes[row, col]
             mu2, ex, ey = ellipses_data[(row, col)]
 
-            # Plot ellipse
             ax.plot(ex, ey, "-", linewidth=2, color=colors[col])
             ax.fill(ex, ey, alpha=0.2, color=colors[col])
+            ax.scatter([mu2[0]], [mu2[1]], s=50, c="black", marker="o", zorder=5)
 
-            # Plot common center
-            ax.scatter([mu2[0]], [mu2[1]], s=60, c="black", marker="o", zorder=5)
-
-            ax.set_xlabel(WIND_LABELS[dims[0]])
-            ax.set_ylabel(WIND_LABELS[dims[1]])
-            ax.set_title(f"k={k}")
+            ax.set_xlabel(WIND_LABELS[dims[0]] + " (MW)", fontsize=7)
+            ax.set_ylabel(WIND_LABELS[dims[1]] + " (MW)", fontsize=7)
+            ax.set_title(k_labels[col], fontsize=8)
+            ax.tick_params(labelsize=6)
             ax.grid(True, alpha=0.3)
             ax.set_xlim(xlim_lo, xlim_hi)
             ax.set_ylim(ylim_lo, ylim_hi)
             ax.set_aspect("equal", adjustable="box")
 
-    # fig.suptitle(...)  # caption in paper
-    plt.tight_layout()
-
+    plt.tight_layout(pad=0.5, h_pad=1.0, w_pad=0.5)
     _save_figure(fig, output_path)
 
     return fig
@@ -1601,8 +1793,16 @@ def fig10_ellipse_overlay(
         ax.fill(ex, ey, alpha=0.1, color=colors[i])
 
     # Single common center
-    ax.scatter([mu_common[0]], [mu_common[1]], s=40, c="black", marker="o",
-               edgecolors="black", linewidths=0.5, zorder=5)
+    ax.scatter(
+        [mu_common[0]],
+        [mu_common[1]],
+        s=40,
+        c="black",
+        marker="o",
+        edgecolors="black",
+        linewidths=0.5,
+        zorder=5,
+    )
 
     ax.set_xlabel(WIND_LABELS[dims[0]])
     ax.set_ylabel(WIND_LABELS[dims[1]])
@@ -1921,9 +2121,9 @@ def generate_all_figures():
         print(f"  Error: {e}")
 
     # Figure 8: Ellipse grid
-    print("\n[8/15] 2D ellipse grid (k=64, 512, 2048)...")
+    print("\n[8/15] 2D ellipse grid (k=16, 512, Global)...")
     try:
-        fig8_ellipse_grid(k_values=[64, 512, 2048])
+        fig8_ellipse_grid()
         figures_generated.append("fig8_ellipse_grid")
     except Exception as e:
         print(f"  Error: {e}")

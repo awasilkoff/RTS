@@ -210,7 +210,7 @@ def run_rts_daruc(
     spp_forecasts_parquet: Optional[Path] = SPP_FORECASTS_PARQUET,
     spp_start_idx: int = SPP_START_IDX,
     enforce_lines: bool = True,
-    rho_lines: Optional[float] = None,
+    rho_lines_frac: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Two-step DARUC pipeline (Setup 1):
@@ -311,7 +311,7 @@ def run_rts_daruc(
         data=data,
         Sigma=Sigma,
         rho=rho_val,
-        rho_lines=rho_lines,
+        rho_lines_frac=rho_lines_frac,
         sqrt_Sigma=sqrt_Sigma,
         M_p=m_penalty,
         model_name=model_name,
@@ -355,7 +355,7 @@ def run_rts_daruc(
         "vars": vars_dict,
         "Sigma": Sigma,
         "rho": rho_val,
-        "rho_lines": rho_lines,
+        "rho_lines_frac": rho_lines_frac,
         "time_varying": time_varying,
     }
 

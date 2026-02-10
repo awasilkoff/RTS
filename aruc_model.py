@@ -70,7 +70,7 @@ def build_aruc_ldr_model(
     data: DAMData,
     Sigma: np.ndarray,
     rho: Union[float, np.ndarray],
-    rho_lines: Union[float, np.ndarray, None] = None,
+    rho_lines_frac: Optional[float] = None,
     sqrt_Sigma: Union[np.ndarray, None] = None,
     M_p: float = 1e5,
     model_name: str = "ARUC_LDR",
@@ -190,11 +190,11 @@ def build_aruc_ldr_model(
         )
         assert rho.shape == (T,), f"Expected rho shape ({T},), got {rho.shape}"
 
-        # Resolve rho_lines: default to rho if not specified
-        if rho_lines is None:
+        # Resolve rho_lines from fraction: scales with time-varying rho
+        if rho_lines_frac is not None:
+            rho_lines = rho_lines_frac * rho  # (T,) array
+        else:
             rho_lines = rho  # Same object — full backward compat
-        elif isinstance(rho_lines, (int, float)):
-            rho_lines = np.full(T, rho_lines)
 
         # Use provided sqrt_Sigma or compute
         if sqrt_Sigma is None:
@@ -206,14 +206,20 @@ def build_aruc_ldr_model(
         assert Sigma.shape == (K, K), (
             f"Expected Sigma shape ({K}, {K}), got {Sigma.shape}"
         )
-        # Resolve rho_lines: default to rho if not specified
-        if rho_lines is None:
+        # Resolve rho_lines from fraction
+        if rho_lines_frac is not None:
+            rho_lines = rho_lines_frac * rho  # scalar
+        else:
             rho_lines = rho  # Same object — full backward compat
         if sqrt_Sigma is None:
             sqrt_Sigma = np.linalg.cholesky(Sigma)
 
     if rho_lines is not rho:
-        print(f"  [ARUC] Using separate rho_lines for line constraints")
+        if time_varying:
+            print(f"  [ARUC] rho_lines_frac={rho_lines_frac} → rho_lines range "
+                  f"[{rho_lines.min():.3f}, {rho_lines.max():.3f}]")
+        else:
+            print(f"  [ARUC] rho_lines_frac={rho_lines_frac} → rho_lines={rho_lines:.3f}")
 
     # Map bus -> list of generators
     gens_at_bus = [[] for _ in range(N)]

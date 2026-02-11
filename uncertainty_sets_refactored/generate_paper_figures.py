@@ -2463,6 +2463,7 @@ def fig_nll_delta_surface(
     knn_k: int = 64,
     grid_res: int = 80,
     smooth_sigma: float = 1.5,
+    proj_indices: tuple[int, int] | None = None,
 ) -> plt.Figure:
     """
     KDE-smoothed ΔNLL surface (NLL_knn − NLL_learned) with scatter overlay.
@@ -2481,6 +2482,9 @@ def fig_nll_delta_surface(
         Number of bins per axis for the smoothed surface.
     smooth_sigma : float
         Gaussian smoothing sigma (in grid cells).
+    proj_indices : tuple[int, int] | None
+        Which feature indices to use for the x/y scatter axes.
+        None = auto-select the two highest-omega features.
     """
     from scipy.interpolate import griddata
     from scipy.ndimage import gaussian_filter
@@ -2532,6 +2536,15 @@ def fig_nll_delta_surface(
 
     omega = _load_omega(feature_set_dir)
 
+    # Auto-select projection: two highest-omega features
+    if proj_indices is None:
+        top2 = np.argsort(omega)[::-1][:2]
+        proj_indices = (int(top2[0]), int(top2[1]))
+
+    ix, iy = proj_indices
+    xlabel = x_cols[ix] if ix < len(x_cols) else f"Feature {ix}"
+    ylabel = x_cols[iy] if iy < len(x_cols) else f"Feature {iy}"
+
     # Predict: learned omega
     pred_cfg = CovPredictConfig(tau=tau, ridge=ridge)
     Mu_learned, Sigma_learned = predict_mu_sigma_topk_cross(
@@ -2549,11 +2562,9 @@ def fig_nll_delta_surface(
     # ΔNLL: positive = learned wins
     delta_nll = nll_knn - nll_learned
 
-    # Projection onto first two features
-    xs = X_test[:, 0]
-    ys = X_test[:, 1]
-    xlabel = x_cols[0] if len(x_cols) > 0 else "Feature 0"
-    ylabel = x_cols[1] if len(x_cols) > 1 else "Feature 1"
+    # Projection onto chosen feature pair
+    xs = X_test[:, ix]
+    ys = X_test[:, iy]
 
     # Build smoothed surface on regular grid
     margin = 0.05
@@ -2570,6 +2581,18 @@ def fig_nll_delta_surface(
     nan_mask = np.isnan(Zi)
     Zi[nan_mask] = Zi_nn[nan_mask]
     Zi_smooth = gaussian_filter(Zi, sigma=smooth_sigma)
+
+    # Density mask: blank out grid cells far from any data point
+    from scipy.spatial import cKDTree
+    tree = cKDTree(np.column_stack([xs, ys]))
+    grid_pts = np.column_stack([Xi.ravel(), Yi.ravel()])
+    dists, _ = tree.query(grid_pts, k=1)
+    # Threshold: ~2 grid cells worth of distance
+    dx = (x_hi - x_lo) / grid_res
+    dy = (y_hi - y_lo) / grid_res
+    dist_thresh = 2.5 * np.sqrt(dx**2 + dy**2)
+    sparse_mask = (dists.reshape(Xi.shape) > dist_thresh)
+    Zi_smooth[sparse_mask] = np.nan
 
     # Clip colorbar symmetrically at 95th percentile of |ΔNLL|
     abs_limit = np.percentile(np.abs(delta_nll), 95)
@@ -2846,14 +2869,6 @@ def generate_all_figures():
     try:
         fig_nll_heatmap(feature_set_dir=HIGH_DIM_16D_DIR)
         figures_generated.append("fig_nll_heatmap_high_dim_16d")
-    except Exception as e:
-        print(f"  Error: {e}")
-
-    # ΔNLL surface: focused_2d
-    print("\n[ΔNLL-2D] ΔNLL surface (focused_2d)...")
-    try:
-        fig_nll_delta_surface(feature_set_dir=FOCUSED_2D_DIR)
-        figures_generated.append("fig_nll_delta_focused_2d")
     except Exception as e:
         print(f"  Error: {e}")
 

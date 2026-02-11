@@ -2607,7 +2607,7 @@ def fig_nll_delta_surface(
     # Filled contour: smoothed ΔNLL surface
     levels = np.linspace(-abs_limit, abs_limit, 31)
     cf = ax.contourf(
-        Xi, Yi, Zi_smooth, levels=levels, cmap="RdBu_r",
+        Xi, Yi, Zi_smooth, levels=levels, cmap="RdBu",
         vmin=-abs_limit, vmax=abs_limit, extend="both",
     )
 
@@ -2619,7 +2619,7 @@ def fig_nll_delta_surface(
 
     # Scatter overlay (small dots for context)
     ax.scatter(
-        xs, ys, c=delta_nll, cmap="RdBu_r", s=8, alpha=0.5,
+        xs, ys, c=delta_nll, cmap="RdBu", s=8, alpha=0.5,
         vmin=-abs_limit, vmax=abs_limit,
         edgecolors="k", linewidths=0.2, rasterized=True,
     )

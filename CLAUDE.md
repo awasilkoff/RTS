@@ -262,12 +262,33 @@ python run_price_of_robustness.py --hours 12 --start-month 7 --start-day 15
 - `fig_price_of_robustness.pdf` — Cost vs rho (DAM baseline + DARUC + ARUC, shaded gap)
 - `fig_curtailment_vs_rho.pdf` — Wind curtailment vs rho
 
+### Alpha Sweep (Conformal Alpha → Cost)
+
+`run_alpha_sweep.py` sweeps conformal alpha values end-to-end: pre-computes covariance (once), generates per-alpha NPZ uncertainty sets, then runs DARUC + ARUC for each.
+
+**This is a long-running script — run manually:**
+```bash
+python run_alpha_sweep.py --alphas 0.9 0.99 --hours 6 --start-month 7 --start-day 15
+```
+
+**Full overnight run (~40-60 min for 4 alphas at 12h with lines):**
+```bash
+python run_alpha_sweep.py --hours 12 --start-month 7 --start-day 15
+```
+
+**Output dir** is auto-named from params (e.g. `alpha_sweep/lines_rlf0.25_12h_m07d15_a0.80_0.90_0.95_0.99/`), overridable with `--out-dir`.
+
+**Outputs:**
+- `sweep_results.csv` — alpha, rho_mean, objectives, costs, curtailment, unit-hours per formulation
+- `fig_price_of_robustness_alpha.pdf` — Cost vs alpha (DAM baseline + DARUC + ARUC)
+- `fig_curtailment_vs_alpha.pdf` — Wind curtailment vs alpha
+
 ### Data Location
 
 - **Static data:** `RTS_Data/SourceData/` (bus.csv, gen.csv, branch.csv)
 - **Time series:** `RTS_Data/timeseries_data_files/` (Load/, WIND/, PV/, HYDRO/)
 - **SPP forecasts (v2):** `uncertainty_sets_refactored/data/*_v2.parquet` (scaled, SUBMODEL-filtered)
-- **Outputs:** `dam_outputs/`, `aruc_outputs/`, `daruc_outputs/`, `comparison_outputs/`, `price_of_robustness/` (generated at runtime)
+- **Outputs:** `dam_outputs/`, `aruc_outputs/`, `daruc_outputs/`, `comparison_outputs/`, `price_of_robustness/`, `alpha_sweep/` (generated at runtime)
 
 ## Key Concepts
 

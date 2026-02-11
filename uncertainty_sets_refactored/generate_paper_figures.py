@@ -2308,6 +2308,153 @@ Feature & Weight \\
 
 
 # ============================================================================
+# FIGURE NLL HEATMAP: Per-point NLL in Feature Space
+# ============================================================================
+def _per_point_gaussian_nll(
+    Y: np.ndarray, Mu: np.ndarray, Sigma: np.ndarray
+) -> np.ndarray:
+    """Per-point NLL of Y under N(Mu, Sigma) row-wise."""
+    N, M = Y.shape
+    nll = np.empty(N, dtype=float)
+    for i in range(N):
+        S = Sigma[i]
+        r = (Y[i] - Mu[i]).reshape(M, 1)
+        try:
+            L = np.linalg.cholesky(S)
+            logdet = 2.0 * np.log(np.diag(L)).sum()
+            x = np.linalg.solve(L, r)
+            x = np.linalg.solve(L.T, x)
+            quad = float(r.T @ x)
+            nll[i] = 0.5 * (logdet + quad + M * np.log(2.0 * np.pi))
+        except np.linalg.LinAlgError:
+            nll[i] = 1e6
+    return nll
+
+
+def fig_nll_heatmap(
+    feature_set_dir: Path = FOCUSED_2D_DIR,
+    output_path: Path = None,
+) -> plt.Figure:
+    """
+    Two-panel scatter of test-set points colored by per-point NLL.
+
+    Left: Euclidean k-NN baseline.  Right: Learned omega kernel.
+    Both panels use (SYS_MEAN, SYS_STD) axes — for high-dim features this is
+    a projection onto the first two feature columns.
+
+    Parameters
+    ----------
+    feature_set_dir : Path
+        Directory containing best_omega.npy and feature_config.json.
+    output_path : Path, optional
+        Stem for output files (PDF + PNG).  Defaults based on feature set name.
+    """
+    from data_processing_extended import FEATURE_BUILDERS
+    from utils import fit_scaler, apply_scaler
+    from covariance_optimization import (
+        CovPredictConfig,
+        predict_mu_sigma_topk_cross,
+        predict_mu_sigma_knn,
+    )
+
+    # Load config
+    config = _load_feature_config(feature_set_dir)
+    feature_set_name = config.get("feature_set", "focused_2d")
+    tau = config.get("tau", 1.0)
+    k = config.get("k", 128)
+    ridge = config.get("ridge", 1e-4)
+    constraint = config.get("omega_constraint", "none")
+    scaler_type = config.get("scaler_type", "standard")
+
+    if output_path is None:
+        output_path = OUTPUT_DIR / "figures" / f"fig_nll_heatmap_{feature_set_name}"
+
+    # Load data
+    forecasts = pd.read_parquet(
+        DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
+    )
+    actuals = pd.read_parquet(
+        DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
+    )
+
+    build_fn = FEATURE_BUILDERS[feature_set_name]
+    X_raw, Y, times, x_cols, y_cols = build_fn(
+        forecasts, actuals, drop_any_nan_rows=True
+    )
+
+    # 50/25/25 split (same seed as sweep)
+    n = X_raw.shape[0]
+    rng = np.random.RandomState(42)
+    indices = rng.permutation(n)
+    n_train = int(0.5 * n)
+    n_val = int(0.25 * n)
+    train_idx = indices[:n_train]
+    test_idx = indices[n_train + n_val:]
+
+    # Scale
+    scaler = fit_scaler(X_raw[train_idx], scaler_type)
+    X = apply_scaler(X_raw, scaler)
+    X_train, Y_train = X[train_idx], Y[train_idx]
+    X_test, Y_test = X[test_idx], Y[test_idx]
+
+    # Load learned omega
+    omega = _load_omega(feature_set_dir)
+
+    # Predict with learned omega
+    pred_cfg = CovPredictConfig(tau=tau, ridge=ridge)
+    Mu_learned, Sigma_learned = predict_mu_sigma_topk_cross(
+        X_test, X_train, Y_train, omega, pred_cfg, k=k,
+        exclude_self_if_same=False,
+    )
+    nll_learned = _per_point_gaussian_nll(Y_test, Mu_learned, Sigma_learned)
+
+    # Predict with Euclidean k-NN baseline (k=64)
+    Mu_knn, Sigma_knn = predict_mu_sigma_knn(
+        X_test, X_train, Y_train, k=64, ridge=ridge,
+    )
+    nll_knn = _per_point_gaussian_nll(Y_test, Mu_knn, Sigma_knn)
+
+    # Clip colorbar at 95th percentile to avoid outlier washout
+    all_nll = np.concatenate([nll_knn, nll_learned])
+    vmin = np.percentile(all_nll, 1)
+    vmax = np.percentile(all_nll, 95)
+
+    # Scatter axes: always first two features (SYS_MEAN, SYS_STD)
+    xs = X_test[:, 0]
+    ys = X_test[:, 1]
+    xlabel = x_cols[0] if len(x_cols) > 0 else "Feature 0"
+    ylabel = x_cols[1] if len(x_cols) > 1 else "Feature 1"
+
+    # Two-panel figure
+    fig, axes = plt.subplots(
+        1, 2, figsize=(IEEE_TWO_COL_WIDTH, 3.0), sharey=True,
+    )
+
+    for ax, nll, title in [
+        (axes[0], nll_knn, "Euclidean k-NN (k=64)"),
+        (axes[1], nll_learned, f"Learned ω (τ={tau}, k={k})"),
+    ]:
+        sc = ax.scatter(
+            xs, ys, c=nll, cmap="viridis_r", s=12, alpha=0.7,
+            vmin=vmin, vmax=vmax, rasterized=True,
+        )
+        ax.set_xlabel(xlabel)
+        ax.set_title(title, fontsize=9)
+        ax.grid(True, alpha=0.3)
+
+    axes[0].set_ylabel(ylabel)
+
+    # Shared colorbar
+    cbar = fig.colorbar(sc, ax=axes, fraction=0.04, pad=0.02)
+    cbar.set_label("NLL (per point)", fontsize=8)
+    cbar.ax.tick_params(labelsize=7)
+
+    fig.subplots_adjust(wspace=0.08)
+    _save_figure(fig, output_path)
+    return fig
+
+
+# ============================================================================
 # UTILITIES
 # ============================================================================
 def _save_figure(
@@ -2520,6 +2667,22 @@ def generate_all_figures():
     try:
         fig11_tau_sweep_unconstrained()
         figures_generated.append("fig11_tau_sweep_unconstrained")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+    # NLL Heatmap: focused_2d
+    print("\n[NLL-2D] NLL heatmap in feature space (focused_2d)...")
+    try:
+        fig_nll_heatmap(feature_set_dir=FOCUSED_2D_DIR)
+        figures_generated.append("fig_nll_heatmap_focused_2d")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+    # NLL Heatmap: high_dim_16d (projected onto SYS_MEAN, SYS_STD)
+    print("\n[NLL-16D] NLL heatmap in feature space (high_dim_16d)...")
+    try:
+        fig_nll_heatmap(feature_set_dir=HIGH_DIM_16D_DIR)
+        figures_generated.append("fig_nll_heatmap_high_dim_16d")
     except Exception as e:
         print(f"  Error: {e}")
 

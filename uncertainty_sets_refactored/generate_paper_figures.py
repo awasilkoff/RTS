@@ -2425,14 +2425,17 @@ def fig_nll_heatmap(
     xlabel = x_cols[0] if len(x_cols) > 0 else "Feature 0"
     ylabel = x_cols[1] if len(x_cols) > 1 else "Feature 1"
 
-    # Two-panel figure
-    fig, axes = plt.subplots(
-        1, 2, figsize=(IEEE_TWO_COL_WIDTH, 3.0), sharey=True,
-    )
+    # Two-panel figure with dedicated colorbar axis
+    from matplotlib.gridspec import GridSpec
+    fig = plt.figure(figsize=(IEEE_TWO_COL_WIDTH, 3.0))
+    gs = GridSpec(1, 3, figure=fig, width_ratios=[1, 1, 0.04], wspace=0.25)
+    ax_left = fig.add_subplot(gs[0, 0])
+    ax_right = fig.add_subplot(gs[0, 1], sharey=ax_left)
+    cax = fig.add_subplot(gs[0, 2])
 
     for ax, nll, title in [
-        (axes[0], nll_knn, "Euclidean k-NN (k=64)"),
-        (axes[1], nll_learned, f"Learned ω (τ={tau}, k={k})"),
+        (ax_left, nll_knn, "Euclidean k-NN (k=64)"),
+        (ax_right, nll_learned, f"Learned ω (τ={tau}, k={k})"),
     ]:
         sc = ax.scatter(
             xs, ys, c=nll, cmap="viridis_r", s=12, alpha=0.7,
@@ -2442,14 +2445,14 @@ def fig_nll_heatmap(
         ax.set_title(title, fontsize=9)
         ax.grid(True, alpha=0.3)
 
-    axes[0].set_ylabel(ylabel)
+    ax_left.set_ylabel(ylabel)
+    plt.setp(ax_right.get_yticklabels(), visible=False)
 
-    # Shared colorbar
-    cbar = fig.colorbar(sc, ax=axes, fraction=0.04, pad=0.02)
+    # Colorbar in its own axis — no overlap
+    cbar = fig.colorbar(sc, cax=cax)
     cbar.set_label("NLL (per point)", fontsize=8)
     cbar.ax.tick_params(labelsize=7)
 
-    fig.subplots_adjust(wspace=0.08)
     _save_figure(fig, output_path)
     return fig
 

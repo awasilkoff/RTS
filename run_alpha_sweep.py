@@ -35,6 +35,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
@@ -119,6 +120,7 @@ def run_alpha_point(
     rho_lines_frac: float | None,
     mip_gap: float,
     provider_start: int,
+    incremental_obj: bool = False,
 ) -> dict | None:
     """Run DARUC + ARUC with a given NPZ and return metrics row."""
     print(f"\n{'#' * 70}")
@@ -138,6 +140,7 @@ def run_alpha_point(
             mip_gap=mip_gap,
             uncertainty_provider_path=str(npz_path),
             provider_start_idx=provider_start,
+            incremental_obj=incremental_obj,
         )
         data = daruc_out["data"]
         daruc_res = daruc_out["daruc_results"]
@@ -153,8 +156,12 @@ def run_alpha_point(
         daruc_curtail = compute_wind_curtailment(daruc_p0, data, common_times)
         dam_uhours = _unit_hours(dam_res["u"], common_times)
         daruc_uhours = _unit_hours(daruc_res["u"], common_times)
-        dam_cost = compute_cost_breakdown(dam_res["u"][common_times], dam_p0[common_times], data)
-        daruc_cost = compute_cost_breakdown(daruc_res["u"][common_times], daruc_p0[common_times], data)
+        dam_cost = compute_cost_breakdown(
+            dam_res["u"][common_times], dam_p0[common_times], data
+        )
+        daruc_cost = compute_cost_breakdown(
+            daruc_res["u"][common_times], daruc_p0[common_times], data
+        )
     except Exception as e:
         print(f"DARUC failed at alpha={alpha}: {e}")
         return None
@@ -176,7 +183,9 @@ def run_alpha_point(
         aruc_p0 = aruc_res["p0"]
         aruc_curtail = compute_wind_curtailment(aruc_p0, data, common_times)
         aruc_uhours = _unit_hours(aruc_res["u"], common_times)
-        aruc_cost = compute_cost_breakdown(aruc_res["u"][common_times], aruc_p0[common_times], data)
+        aruc_cost = compute_cost_breakdown(
+            aruc_res["u"][common_times], aruc_p0[common_times], data
+        )
     except Exception as e:
         print(f"ARUC failed at alpha={alpha}: {e}")
         return None
@@ -198,6 +207,18 @@ def run_alpha_point(
         "dam_cost_total": dam_cost["total"],
         "daruc_cost_total": daruc_cost["total"],
         "aruc_cost_total": aruc_cost["total"],
+        "dam_no_load": dam_cost["no_load"],
+        "daruc_no_load": daruc_cost["no_load"],
+        "aruc_no_load": aruc_cost["no_load"],
+        "dam_startup": dam_cost["startup"],
+        "daruc_startup": daruc_cost["startup"],
+        "aruc_startup": aruc_cost["startup"],
+        "dam_shutdown": dam_cost["shutdown"],
+        "daruc_shutdown": daruc_cost["shutdown"],
+        "aruc_shutdown": aruc_cost["shutdown"],
+        "dam_energy": dam_cost["energy"],
+        "daruc_energy": daruc_cost["energy"],
+        "aruc_energy": aruc_cost["energy"],
         "dam_curtail_mwh": dam_curtail["total_mwh"],
         "daruc_curtail_mwh": daruc_curtail["total_mwh"],
         "aruc_curtail_mwh": aruc_curtail["total_mwh"],
@@ -227,21 +248,37 @@ def plot_price_of_robustness_alpha(df: pd.DataFrame, out_dir: Path):
     fig, ax = plt.subplots(figsize=(7, 4.5))
 
     ax.axhline(
-        df["dam_obj"].iloc[0], color="#2ca02c", linestyle="--",
-        linewidth=1.2, label="DAM (baseline)",
+        df["dam_obj"].iloc[0],
+        color="#2ca02c",
+        linestyle="--",
+        linewidth=1.2,
+        label="DAM (baseline)",
     )
     ax.plot(
-        df["alpha"], df["daruc_obj"], "o-", color="#ff7f0e",
-        linewidth=1.5, markersize=5, label="DARUC",
+        df["alpha"],
+        df["daruc_obj"],
+        "o-",
+        color="#ff7f0e",
+        linewidth=1.5,
+        markersize=5,
+        label="DARUC",
     )
     ax.plot(
-        df["alpha"], df["aruc_obj"], "s-", color="#1f77b4",
-        linewidth=1.5, markersize=5, label="ARUC",
+        df["alpha"],
+        df["aruc_obj"],
+        "s-",
+        color="#1f77b4",
+        linewidth=1.5,
+        markersize=5,
+        label="ARUC",
     )
 
     ax.fill_between(
-        df["alpha"], df["daruc_obj"], df["aruc_obj"],
-        alpha=0.15, color="#1f77b4",
+        df["alpha"],
+        df["daruc_obj"],
+        df["aruc_obj"],
+        alpha=0.15,
+        color="#1f77b4",
     )
 
     ax.set_xlabel(r"Conformal coverage $\alpha$", fontsize=10)
@@ -263,10 +300,65 @@ def plot_price_of_robustness_alpha(df: pd.DataFrame, out_dir: Path):
     for ext in ["pdf", "png"]:
         fig.savefig(
             out_dir / f"fig_price_of_robustness_alpha.{ext}",
-            dpi=300, bbox_inches="tight",
+            dpi=300,
+            bbox_inches="tight",
         )
     plt.close(fig)
     print("  Saved fig_price_of_robustness_alpha.pdf/.png")
+
+
+def plot_commitment_cost_vs_alpha(df: pd.DataFrame, out_dir: Path):
+    """Commitment + startup cost vs alpha (no energy/dispatch costs)."""
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+
+    # Commitment cost = no_load + startup (+ shutdown, usually small)
+    dam_commit = df["dam_no_load"] + df["dam_startup"] + df["dam_shutdown"]
+    daruc_commit = df["daruc_no_load"] + df["daruc_startup"] + df["daruc_shutdown"]
+    aruc_commit = df["aruc_no_load"] + df["aruc_startup"] + df["aruc_shutdown"]
+
+    ax.axhline(
+        dam_commit.iloc[0],
+        color="#2ca02c",
+        linestyle="--",
+        linewidth=1.2,
+        label="DAM (baseline)",
+    )
+    ax.plot(
+        df["alpha"], daruc_commit, "o-",
+        color="#ff7f0e", linewidth=1.5, markersize=5, label="DARUC",
+    )
+    ax.plot(
+        df["alpha"], aruc_commit, "s-",
+        color="#1f77b4", linewidth=1.5, markersize=5, label="ARUC",
+    )
+    ax.fill_between(
+        df["alpha"], daruc_commit, aruc_commit,
+        alpha=0.15, color="#1f77b4",
+    )
+
+    ax.set_xlabel(r"Conformal coverage $\alpha$", fontsize=10)
+    ax.set_ylabel("Commitment + Startup Cost ($)", fontsize=10)
+    ax.set_title("Commitment Cost vs Conformal Alpha", fontsize=12)
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+    # Secondary y-axis: % increase vs DAM
+    dam_base = dam_commit.iloc[0]
+    if dam_base > 0:
+        ax2 = ax.twinx()
+        ax2.set_ylabel("% increase vs DAM", fontsize=9)
+        y_lo, y_hi = ax.get_ylim()
+        ax2.set_ylim(100 * (y_lo / dam_base - 1), 100 * (y_hi / dam_base - 1))
+        ax2.tick_params(labelsize=8)
+
+    fig.tight_layout()
+    for ext in ["pdf", "png"]:
+        fig.savefig(
+            out_dir / f"fig_commitment_cost_vs_alpha.{ext}",
+            dpi=300, bbox_inches="tight",
+        )
+    plt.close(fig)
+    print("  Saved fig_commitment_cost_vs_alpha.pdf/.png")
 
 
 def plot_curtailment_vs_alpha(df: pd.DataFrame, out_dir: Path):
@@ -274,16 +366,29 @@ def plot_curtailment_vs_alpha(df: pd.DataFrame, out_dir: Path):
     fig, ax = plt.subplots(figsize=(7, 4.5))
 
     ax.axhline(
-        df["dam_curtail_mwh"].iloc[0], color="#2ca02c", linestyle="--",
-        linewidth=1.2, label="DAM (baseline)",
+        df["dam_curtail_mwh"].iloc[0],
+        color="#2ca02c",
+        linestyle="--",
+        linewidth=1.2,
+        label="DAM (baseline)",
     )
     ax.plot(
-        df["alpha"], df["daruc_curtail_mwh"], "o-", color="#ff7f0e",
-        linewidth=1.5, markersize=5, label="DARUC",
+        df["alpha"],
+        df["daruc_curtail_mwh"],
+        "o-",
+        color="#ff7f0e",
+        linewidth=1.5,
+        markersize=5,
+        label="DARUC",
     )
     ax.plot(
-        df["alpha"], df["aruc_curtail_mwh"], "s-", color="#1f77b4",
-        linewidth=1.5, markersize=5, label="ARUC",
+        df["alpha"],
+        df["aruc_curtail_mwh"],
+        "s-",
+        color="#1f77b4",
+        linewidth=1.5,
+        markersize=5,
+        label="ARUC",
     )
 
     ax.set_xlabel(r"Conformal coverage $\alpha$", fontsize=10)
@@ -296,7 +401,8 @@ def plot_curtailment_vs_alpha(df: pd.DataFrame, out_dir: Path):
     for ext in ["pdf", "png"]:
         fig.savefig(
             out_dir / f"fig_curtailment_vs_alpha.{ext}",
-            dpi=300, bbox_inches="tight",
+            dpi=300,
+            bbox_inches="tight",
         )
     plt.close(fig)
     print("  Saved fig_curtailment_vs_alpha.pdf/.png")
@@ -311,18 +417,65 @@ def main():
     parser = argparse.ArgumentParser(
         description="Alpha-sweep price of robustness (conformal alpha -> NPZ -> DARUC/ARUC)"
     )
-    parser.add_argument("--alphas", type=float, nargs="+", default=[0.80, 0.90, 0.95, 0.99], help="Conformal alpha values to sweep (default: 0.80 0.90 0.95 0.99)")
-    parser.add_argument("--hours", type=int, default=12, help="Horizon hours (default: 12)")
-    parser.add_argument("--start-month", type=int, default=7, help="Start month (default: 7)")
-    parser.add_argument("--start-day", type=int, default=15, help="Start day (default: 15)")
-    parser.add_argument("--start-hour", type=int, default=0, help="Start hour (default: 0)")
-    parser.add_argument("--provider-start", type=int, default=0, help="Start index into NPZ time series (default: 0)")
-    parser.add_argument("--rho-lines-frac", type=float, default=0.25, help="Fraction of rho for line constraints (default: 0.25)")
-    parser.add_argument("--mip-gap", type=float, default=0.005, help="MIP gap (default: 0.005)")
-    parser.add_argument("--no-enforce-lines", dest="enforce_lines", action="store_false", help="Disable line flow limits (default: enforce lines)")
+    parser.add_argument(
+        "--alphas",
+        type=float,
+        nargs="+",
+        default=[0.80, 0.90, 0.95, 0.99],
+        help="Conformal alpha values to sweep (default: 0.80 0.90 0.95 0.99)",
+    )
+    parser.add_argument(
+        "--hours", type=int, default=12, help="Horizon hours (default: 12)"
+    )
+    parser.add_argument(
+        "--start-month", type=int, default=7, help="Start month (default: 7)"
+    )
+    parser.add_argument(
+        "--start-day", type=int, default=15, help="Start day (default: 15)"
+    )
+    parser.add_argument(
+        "--start-hour", type=int, default=0, help="Start hour (default: 0)"
+    )
+    parser.add_argument(
+        "--provider-start",
+        type=int,
+        default=0,
+        help="Start index into NPZ time series (default: 0)",
+    )
+    parser.add_argument(
+        "--rho-lines-frac",
+        type=float,
+        default=0.25,
+        help="Fraction of rho for line constraints (default: 0.25)",
+    )
+    parser.add_argument(
+        "--mip-gap", type=float, default=0.01, help="MIP gap (default: 0.01)"
+    )
+    parser.add_argument(
+        "--no-enforce-lines",
+        dest="enforce_lines",
+        action="store_false",
+        help="Disable line flow limits (default: enforce lines)",
+    )
     parser.set_defaults(enforce_lines=True)
-    parser.add_argument("--out-dir", type=str, default=None, help="Output directory (default: auto-generated from params)")
-    parser.add_argument("--data-dir", type=str, default="uncertainty_sets_refactored/data", help="Data directory for uncertainty set generation")
+    parser.add_argument(
+        "--incremental-obj",
+        action="store_true",
+        default=False,
+        help="Use incremental DARUC objective (commitment costs for additional units only)",
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=str,
+        default=None,
+        help="Output directory (default: auto-generated from params)",
+    )
+    parser.add_argument(
+        "--data-dir",
+        type=str,
+        default="uncertainty_sets_refactored/data",
+        help="Data directory for uncertainty set generation",
+    )
     args = parser.parse_args()
 
     # Auto-generate output dir name from run parameters if not specified
@@ -330,14 +483,18 @@ def main():
         net = "lines" if args.enforce_lines else "copper"
         alphas_tag = "_".join(f"{a:.2f}" for a in sorted(args.alphas))
         rlf = f"_rlf{args.rho_lines_frac:.2f}" if args.enforce_lines else ""
-        args.out_dir = f"alpha_sweep/{net}{rlf}_{args.hours}h_m{args.start_month:02d}d{args.start_day:02d}_a{alphas_tag}"
+        incr = "_incr" if args.incremental_obj else ""
+        args.out_dir = f"alpha_sweep/{net}{rlf}{incr}_{args.hours}h_m{args.start_month:02d}d{args.start_day:02d}_a{alphas_tag}"
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     data_dir = Path(args.data_dir)
 
     start_time = pd.Timestamp(
-        year=2020, month=args.start_month, day=args.start_day, hour=args.start_hour,
+        year=2020,
+        month=args.start_month,
+        day=args.start_day,
+        hour=args.start_hour,
     )
 
     print("=" * 70)
@@ -348,6 +505,7 @@ def main():
     print(f"  Start:    {start_time}")
     print(f"  Network:  {'with line limits' if args.enforce_lines else 'copperplate'}")
     print(f"  rho_lines_frac: {args.rho_lines_frac}")
+    print(f"  Incremental obj: {args.incremental_obj}")
     print(f"  MIP gap:  {args.mip_gap}")
     print(f"  Output:   {out_dir}")
     print("=" * 70)
@@ -388,6 +546,7 @@ def main():
             rho_lines_frac=args.rho_lines_frac,
             mip_gap=args.mip_gap,
             provider_start=args.provider_start,
+            incremental_obj=args.incremental_obj,
         )
         if row is not None:
             rows.append(row)
@@ -411,6 +570,7 @@ def main():
 
     print("\nGenerating figures...")
     plot_price_of_robustness_alpha(df, out_dir)
+    plot_commitment_cost_vs_alpha(df, out_dir)
     plot_curtailment_vs_alpha(df, out_dir)
 
     print(f"\nAll outputs saved to {out_dir}/")

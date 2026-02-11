@@ -2457,6 +2457,166 @@ def fig_nll_heatmap(
     return fig
 
 
+def fig_nll_delta_surface(
+    feature_set_dir: Path = HIGH_DIM_16D_DIR,
+    output_path: Path = None,
+    knn_k: int = 64,
+    grid_res: int = 80,
+    smooth_sigma: float = 1.5,
+) -> plt.Figure:
+    """
+    KDE-smoothed ΔNLL surface (NLL_knn − NLL_learned) with scatter overlay.
+
+    Positive ΔNLL = learned omega wins.  A zero-contour line marks the boundary.
+
+    Parameters
+    ----------
+    feature_set_dir : Path
+        Directory containing best_omega.npy and feature_config.json.
+    output_path : Path, optional
+        Stem for output files (PDF + PNG).
+    knn_k : int
+        Number of neighbors for the Euclidean k-NN baseline.
+    grid_res : int
+        Number of bins per axis for the smoothed surface.
+    smooth_sigma : float
+        Gaussian smoothing sigma (in grid cells).
+    """
+    from scipy.interpolate import griddata
+    from scipy.ndimage import gaussian_filter
+    from data_processing_extended import FEATURE_BUILDERS
+    from utils import fit_scaler, apply_scaler
+    from covariance_optimization import (
+        CovPredictConfig,
+        predict_mu_sigma_topk_cross,
+        predict_mu_sigma_knn,
+    )
+
+    # Load config
+    config = _load_feature_config(feature_set_dir)
+    feature_set_name = config.get("feature_set", "high_dim_16d")
+    tau = config.get("tau", 1.0)
+    k = config.get("k", 128)
+    ridge = config.get("ridge", 1e-4)
+    scaler_type = config.get("scaler_type", "standard")
+
+    if output_path is None:
+        output_path = OUTPUT_DIR / "figures" / f"fig_nll_delta_{feature_set_name}"
+
+    # Load data
+    forecasts = pd.read_parquet(
+        DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
+    )
+    actuals = pd.read_parquet(
+        DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
+    )
+
+    build_fn = FEATURE_BUILDERS[feature_set_name]
+    X_raw, Y, times, x_cols, y_cols = build_fn(
+        forecasts, actuals, drop_any_nan_rows=True
+    )
+
+    # 50/25/25 split (same seed as sweep)
+    n = X_raw.shape[0]
+    rng = np.random.RandomState(42)
+    indices = rng.permutation(n)
+    n_train = int(0.5 * n)
+    n_val = int(0.25 * n)
+    train_idx = indices[:n_train]
+    test_idx = indices[n_train + n_val:]
+
+    scaler = fit_scaler(X_raw[train_idx], scaler_type)
+    X = apply_scaler(X_raw, scaler)
+    X_train, Y_train = X[train_idx], Y[train_idx]
+    X_test, Y_test = X[test_idx], Y[test_idx]
+
+    omega = _load_omega(feature_set_dir)
+
+    # Predict: learned omega
+    pred_cfg = CovPredictConfig(tau=tau, ridge=ridge)
+    Mu_learned, Sigma_learned = predict_mu_sigma_topk_cross(
+        X_test, X_train, Y_train, omega, pred_cfg, k=k,
+        exclude_self_if_same=False,
+    )
+    nll_learned = _per_point_gaussian_nll(Y_test, Mu_learned, Sigma_learned)
+
+    # Predict: Euclidean k-NN
+    Mu_knn, Sigma_knn = predict_mu_sigma_knn(
+        X_test, X_train, Y_train, k=knn_k, ridge=ridge,
+    )
+    nll_knn = _per_point_gaussian_nll(Y_test, Mu_knn, Sigma_knn)
+
+    # ΔNLL: positive = learned wins
+    delta_nll = nll_knn - nll_learned
+
+    # Projection onto first two features
+    xs = X_test[:, 0]
+    ys = X_test[:, 1]
+    xlabel = x_cols[0] if len(x_cols) > 0 else "Feature 0"
+    ylabel = x_cols[1] if len(x_cols) > 1 else "Feature 1"
+
+    # Build smoothed surface on regular grid
+    margin = 0.05
+    x_lo, x_hi = xs.min() - margin, xs.max() + margin
+    y_lo, y_hi = ys.min() - margin, ys.max() + margin
+    xi = np.linspace(x_lo, x_hi, grid_res)
+    yi = np.linspace(y_lo, y_hi, grid_res)
+    Xi, Yi = np.meshgrid(xi, yi)
+
+    # Interpolate ΔNLL onto grid, then Gaussian-smooth
+    Zi = griddata((xs, ys), delta_nll, (Xi, Yi), method="linear")
+    # Fill NaN edges with nearest-neighbor so smoothing doesn't propagate NaN
+    Zi_nn = griddata((xs, ys), delta_nll, (Xi, Yi), method="nearest")
+    nan_mask = np.isnan(Zi)
+    Zi[nan_mask] = Zi_nn[nan_mask]
+    Zi_smooth = gaussian_filter(Zi, sigma=smooth_sigma)
+
+    # Clip colorbar symmetrically at 95th percentile of |ΔNLL|
+    abs_limit = np.percentile(np.abs(delta_nll), 95)
+
+    # Figure
+    from matplotlib.gridspec import GridSpec
+    fig = plt.figure(figsize=(IEEE_TWO_COL_WIDTH * 0.6, 3.5))
+    gs = GridSpec(1, 2, figure=fig, width_ratios=[1, 0.04], wspace=0.05)
+    ax = fig.add_subplot(gs[0, 0])
+    cax = fig.add_subplot(gs[0, 1])
+
+    # Filled contour: smoothed ΔNLL surface
+    levels = np.linspace(-abs_limit, abs_limit, 31)
+    cf = ax.contourf(
+        Xi, Yi, Zi_smooth, levels=levels, cmap="RdBu_r",
+        vmin=-abs_limit, vmax=abs_limit, extend="both",
+    )
+
+    # Zero contour (boundary where methods are equal)
+    ax.contour(
+        Xi, Yi, Zi_smooth, levels=[0.0],
+        colors="black", linewidths=1.2, linestyles="--",
+    )
+
+    # Scatter overlay (small dots for context)
+    ax.scatter(
+        xs, ys, c=delta_nll, cmap="RdBu_r", s=8, alpha=0.5,
+        vmin=-abs_limit, vmax=abs_limit,
+        edgecolors="k", linewidths=0.2, rasterized=True,
+    )
+
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(
+        f"ΔNLL (k-NN k={knn_k} − Learned ω)", fontsize=9,
+    )
+    ax.grid(True, alpha=0.2)
+
+    # Colorbar
+    cbar = fig.colorbar(cf, cax=cax)
+    cbar.set_label("ΔNLL  (blue = learned wins)", fontsize=8)
+    cbar.ax.tick_params(labelsize=7)
+
+    _save_figure(fig, output_path)
+    return fig
+
+
 # ============================================================================
 # UTILITIES
 # ============================================================================
@@ -2686,6 +2846,22 @@ def generate_all_figures():
     try:
         fig_nll_heatmap(feature_set_dir=HIGH_DIM_16D_DIR)
         figures_generated.append("fig_nll_heatmap_high_dim_16d")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+    # ΔNLL surface: focused_2d
+    print("\n[ΔNLL-2D] ΔNLL surface (focused_2d)...")
+    try:
+        fig_nll_delta_surface(feature_set_dir=FOCUSED_2D_DIR)
+        figures_generated.append("fig_nll_delta_focused_2d")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+    # ΔNLL surface: high_dim_16d
+    print("\n[ΔNLL-16D] ΔNLL surface (high_dim_16d)...")
+    try:
+        fig_nll_delta_surface(feature_set_dir=HIGH_DIM_16D_DIR)
+        figures_generated.append("fig_nll_delta_high_dim_16d")
     except Exception as e:
         print(f"  Error: {e}")
 

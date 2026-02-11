@@ -506,8 +506,10 @@ def compute_wind_curtailment(p0_df: pd.DataFrame, data, common_times: list[str])
     T = len(common_times)
 
     # Map common_times to column positions in the full time axis
-    time_list = list(data.time)
-    time_pos = [time_list.index(t) for t in common_times]
+    # Handle string vs Timestamp mismatch between CSV columns and data.time
+    time_list = [str(t) for t in data.time]
+    common_str = [str(t) for t in common_times]
+    time_pos = [time_list.index(t) for t in common_str]
 
     total_curtail_ts = np.zeros(T)
     per_farm_ts = {}

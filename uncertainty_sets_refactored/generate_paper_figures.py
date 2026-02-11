@@ -26,6 +26,9 @@ Outputs saved to: data/viz_artifacts/paper_final/
         fig9_omega_bar_chart.png    - Learned feature weights bar chart
         fig10_ellipse_overlay.pdf   - Ellipse overlay (k=16, 512, global)
         fig11_tau_sweep_unconstrained.pdf - NLL vs tau (no constraint, no reg, 16D)
+        fig_nll_heatmap_focused_2d.pdf  - Per-point NLL scatter (k-NN vs Learned, 2D)
+        fig_nll_heatmap_high_dim_16d.pdf - Per-point NLL scatter (k-NN vs Learned, 16D projected)
+        fig_nll_delta_high_dim_16d.pdf  - Smoothed ΔNLL surface (learned ω improvement over k-NN)
     tables/
         tab_nll_vs_tau.tex          - NLL at different tau values
         tab_nll_vs_k.tex            - NLL at different k values

@@ -127,9 +127,14 @@ def _align_time(aruc: dict, daruc: dict, dam: dict | None) -> list[str]:
 
 def compute_cost_breakdown(u_df: pd.DataFrame, p0_df: pd.DataFrame, data) -> dict:
     """
-    Compute no-load, startup, and energy cost from commitment/dispatch and DAMData.
+    Compute cost breakdown matching the Gurobi objective structure.
 
-    Returns dict with keys: no_load, startup, energy, total.
+    The model objective is:
+      sum_{i,t} [ C_NL*u + C_SU*v + C_SD*w + sum_b block_cost*p_block ] + M_p*s_p
+
+    Block structure: p[i,t] = sum_b p_block[i,t,b]  (blocks start from 0, not Pmin).
+
+    Returns dict with keys: no_load, startup, shutdown, energy, slack, total.
     """
     u = np.round(u_df.values).astype(float)
     p0 = p0_df.values
@@ -142,21 +147,25 @@ def compute_cost_breakdown(u_df: pd.DataFrame, p0_df: pd.DataFrame, data) -> dic
     if T > 1:
         v[:, 1:] = np.maximum(0.0, u[:, 1:] - u[:, :-1])
 
+    # Shutdown detection: w[i,t] = max(0, u[i,t-1] - u[i,t])
+    w = np.zeros_like(u)
+    for i in range(I):
+        w[i, 0] = max(0.0, data.u_init[i] - u[i, 0])
+    if T > 1:
+        w[:, 1:] = np.maximum(0.0, u[:, :-1] - u[:, 1:])
+
     no_load = float((data.no_load_cost[:, None] * u).sum())
     startup = float((data.startup_cost[:, None] * v).sum())
+    shutdown = float((data.shutdown_cost[:, None] * w).sum())
 
-    # Energy cost: dispatch above Pmin through cost blocks
+    # Energy cost: full dispatch through cost blocks (blocks start at 0)
     energy = 0.0
-    Pmin = data.Pmin
     block_cap = data.block_cap   # (I, B)
     block_cost = data.block_cost  # (I, B)
     B = block_cap.shape[1]
     for i in range(I):
         for t in range(T):
-            if u[i, t] < 0.5:
-                continue
-            above_pmin = max(0.0, p0[i, t] - Pmin[i])
-            remaining = above_pmin
+            remaining = max(0.0, p0[i, t])
             for b in range(B):
                 allocated = min(remaining, block_cap[i, b])
                 energy += allocated * block_cost[i, b]
@@ -164,8 +173,18 @@ def compute_cost_breakdown(u_df: pd.DataFrame, p0_df: pd.DataFrame, data) -> dic
                 if remaining <= 1e-9:
                     break
 
-    total = no_load + startup + energy
-    return {"no_load": no_load, "startup": startup, "energy": energy, "total": total}
+    # Slack penalty: total generation shortfall × M_p
+    total_gen = p0.sum(axis=0)  # (T,)
+    total_load = data.d.sum(axis=0)[:T]  # (T,)
+    slack = np.maximum(0.0, total_load - total_gen)
+    m_penalty = 1e4  # must match M_PENALTY in runner scripts
+    slack_cost = float(m_penalty * slack.sum())
+
+    total = no_load + startup + shutdown + energy + slack_cost
+    return {
+        "no_load": no_load, "startup": startup, "shutdown": shutdown,
+        "energy": energy, "slack": slack_cost, "total": total,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -283,8 +302,8 @@ def fig_commitment_and_cost(
 
     # --- (c) Cost comparison (3-way if DAM available) ---
     ax = axes[2]
-    categories = ["No-Load", "Startup", "Energy"]
-    cost_keys = ["no_load", "startup", "energy"]
+    categories = ["No-Load", "Startup", "Shutdown", "Energy", "Slack"]
+    cost_keys = ["no_load", "startup", "shutdown", "energy", "slack"]
 
     # Build bar data
     bar_data = {}
@@ -638,13 +657,15 @@ def write_summary(
     # Cost breakdown
     if cost_aruc or cost_daruc or cost_dam:
         lines.append("\n--- Cost Breakdown ---")
-        header = f"  {'':20s}  {'No-Load':>12s}  {'Startup':>12s}  {'Energy':>12s}  {'Total':>12s}"
+        header = (f"  {'':20s}  {'No-Load':>12s}  {'Startup':>12s}  {'Shutdown':>12s}"
+                  f"  {'Energy':>12s}  {'Slack':>12s}  {'Total':>12s}")
         lines.append(header)
         for name, cost in [("DAM", cost_dam), ("DARUC", cost_daruc), ("ARUC-LDR", cost_aruc)]:
             if cost:
                 lines.append(
                     f"  {name:20s}  {cost['no_load']:>12,.2f}  {cost['startup']:>12,.2f}  "
-                    f"{cost['energy']:>12,.2f}  {cost['total']:>12,.2f}"
+                    f"{cost['shutdown']:>12,.2f}  {cost['energy']:>12,.2f}  "
+                    f"{cost['slack']:>12,.2f}  {cost['total']:>12,.2f}"
                 )
 
     # Commitment counts

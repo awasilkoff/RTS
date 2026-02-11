@@ -1,0 +1,57 @@
+{
+  "created_at": "2026-02-08T00:04:48.681154+00:00",
+  "data_source": "rts4_constellation_v1",
+  "n_hours": 2952,
+  "n_wind_resources": 4,
+  "wind_resource_ids": [
+    "122_WIND_1",
+    "303_WIND_1",
+    "309_WIND_1",
+    "317_WIND_1"
+  ],
+  "feature_cols": [
+    "SYS_MEAN",
+    "SYS_STD"
+  ],
+  "conformal_feature_cols": [
+    "ens_mean",
+    "ens_std",
+    "ens_min",
+    "ens_max",
+    "n_models",
+    "hour",
+    "dow",
+    "forecast_range",
+    "forecast_range_normalized",
+    "forecast_cv",
+    "y_lag24",
+    "forecast_error_lag24"
+  ],
+  "config": {
+    "tau": 0.5,
+    "ridge": 0.001,
+    "k": 128,
+    "alpha_target": 0.9,
+    "n_bins": 1,
+    "quantile_alpha": 0.05,
+    "safety_margin": 0.0,
+    "scaler_type": "standard",
+    "feature_set": "focused_2d",
+    "train_frac": 0.75,
+    "omega_constraint": "softmax"
+  },
+  "conformal_metrics": {
+    "coverage": 0.9041591320072333,
+    "rmse": 105.30324619492917
+  },
+  "omega": [
+    0.6265113353729248,
+    0.37348875403404236
+  ],
+  "rho_stats": {
+    "min": 0.0,
+    "max": 3.363635488383371,
+    "mean": 1.0756838720154744,
+    "std": 0.40821532413254924
+  }
+}

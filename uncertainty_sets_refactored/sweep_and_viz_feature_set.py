@@ -52,7 +52,9 @@ from viz_projections import (
 # Feature set dispatch - imported from data_processing_extended
 
 
-def _per_point_gaussian_nll(Y: np.ndarray, Mu: np.ndarray, Sigma: np.ndarray) -> np.ndarray:
+def _per_point_gaussian_nll(
+    Y: np.ndarray, Mu: np.ndarray, Sigma: np.ndarray
+) -> np.ndarray:
     """Per-point NLL of Y under N(Mu, Sigma) row-wise."""
     N, M = Y.shape
     nll = np.empty(N, dtype=float)
@@ -84,16 +86,19 @@ def run_sweep(
     actuals_parquet: Path,
     artifact_dir: Path,
     *,
+    target_col: str = "ACTUAL",
     scaler_types: tuple[str, ...] = ("standard", "minmax"),
-    taus: tuple[float, ...] = (0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 5.0, 20.0),
+    taus: tuple[float, ...] = (0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 20.0),
     omega_l2_regs: tuple[float, ...] = (0.0, 0.01, 0.1, 1.0),
-    omega_constraints: tuple[str, ...] = ("none",),  # "none", "softmax", "simplex", or "normalize"
-    k: int = 128,  # Number of neighbors (hyperparameter, not just for speed)
+    omega_constraints: tuple[str, ...] = (
+        "none",
+    ),  # "none", "softmax", "simplex", or "normalize"
+    k: int = 64,  # Number of neighbors (tuned via sweep_knn_k_values.py)
     ridge: float = 1e-3,
-    max_iters: int = 100,  # Reduced from 300 (3x speedup, usually converges by 100)
+    max_iters: int = 250,  # Reduced from 300 (3x speedup, usually converges by 100)
     step_size: float = 0.1,
-    train_frac: float = 0.60,
-    val_frac: float = 0.20,
+    train_frac: float = 0.5,
+    val_frac: float = 0.25,
     # test_frac = 1 - train_frac - val_frac = 0.20
 ):
     """
@@ -115,7 +120,9 @@ def run_sweep(
     actuals = pd.read_parquet(actuals_parquet)
     forecasts = pd.read_parquet(forecasts_parquet)
 
-    X_raw, Y, times, x_cols, y_cols = build_fn(forecasts, actuals, drop_any_nan_rows=True)
+    X_raw, Y, times, x_cols, y_cols = build_fn(
+        forecasts, actuals, actual_col=target_col, drop_any_nan_rows=True
+    )
 
     print(f"Feature set: {feature_set}")
     print(f"  Description: {FEATURE_SET_DESCRIPTIONS[feature_set]}")
@@ -137,11 +144,12 @@ def run_sweep(
     rng = np.random.RandomState(42)
     indices = rng.permutation(n)
     train_idx = np.sort(indices[:n_train])
-    val_idx = np.sort(indices[n_train:n_train + n_val])
-    test_idx = np.sort(indices[n_train + n_val:])
+    val_idx = np.sort(indices[n_train : n_train + n_val])
+    test_idx = np.sort(indices[n_train + n_val :])
 
+    test_frac = 1.0 - train_frac - val_frac
     print(f"Train: {n_train}, Val: {n_val}, Test: {n_test}")
-    print(f"Split: Random 60/20/20 (seed=42)")
+    print(f"Split: Random {train_frac:.0%}/{val_frac:.0%}/{test_frac:.0%} (seed=42)")
     print(f"  - Val used for hyperparameter selection")
     print(f"  - Test used ONCE for final unbiased evaluation")
     print()
@@ -178,7 +186,14 @@ def run_sweep(
             # Scaled features start with equal weights
             omega0 = np.ones(X.shape[1], dtype=float)
 
-        cfg = KernelCovConfig(tau=float(tau), ridge=float(ridge))
+        # Use zero_mean=True for residuals (mean already removed by forecast)
+        use_zero_mean = target_col == "RESIDUAL"
+
+        cfg = KernelCovConfig(
+            tau=float(tau),
+            ridge=float(ridge),
+            zero_mean=use_zero_mean,
+        )
         fit_cfg = FitConfig(
             max_iters=max_iters,
             step_size=float(step_size),
@@ -189,6 +204,8 @@ def run_sweep(
             device="cpu",
             omega_l2_reg=float(omega_l2_reg),
             omega_constraint=omega_constraint,
+            # k_fit=None: use all neighbors during training (better omega learning)
+            # Prediction uses top-k which filters noise - this "mismatch" is beneficial
         )
 
         # Fit omega
@@ -212,6 +229,7 @@ def run_sweep(
             enforce_nonneg_omega=True,
             dtype="float32",
             device="cpu",
+            zero_mean=use_zero_mean,
         )
 
         # Learned omega eval
@@ -272,8 +290,12 @@ def run_sweep(
         # Compute per-point NLL for detailed metrics
         nll_learned_per_point = _per_point_gaussian_nll(Y_val, Mu_eval, Sigma_eval)
         nll_baseline_per_point = _per_point_gaussian_nll(Y_val, Mu_base, Sigma_base)
-        nll_euclidean_per_point = _per_point_gaussian_nll(Y_val, Mu_euclidean, Sigma_euclidean)
-        nll_global_per_point = _per_point_gaussian_nll(Y_val, Mu_global_eval, Sigma_global_eval)
+        nll_euclidean_per_point = _per_point_gaussian_nll(
+            Y_val, Mu_euclidean, Sigma_euclidean
+        )
+        nll_global_per_point = _per_point_gaussian_nll(
+            Y_val, Mu_global_eval, Sigma_global_eval
+        )
 
         # Improvements over baselines (mean NLL)
         nll_improvement = nll_baseline - nll_learned
@@ -281,18 +303,30 @@ def run_sweep(
         nll_improvement_vs_euclidean = nll_euclidean - nll_learned
 
         # Percentage of samples where learned is better
-        pct_better_kernel = 100.0 * np.mean(nll_learned_per_point < nll_baseline_per_point)
-        pct_better_euclidean = 100.0 * np.mean(nll_learned_per_point < nll_euclidean_per_point)
-        pct_better_global = 100.0 * np.mean(nll_learned_per_point < nll_global_per_point)
+        pct_better_kernel = 100.0 * np.mean(
+            nll_learned_per_point < nll_baseline_per_point
+        )
+        pct_better_euclidean = 100.0 * np.mean(
+            nll_learned_per_point < nll_euclidean_per_point
+        )
+        pct_better_global = 100.0 * np.mean(
+            nll_learned_per_point < nll_global_per_point
+        )
 
         # Likelihood ratio (geometric mean)
         def _geom_mean_likelihood_ratio(nll_base, nll_learned):
             nll_diff = np.clip(nll_base - nll_learned, -50, 50)
             return float(np.exp(np.mean(nll_diff)))
 
-        lr_kernel = _geom_mean_likelihood_ratio(nll_baseline_per_point, nll_learned_per_point)
-        lr_euclidean = _geom_mean_likelihood_ratio(nll_euclidean_per_point, nll_learned_per_point)
-        lr_global = _geom_mean_likelihood_ratio(nll_global_per_point, nll_learned_per_point)
+        lr_kernel = _geom_mean_likelihood_ratio(
+            nll_baseline_per_point, nll_learned_per_point
+        )
+        lr_euclidean = _geom_mean_likelihood_ratio(
+            nll_euclidean_per_point, nll_learned_per_point
+        )
+        lr_global = _geom_mean_likelihood_ratio(
+            nll_global_per_point, nll_learned_per_point
+        )
 
         row = {
             "scaler_type": scaler_type,
@@ -331,7 +365,7 @@ def run_sweep(
         omega_str = ", ".join([f"{w:.3f}" for w in omega_hat])
         constraint_str = f"/{omega_constraint}" if omega_constraint != "none" else ""
         print(
-            f"scaler={scaler_type:8s}, tau={tau:5.1f}, reg={omega_l2_reg:.2f}{constraint_str} => "
+            f"scaler={scaler_type:8s}, tau={tau:5.3f}, reg={omega_l2_reg:.2f}{constraint_str} => "
             f"ω=[{omega_str}], "
             f"NLL: {nll_learned:.3f} vs kernel({status_kernel}){nll_baseline:.3f} "
             f"euclid({status_euclidean}){nll_euclidean:.3f} "
@@ -340,14 +374,18 @@ def run_sweep(
         )
 
     # Find best configuration (sort by improvement vs kernel equal weights)
-    sweep_df = pd.DataFrame(rows).sort_values("nll_improvement_vs_kernel", ascending=False)
+    sweep_df = pd.DataFrame(rows).sort_values(
+        "nll_improvement_vs_kernel", ascending=False
+    )
 
     best_row_idx = 0  # Rank in sorted dataframe
     best_row = sweep_df.iloc[0]
 
     # Reconstruct best omega (strict regex to avoid matching omega_l2_reg)
     omega_cols = [c for c in sweep_df.columns if re.match(r"^omega_\d+_", c)]
-    omega_cols = sorted(omega_cols, key=lambda c: int(c.split("_")[1]))  # Sort by feature index
+    omega_cols = sorted(
+        omega_cols, key=lambda c: int(c.split("_")[1])
+    )  # Sort by feature index
     omega_best = np.array([best_row[c] for c in omega_cols], dtype=float)
 
     # Sanity check: omega dimensionality should match number of features
@@ -357,15 +395,17 @@ def run_sweep(
     )
 
     # Baseline label depends on constraint
-    constraint = best_row['omega_constraint']
+    constraint = best_row["omega_constraint"]
     if constraint in ("softmax", "simplex", "normalize"):
         baseline_label = f"Uniform(ω=1/{len(x_cols)})"
     else:
         baseline_label = "Kernel(ω=1)"
 
     print(f"\nBest configuration (selected on VALIDATION set):")
-    print(f"  scaler_type={best_row['scaler_type']}, tau={best_row['tau']}, "
-          f"omega_l2_reg={best_row['omega_l2_reg']}, constraint={constraint}")
+    print(
+        f"  scaler_type={best_row['scaler_type']}, tau={best_row['tau']}, "
+        f"omega_l2_reg={best_row['omega_l2_reg']}, constraint={constraint}"
+    )
     print(f"  Learned omega: {omega_best}")
     print(f"  Validation NLL:")
     print(f"    Learned:       {best_row['val_nll_learned']:.4f}")
@@ -379,7 +419,7 @@ def run_sweep(
     print(f"\n--- Final Evaluation on TEST set (unbiased) ---")
 
     # Apply best scaler
-    best_scaler = fit_scaler(X_raw[train_idx], best_row['scaler_type'])
+    best_scaler = fit_scaler(X_raw[train_idx], best_row["scaler_type"])
     X_scaled = apply_scaler(X_raw, best_scaler)
     X_train_scaled = X_scaled[train_idx]
     Y_train_data = Y[train_idx]
@@ -387,12 +427,14 @@ def run_sweep(
     Y_test = Y[test_idx]
 
     # Prediction config
+    use_zero_mean = target_col == "RESIDUAL"
     pred_cfg = CovPredictConfig(
-        tau=float(best_row['tau']),
+        tau=float(best_row["tau"]),
         ridge=float(ridge),
         enforce_nonneg_omega=True,
         dtype="float32",
         device="cpu",
+        zero_mean=use_zero_mean,
     )
 
     # Learned omega on test
@@ -425,7 +467,9 @@ def run_sweep(
         exclude_self_if_same=False,
         return_type="numpy",
     )
-    test_nll_baseline = _mean_gaussian_nll(Y_test, Mu_test_baseline, Sigma_test_baseline)
+    test_nll_baseline = _mean_gaussian_nll(
+        Y_test, Mu_test_baseline, Sigma_test_baseline
+    )
 
     # Euclidean k-NN on test
     Mu_test_euclidean, Sigma_test_euclidean = predict_mu_sigma_knn(
@@ -435,7 +479,9 @@ def run_sweep(
         k=k,
         ridge=ridge,
     )
-    test_nll_euclidean = _mean_gaussian_nll(Y_test, Mu_test_euclidean, Sigma_test_euclidean)
+    test_nll_euclidean = _mean_gaussian_nll(
+        Y_test, Mu_test_euclidean, Sigma_test_euclidean
+    )
 
     # Global covariance on test
     Mu_global = np.mean(Y_train_data, axis=0)
@@ -470,7 +516,98 @@ def run_sweep(
         "test_improvement_vs_global": test_improvement_vs_global,
     }
 
-    return sweep_df, best_row_idx, omega_best, X_raw, Y, times, x_cols, y_cols, test_results
+    return (
+        sweep_df,
+        best_row_idx,
+        omega_best,
+        X_raw,
+        Y,
+        times,
+        x_cols,
+        y_cols,
+        test_results,
+    )
+
+
+def plot_nll_vs_tau(
+    sweep_df: pd.DataFrame,
+    artifact_dir: Path,
+    feature_set: str,
+    scaler_type: str = None,
+):
+    """
+    Plot NLL vs tau curve showing hyperparameter tuning.
+
+    Only shows learned omega (no equal omega baseline).
+    """
+    import matplotlib.pyplot as plt
+    from plot_config import setup_plotting
+    setup_plotting()
+
+    # Filter to best scaler if specified, otherwise use all
+    if scaler_type is not None:
+        df = sweep_df[sweep_df["scaler_type"] == scaler_type].copy()
+    else:
+        # Use the scaler type from the best config
+        best_scaler = sweep_df.iloc[0]["scaler_type"]
+        df = sweep_df[sweep_df["scaler_type"] == best_scaler].copy()
+        scaler_type = best_scaler
+
+    # Group by tau and get mean NLL (in case of multiple L2 regs)
+    tau_nll = df.groupby("tau")["val_nll_learned"].min().reset_index()
+    tau_nll = tau_nll.sort_values("tau")
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Plot learned omega NLL vs tau
+    ax.plot(
+        tau_nll["tau"],
+        tau_nll["val_nll_learned"],
+        "o-",
+        linewidth=2.5,
+        markersize=10,
+        color="#E63946",
+        label="Learned ω",
+    )
+
+    # Mark best tau
+    best_idx = tau_nll["val_nll_learned"].idxmin()
+    best_tau = tau_nll.loc[best_idx, "tau"]
+    best_nll = tau_nll.loc[best_idx, "val_nll_learned"]
+
+    ax.scatter(
+        [best_tau],
+        [best_nll],
+        s=300,
+        c="#E63946",
+        marker="*",
+        zorder=10,
+        edgecolors="black",
+        linewidths=2,
+        label=f"Best: τ={best_tau}",
+    )
+
+    # Styling
+    ax.set_xlabel("τ (Kernel Bandwidth)")
+    ax.set_ylabel("Validation NLL")
+    ax.set_title(f"Hyperparameter Tuning: {feature_set} (scaler={scaler_type})")
+    ax.set_xscale("log")
+    ax.legend(loc="upper right")
+
+    plt.tight_layout()
+
+    # Save
+    output_path = artifact_dir / "nll_vs_tau.png"
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    print(f"✓ Saved NLL vs tau plot to {output_path}")
+
+    output_path_pdf = artifact_dir / "nll_vs_tau.pdf"
+    plt.savefig(output_path_pdf, dpi=300, bbox_inches="tight")
+    print(f"✓ Saved PDF to {output_path_pdf}")
+
+    plt.close()
+
+    return best_tau, best_nll
 
 
 def generate_visualizations(
@@ -485,9 +622,14 @@ def generate_visualizations(
     tau_best: float,
     scaler_type_best: str,
     omega_constraint_best: str = "none",
+    sweep_df: pd.DataFrame = None,
 ):
     """Generate feature-set-specific visualizations."""
     print("\nGenerating visualizations...")
+
+    # 0. NLL vs tau hyperparameter tuning plot
+    if sweep_df is not None:
+        plot_nll_vs_tau(sweep_df, artifact_dir, feature_set, scaler_type_best)
 
     # Apply best scaler
     scaler = fit_scaler(X_raw, scaler_type_best)
@@ -564,7 +706,9 @@ def main():
         "--scaler-types",
         nargs="+",
         type=str,
-        default=["standard", "minmax"],
+        default=[
+            "standard",
+        ],
         choices=["none", "standard", "minmax"],
         help="Scaler types to test",
     )
@@ -572,7 +716,19 @@ def main():
         "--taus",
         nargs="+",
         type=float,
-        default=[0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 5.0, 20.0],
+        default=[
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            1.0,
+            2.5,
+            5.0,
+            7.5,
+            10.0,
+            15.0,
+            20.0,
+        ],
         help="Tau values to sweep (finer at low tau where performance is better)",
     )
     parser.add_argument(
@@ -586,10 +742,16 @@ def main():
         "--omega-constraints",
         nargs="+",
         type=str,
-        default=["none"],
+        default=["softmax"],
         choices=["none", "softmax", "simplex", "normalize"],
         help="Omega constraint types to sweep: none (L2 reg), softmax (sum=1 via softmax), "
-             "simplex (projected sum=1), normalize (post-hoc normalize)",
+        "simplex (projected sum=1), normalize (post-hoc normalize)",
+    )
+    parser.add_argument(
+        "--k",
+        type=int,
+        default=64,
+        help="Number of neighbors for k-NN (default 64, tuned via sweep_knn_k_values.py)",
     )
     parser.add_argument(
         "--output-suffix",
@@ -597,12 +759,27 @@ def main():
         default="",
         help="Suffix to append to output directory name (e.g., '_softmax' -> 'focused_2d_softmax')",
     )
+    parser.add_argument(
+        "--use-residuals",
+        action="store_true",
+        help="Use residuals (ACTUAL - MEAN_FORECAST) instead of raw actuals as target",
+    )
 
     args = parser.parse_args()
 
     DATA_DIR = args.data_dir
     feature_set = args.feature_set
     output_suffix = args.output_suffix
+
+    # Determine data source and target column based on --use-residuals flag
+    if args.use_residuals:
+        data_parquet = DATA_DIR / "residuals_filtered_rts3_constellation_v1.parquet"
+        target_col = "RESIDUAL"
+        print("\n*** Using RESIDUALS as target (ACTUAL - MEAN_FORECAST) ***\n")
+    else:
+        data_parquet = DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
+        target_col = "ACTUAL"
+        print("\n*** Using raw ACTUALS as target ***\n")
 
     # Build output directory name with optional suffix
     output_name = f"{feature_set}{output_suffix}" if output_suffix else feature_set
@@ -614,6 +791,8 @@ def main():
             "description": FEATURE_SET_DESCRIPTIONS[feature_set],
             "feature_set_base": feature_set,  # Original feature set name
             "output_suffix": output_suffix,
+            "use_residuals": args.use_residuals,
+            "target_col": target_col,
             "scaler_types": args.scaler_types,
             "taus": args.taus,
             "omega_l2_regs": args.omega_l2_regs,
@@ -627,19 +806,33 @@ def main():
     print(f"Running sweep for feature set: {feature_set}")
     print("=" * 80)
 
-    sweep_df, best_row_idx, omega_best, X_raw, Y, times, x_cols, y_cols, test_results = run_sweep(
+    (
+        sweep_df,
+        best_row_idx,
+        omega_best,
+        X_raw,
+        Y,
+        times,
+        x_cols,
+        y_cols,
+        test_results,
+    ) = run_sweep(
         feature_set=feature_set,
         forecasts_parquet=DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet",
-        actuals_parquet=DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet",
+        actuals_parquet=data_parquet,
         artifact_dir=artifact_dir,
+        target_col=target_col,
         scaler_types=tuple(args.scaler_types),
         taus=tuple(args.taus),
         omega_l2_regs=tuple(args.omega_l2_regs),
         omega_constraints=tuple(args.omega_constraints),
+        k=args.k,
     )
 
     # Save results (including test results)
-    save_sweep_summary(artifact_dir, sweep_df, best_row_idx, omega_best, test_results=test_results)
+    save_sweep_summary(
+        artifact_dir, sweep_df, best_row_idx, omega_best, test_results=test_results
+    )
 
     # Update config with actual feature info
     best_row = sweep_df.iloc[best_row_idx]
@@ -647,17 +840,19 @@ def main():
     import json
 
     config = load_feature_config(artifact_dir)
-    config.update({
-        "x_cols": x_cols,
-        "y_cols": y_cols,
-        "n_features": len(x_cols),
-        "scaler_type": str(best_row["scaler_type"]),
-        "tau": float(best_row["tau"]),
-        "omega_l2_reg": float(best_row["omega_l2_reg"]),
-        "omega_constraint": str(best_row.get("omega_constraint", "none")),
-        "ridge": 1e-3,
-        "k": 128,
-    })
+    config.update(
+        {
+            "x_cols": x_cols,
+            "y_cols": y_cols,
+            "n_features": len(x_cols),
+            "scaler_type": str(best_row["scaler_type"]),
+            "tau": float(best_row["tau"]),
+            "omega_l2_reg": float(best_row["omega_l2_reg"]),
+            "omega_constraint": str(best_row.get("omega_constraint", "none")),
+            "ridge": 1e-3,
+            "k": 128,
+        }
+    )
     with open(artifact_dir / "feature_config.json", "w") as f:
         json.dump(config, f, indent=2)
 
@@ -674,6 +869,7 @@ def main():
         tau_best=best_row["tau"],
         scaler_type_best=best_row["scaler_type"],
         omega_constraint_best=best_row["omega_constraint"],
+        sweep_df=sweep_df,
     )
 
     # Update README with file list

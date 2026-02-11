@@ -122,6 +122,11 @@ def main():
         default=Path("data"),
         help="Data directory (default: data/)",
     )
+    parser.add_argument(
+        "--use-residuals",
+        action="store_true",
+        help="Use residuals (ACTUAL - MEAN_FORECAST) instead of raw actuals as target",
+    )
 
     args = parser.parse_args()
 
@@ -203,6 +208,9 @@ def main():
         "--data-dir",
         str(args.data_dir),
     ]
+
+    if args.use_residuals:
+        cmd.append("--use-residuals")
 
     print("Command:")
     print(" ".join(cmd))

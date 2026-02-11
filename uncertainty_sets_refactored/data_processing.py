@@ -114,6 +114,10 @@ def build_total_actuals(
     """
     Aggregate actuals to system level.
 
+    Parameters:
+      value_col: column name to use. Pass "RESIDUAL" to aggregate residuals instead of actuals.
+                 Residuals are computed as ACTUAL - MEAN_FORECAST and must be in the dataframe.
+
     Output columns:
       - TIME_HOURLY
       - y
@@ -290,9 +294,11 @@ def build_Y_actuals_matrix(
     agg: str = "mean",
 ) -> pd.DataFrame:
     """
-    Build wide target matrix Y: index=time, columns=resources, values=actuals.
+    Build wide target matrix Y: index=time, columns=resources, values=actuals or residuals.
 
     Parameters:
+      value_col: column name to use as target. Pass "RESIDUAL" to use residuals instead of actuals.
+                 Residuals are computed as ACTUAL - MEAN_FORECAST and should be in the dataframe.
       agg: how to handle duplicates within (time, resource). Options: "mean" or "sum".
     """
     _require_columns(
@@ -344,6 +350,10 @@ def build_XY_for_covariance(
 ) -> Tuple[np.ndarray, np.ndarray, pd.DatetimeIndex, List[str], List[str]] | tuple:
     """
     Merge features and targets, align them by time, and return numpy arrays.
+
+    Parameters:
+      actual_col: column name to use as target. Pass "RESIDUAL" to use residuals (ACTUAL - MEAN_FORECAST)
+                  instead of raw actuals. Residuals must be computed in the dataframe first.
 
     Returns:
       X: (T, K) float64
@@ -483,9 +493,13 @@ def build_XY_for_covariance_system_only(
 
     Uses only SYS_MEAN and SYS_STD as features (2 columns), while Y remains per-unit.
 
+    Parameters:
+      actual_col: column name to use as target. Pass "RESIDUAL" to use residuals (ACTUAL - MEAN_FORECAST)
+                  instead of raw actuals. Residuals must be computed in the dataframe first.
+
     Returns:
       X: (T, 2) float64 - system mean and std only
-      Y: (T, M) float64 - per-unit actuals
+      Y: (T, M) float64 - per-unit actuals or residuals
       times: DatetimeIndex
       x_cols: list[str] - ['SYS_MEAN', 'SYS_STD']
       y_cols: list[str] - resource IDs

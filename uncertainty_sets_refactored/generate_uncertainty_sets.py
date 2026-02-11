@@ -109,7 +109,7 @@ class UncertaintySetConfig:
             "forecast_range_normalized",
             "forecast_cv",
             # Historical features (day-ahead safe: from previous days)
-            "y_lag24",              # Same hour yesterday
+            "y_lag24",  # Same hour yesterday
             "forecast_error_lag24",  # Yesterday's forecast error at this hour
         ]
     )
@@ -201,7 +201,9 @@ def generate_uncertainty_sets(
     # -------------------------------------------------------------------------
     # Step 2: Build X/Y for covariance
     # -------------------------------------------------------------------------
-    logger.info("Building X/Y matrices for covariance (feature_set=%s)...", config.feature_set)
+    logger.info(
+        "Building X/Y matrices for covariance (feature_set=%s)...", config.feature_set
+    )
 
     # Select feature builder based on config
     if config.feature_set not in FEATURE_BUILDERS:
@@ -283,9 +285,11 @@ def generate_uncertainty_sets(
     # -------------------------------------------------------------------------
     logger.info("Training conformal model for lower bounds...")
     logger.info("  Features: %s", config.conformal_feature_cols)
-    logger.info("  Model: n_estimators=%d, lr=%.3f",
-                config.conformal_model_kwargs.get("n_estimators", 1000),
-                config.conformal_model_kwargs.get("learning_rate", 0.05))
+    logger.info(
+        "  Model: n_estimators=%d, lr=%.3f",
+        config.conformal_model_kwargs.get("n_estimators", 1000),
+        config.conformal_model_kwargs.get("learning_rate", 0.05),
+    )
 
     df_tot = build_conformal_totals_df(actuals, forecasts)
 

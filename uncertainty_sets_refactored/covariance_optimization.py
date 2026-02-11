@@ -26,6 +26,9 @@ class KernelCovConfig:
     tau: float
     ridge: float = 1e-4
     enforce_nonneg_omega: bool = True
+    zero_mean: bool = (
+        False  # If True, force Mu=0 (for residuals with mean already removed)
+    )
 
 
 @dataclass(frozen=True)
@@ -43,12 +46,19 @@ class FitConfig:
     cholesky_jitter_mult: float = 10.0
     finite_check: bool = True
     device: str = "cpu"
-    omega_l2_reg: float = 0.0  # L2 regularization on omega (only used when omega_constraint="none")
+    omega_l2_reg: float = (
+        0.0  # L2 regularization on omega (only used when omega_constraint="none")
+    )
     omega_constraint: str = "none"  # "none", "softmax", "simplex", or "normalize"
     # - "none": No constraint on omega scale. L2 reg pulls toward 1.0.
     # - "softmax": Learn unconstrained alpha, omega = softmax(alpha). Ensures sum(omega)=1. L2 reg ignored.
     # - "simplex": Project omega onto probability simplex after each step. Ensures sum(omega)=1. L2 reg ignored.
     # - "normalize": Divide omega by sum(omega) at the end (post-hoc normalization). L2 reg ignored.
+    k_fit: Optional[
+        int
+    ] = None  # If set, use top-k neighbors during training (matches prediction)
+    # - None: Use all N-1 neighbors (original behavior, softmax over full training set)
+    # - int > 0: Use only top-k neighbors (aligns train/predict, usually improves signal)
 
 
 @dataclass(frozen=True)
@@ -61,6 +71,9 @@ class CovPredictConfig:
     dtype: str = "float32"  # "float32" or "float64"
     device: str = "cpu"
     finite_check: bool = True
+    zero_mean: bool = (
+        False  # If True, force Mu=0 (for residuals with mean already removed)
+    )
 
 
 def _check_torch() -> None:
@@ -176,6 +189,11 @@ def fit_omega(
 
     IMPORTANT: This performs leave-one-out moment estimation on the *training* set indices.
 
+    Train/Predict Alignment:
+    - Use fit_cfg.k_fit to match the k used at prediction time (predict_mu_sigma_topk_cross).
+    - Without k_fit: softmax over all N-1 neighbors (may not align with prediction).
+    - With k_fit=k: softmax over top-k neighbors (aligns with prediction, improves signal).
+
     The omega_constraint option in fit_cfg controls how omega is parameterized:
     - "none": Learn omega directly (current behavior, no sum constraint)
     - "softmax": Learn alpha, omega = softmax(alpha). Ensures sum(omega)=1, omega>=0.
@@ -247,21 +265,58 @@ def fit_omega(
             # "none" or "normalize": use clamped param directly
             om = torch.clamp(param_t, min=0.0) if cfg.enforce_nonneg_omega else param_t
 
-        # leave-one-out distances and masked softmax on training set
+        # leave-one-out distances on training set
         D = _pairwise_sqdist(Xtr, Xtr, om)  # (Nt, Nt)
-        logits = -D / float(cfg.tau)
 
-        mask = ~torch.eye(Nt, dtype=torch.bool, device=device)
-        logits = logits.masked_fill(~mask, -1e9)  # exclude self
+        # Exclude self by setting diagonal to inf
+        D.fill_diagonal_(float("inf"))
 
-        Phi = torch.softmax(logits, dim=1) * mask.to(dtype)
+        # Determine effective k for training
+        k_fit = fit_cfg.k_fit
+        if k_fit is not None and k_fit > 0:
+            # Use top-k neighbors (aligns with prediction-time behavior)
+            k_eff = min(k_fit, Nt - 1)
+            d_k, idx_k = torch.topk(
+                D, k=k_eff, dim=1, largest=False, sorted=False
+            )  # (Nt, k_eff)
+            logits_k = -d_k / float(cfg.tau)
+            Phi_k = torch.softmax(logits_k, dim=1)  # (Nt, k_eff)
 
-        Mu = Phi @ Ytr  # (Nt, M)
+            # Gather neighbor Y values
+            Y_nb = Ytr[idx_k]  # (Nt, k_eff, M)
 
-        C = Ytr.unsqueeze(0) - Mu.unsqueeze(1)  # (Nt, Nt, M)
-        CW = C * Phi.unsqueeze(-1)  # (Nt, Nt, M)
+            if cfg.zero_mean:
+                Mu = torch.zeros_like(Ytr)  # (Nt, M)
+                C = Y_nb  # (Nt, k_eff, M) - deviations from zero
+            else:
+                Mu = (Phi_k.unsqueeze(-1) * Y_nb).sum(dim=1)  # (Nt, M)
+                C = Y_nb - Mu.unsqueeze(1)  # (Nt, k_eff, M)
 
-        Sigma = torch.matmul(C.transpose(1, 2), CW)  # (Nt, M, M)
+            CW = C * Phi_k.unsqueeze(-1)  # (Nt, k_eff, M)
+            Sigma = torch.matmul(C.transpose(1, 2), CW)  # (Nt, M, M)
+
+            # For diagnostics, use Phi_k
+            Phi_diag = Phi_k
+        else:
+            # Original behavior: softmax over all N-1 neighbors
+            logits = -D / float(cfg.tau)
+            logits = logits.masked_fill(
+                torch.isinf(D), -1e9
+            )  # exclude self (diagonal is inf)
+            Phi = torch.softmax(logits, dim=1)  # (Nt, Nt)
+
+            if cfg.zero_mean:
+                Mu = torch.zeros_like(Ytr)  # (Nt, M)
+                C = Ytr.unsqueeze(0)  # (Nt, Nt, M) - deviations from zero
+            else:
+                Mu = Phi @ Ytr  # (Nt, M)
+                C = Ytr.unsqueeze(0) - Mu.unsqueeze(1)  # (Nt, Nt, M)
+
+            CW = C * Phi.unsqueeze(-1)  # (Nt, Nt, M)
+            Sigma = torch.matmul(C.transpose(1, 2), CW)  # (Nt, M, M)
+
+            # For diagnostics
+            Phi_diag = Phi
         Sigma = 0.5 * (Sigma + Sigma.transpose(1, 2)) + float(cfg.ridge) * I
 
         # NLL under Gaussian with per-row Sigma
@@ -326,6 +381,19 @@ def fit_omega(
                         if cfg.enforce_nonneg_omega
                         else param_t
                     )
+
+                # Effective neighborhood diagnostics
+                phi_max_per_row = Phi_diag.max(
+                    dim=1
+                ).values  # (Nt,) or (Nt,) for k mode
+                phi_max_mean = float(phi_max_per_row.mean().item())
+
+                # Effective k: count neighbors with weight > 5% of max weight per row
+                threshold = 0.05  # 5% of max weight
+                phi_threshold = phi_max_per_row.unsqueeze(1) * threshold
+                eff_k_per_row = (Phi_diag > phi_threshold).sum(dim=1).float()
+                eff_k_mean = float(eff_k_per_row.mean().item())
+
                 history.append(
                     {
                         "iter": it,
@@ -338,6 +406,8 @@ def fit_omega(
                         "omega_mean": float(om_now.mean().item()),
                         "omega_sum": float(om_now.sum().item()),
                         "omega_nnz": int((om_now > 0).sum().item()),
+                        "phi_max_mean": phi_max_mean,
+                        "eff_k_mean": eff_k_mean,
                     }
                 )
         if it % fit_cfg.verbose_every == 0:
@@ -356,6 +426,14 @@ def fit_omega(
                         if cfg.enforce_nonneg_omega
                         else param_t
                     )
+
+                # Effective neighborhood diagnostics
+                phi_max_per_row = Phi_diag.max(dim=1).values
+                phi_max_mean = float(phi_max_per_row.mean().item())
+                phi_threshold = phi_max_per_row.unsqueeze(1) * 0.05
+                eff_k_per_row = (Phi_diag > phi_threshold).sum(dim=1).float()
+                eff_k_mean = float(eff_k_per_row.mean().item())
+
                 logger.info(
                     "omega: min=%.3e, max=%.3e, mean=%.3e, sum=%.3f, nnz=%d/%d",
                     float(om_now.min().item()),
@@ -364,6 +442,11 @@ def fit_omega(
                     float(om_now.sum().item()),
                     int((om_now > 0).sum().item()),
                     int(om_now.numel()),
+                )
+                logger.info(
+                    "kernel: phi_max_mean=%.3f, eff_k_mean=%.1f (neighbors >5%% of max weight)",
+                    phi_max_mean,
+                    eff_k_mean,
                 )
 
         # Convergence check
@@ -501,8 +584,15 @@ def predict_mu_sigma_topk_cross(
 
     Y_nb = Yr[idx]  # (Nq, k, M)
 
-    Mu = (Phi_k.unsqueeze(-1) * Y_nb).sum(dim=1)  # (Nq, M)
-    C = Y_nb - Mu.unsqueeze(1)  # (Nq, k, M)
+    if cfg.zero_mean:
+        # For residuals: mean is zero by construction, only learn covariance
+        Mu = torch.zeros((Xq.shape[0], Yr.shape[1]), dtype=dtype, device=device)
+        C = Y_nb  # Deviations from zero
+    else:
+        # Standard: learn both mean and covariance
+        Mu = (Phi_k.unsqueeze(-1) * Y_nb).sum(dim=1)  # (Nq, M)
+        C = Y_nb - Mu.unsqueeze(1)  # (Nq, k, M)
+
     CW = C * Phi_k.unsqueeze(-1)  # (Nq, k, M)
     Sigma = torch.matmul(C.transpose(1, 2), CW)  # (Nq, M, M)
 

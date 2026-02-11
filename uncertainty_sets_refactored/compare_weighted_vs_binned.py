@@ -23,6 +23,7 @@ from conformal_prediction import (
     train_wind_lower_model_conformal_binned,
 )
 from data_processing import build_conformal_totals_df
+from plot_config import setup_plotting, IEEE_TWO_COL_WIDTH
 
 
 def load_rts_data():
@@ -190,8 +191,8 @@ def plot_comparison_results(df_results: pd.DataFrame, output_dir: Path):
     """
     print("\nGenerating visualizations...")
 
-    # Set up style
-    plt.style.use("seaborn-v0_8-darkgrid")
+    # Set up paper-ready fonts
+    setup_plotting()
     colors = {"weighted": "#2E86AB", "binned": "#A23B72"}
 
     # Create figure with multiple subplots
@@ -235,13 +236,13 @@ def plot_comparison_results(df_results: pd.DataFrame, output_dir: Path):
     for alpha in alpha_values:
         ax1.axhline(alpha, color="red", linestyle=":", alpha=0.3, linewidth=1)
 
-    ax1.set_xlabel("Tau (Bandwidth)", fontsize=12, fontweight="bold")
-    ax1.set_ylabel("Coverage", fontsize=12, fontweight="bold")
+    ax1.set_xlabel("Tau (Bandwidth)", fontweight="bold")
+    ax1.set_ylabel("Coverage", fontweight="bold")
     ax1.set_xscale("log")
-    ax1.legend(fontsize=9, ncol=2)
+    ax1.legend(ncol=2)
     ax1.grid(True, alpha=0.3)
     ax1.set_title(
-        "Coverage vs Tau (Different Target Levels)", fontsize=14, fontweight="bold"
+        "Coverage vs Tau (Different Target Levels)", fontweight="bold"
     )
 
     # -------------------------------------------------------------------------
@@ -288,14 +289,14 @@ def plot_comparison_results(df_results: pd.DataFrame, output_dir: Path):
         alpha=0.8,
     )
 
-    ax2.set_xlabel("Target Coverage", fontsize=11, fontweight="bold")
-    ax2.set_ylabel("Coverage Gap", fontsize=11, fontweight="bold")
+    ax2.set_xlabel("Target Coverage", fontweight="bold")
+    ax2.set_ylabel("Coverage Gap", fontweight="bold")
     ax2.set_xticks(x)
     ax2.set_xticklabels(labels)
-    ax2.legend(fontsize=9)
+    ax2.legend()
     ax2.grid(True, alpha=0.3, axis="y")
     ax2.set_title(
-        "Coverage Gap\n(Weighted Best vs Binned)", fontsize=12, fontweight="bold"
+        "Coverage Gap\n(Weighted Best vs Binned)", fontweight="bold"
     )
 
     # -------------------------------------------------------------------------
@@ -331,13 +332,13 @@ def plot_comparison_results(df_results: pd.DataFrame, output_dir: Path):
                 label=f"Binned global α={alpha} ({q_global:.2f})",
             )
 
-    ax3.set_xlabel("Tau (Bandwidth)", fontsize=11, fontweight="bold")
-    ax3.set_ylabel("q_hat (Std for Weighted, Global for Binned)", fontsize=11, fontweight="bold")
+    ax3.set_xlabel("Tau (Bandwidth)", fontweight="bold")
+    ax3.set_ylabel("q_hat (Std for Weighted, Global for Binned)", fontweight="bold")
     ax3.set_xscale("log")
-    ax3.legend(fontsize=8, ncol=1)
+    ax3.legend(ncol=1)
     ax3.grid(True, alpha=0.3)
     ax3.set_title(
-        "q_hat: Spatial Variation (Weighted) vs Global (Binned)", fontsize=12, fontweight="bold"
+        "q_hat: Spatial Variation (Weighted) vs Global (Binned)", fontweight="bold"
     )
 
     # -------------------------------------------------------------------------
@@ -384,13 +385,13 @@ def plot_comparison_results(df_results: pd.DataFrame, output_dir: Path):
         alpha=0.8,
     )
 
-    ax4.set_xlabel("Target Coverage", fontsize=11, fontweight="bold")
-    ax4.set_ylabel("RMSE (MW)", fontsize=11, fontweight="bold")
+    ax4.set_xlabel("Target Coverage", fontweight="bold")
+    ax4.set_ylabel("RMSE (MW)", fontweight="bold")
     ax4.set_xticks(x)
     ax4.set_xticklabels(labels)
-    ax4.legend(fontsize=9)
+    ax4.legend()
     ax4.grid(True, alpha=0.3, axis="y")
-    ax4.set_title("Error Comparison\n(Lower is Better)", fontsize=12, fontweight="bold")
+    ax4.set_title("Error Comparison\n(Lower is Better)", fontweight="bold")
 
     # -------------------------------------------------------------------------
     # 5. Heatmap: Coverage Gap vs (Alpha, Tau) for Weighted
@@ -416,15 +417,15 @@ def plot_comparison_results(df_results: pd.DataFrame, output_dir: Path):
         ax5.set_xticklabels([f"{x:.2f}" for x in pivot.columns])
         ax5.set_yticklabels([f"{y:.1f}" for y in pivot.index])
 
-        ax5.set_xlabel("Target Coverage (α)", fontsize=11, fontweight="bold")
-        ax5.set_ylabel("Tau (Bandwidth)", fontsize=11, fontweight="bold")
+        ax5.set_xlabel("Target Coverage (α)", fontweight="bold")
+        ax5.set_ylabel("Tau (Bandwidth)", fontweight="bold")
         ax5.set_title(
-            "Weighted Conformal:\nCoverage Gap Heatmap", fontsize=12, fontweight="bold"
+            "Weighted Conformal:\nCoverage Gap Heatmap", fontweight="bold"
         )
 
         # Add colorbar
         cbar = plt.colorbar(im, ax=ax5)
-        cbar.set_label("Coverage Gap", fontsize=10)
+        cbar.set_label("Coverage Gap")
 
         # Add text annotations
         for i in range(len(pivot.index)):
@@ -436,7 +437,6 @@ def plot_comparison_results(df_results: pd.DataFrame, output_dir: Path):
                     ha="center",
                     va="center",
                     color="black",
-                    fontsize=8,
                 )
 
     # -------------------------------------------------------------------------
@@ -481,11 +481,11 @@ def plot_comparison_results(df_results: pd.DataFrame, output_dir: Path):
     )
     ax6.plot(alpha_range, alpha_range, "r:", linewidth=2, label="Perfect", alpha=0.5)
 
-    ax6.set_xlabel("Target Coverage (α)", fontsize=11, fontweight="bold")
-    ax6.set_ylabel("Achieved Coverage", fontsize=11, fontweight="bold")
-    ax6.legend(fontsize=9, ncol=2)
+    ax6.set_xlabel("Target Coverage (α)", fontweight="bold")
+    ax6.set_ylabel("Achieved Coverage", fontweight="bold")
+    ax6.legend(ncol=2)
     ax6.grid(True, alpha=0.3)
-    ax6.set_title("Achieved vs Target Coverage", fontsize=12, fontweight="bold")
+    ax6.set_title("Achieved vs Target Coverage", fontweight="bold")
 
     # -------------------------------------------------------------------------
     # 7. q_hat Value Comparison (mean for weighted vs global for binned)
@@ -534,19 +534,19 @@ def plot_comparison_results(df_results: pd.DataFrame, output_dir: Path):
     for bar in bars_w:
         height = bar.get_height()
         ax7.text(bar.get_x() + bar.get_width()/2., height,
-                f'{height:.2f}', ha='center', va='bottom', fontsize=8)
+                f'{height:.2f}', ha='center', va='bottom')
     for bar in bars_b:
         height = bar.get_height()
         ax7.text(bar.get_x() + bar.get_width()/2., height,
-                f'{height:.2f}', ha='center', va='bottom', fontsize=8)
+                f'{height:.2f}', ha='center', va='bottom')
 
-    ax7.set_xlabel("Target Coverage", fontsize=11, fontweight="bold")
-    ax7.set_ylabel("q_hat (Correction Factor)", fontsize=11, fontweight="bold")
+    ax7.set_xlabel("Target Coverage", fontweight="bold")
+    ax7.set_ylabel("q_hat (Correction Factor)", fontweight="bold")
     ax7.set_xticks(x)
     ax7.set_xticklabels(labels)
-    ax7.legend(fontsize=9)
+    ax7.legend()
     ax7.grid(True, alpha=0.3, axis="y")
-    ax7.set_title("q_hat Comparison\n(Localized Mean vs Global)", fontsize=12, fontweight="bold")
+    ax7.set_title("q_hat Comparison\n(Localized Mean vs Global)", fontweight="bold")
 
     # -------------------------------------------------------------------------
     # 8. Best tau vs alpha
@@ -568,8 +568,8 @@ def plot_comparison_results(df_results: pd.DataFrame, output_dir: Path):
             alpha_labels.append(alpha)
 
     ax8_color = "tab:blue"
-    ax8.set_xlabel("Target Coverage (α)", fontsize=11, fontweight="bold")
-    ax8.set_ylabel("Best Tau", fontsize=11, fontweight="bold", color=ax8_color)
+    ax8.set_xlabel("Target Coverage (α)", fontweight="bold")
+    ax8.set_ylabel("Best Tau", fontweight="bold", color=ax8_color)
     ax8.plot(alpha_labels, best_taus, "o-", color=ax8_color, linewidth=2, markersize=8)
     ax8.tick_params(axis="y", labelcolor=ax8_color)
     ax8.grid(True, alpha=0.3)
@@ -578,20 +578,19 @@ def plot_comparison_results(df_results: pd.DataFrame, output_dir: Path):
     ax8_twin = ax8.twinx()
     ax8_twin_color = "tab:red"
     ax8_twin.set_ylabel(
-        "Coverage Gap at Best Tau", fontsize=11, fontweight="bold", color=ax8_twin_color
+        "Coverage Gap at Best Tau", fontweight="bold", color=ax8_twin_color
     )
     ax8_twin.plot(
         alpha_labels, best_gaps, "s--", color=ax8_twin_color, linewidth=2, markersize=6
     )
     ax8_twin.tick_params(axis="y", labelcolor=ax8_twin_color)
 
-    ax8.set_title("Optimal Tau vs Target Coverage", fontsize=12, fontweight="bold")
+    ax8.set_title("Optimal Tau vs Target Coverage", fontweight="bold")
 
     # Overall title
     fig.suptitle(
         "Weighted vs Binned Conformal Prediction: Comprehensive Comparison",
-        fontsize=16,
-        fontweight="bold",
+                fontweight="bold",
         y=0.995,
     )
 

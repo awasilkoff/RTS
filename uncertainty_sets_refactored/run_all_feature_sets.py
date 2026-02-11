@@ -49,6 +49,7 @@ def run_feature_set(
     scaler_types: list[str] | None = None,
     omega_constraints: list[str] | None = None,
     output_suffix: str = "",
+    use_residuals: bool = False,
 ) -> bool:
     """
     Run sweep for a single feature set.
@@ -80,6 +81,8 @@ def run_feature_set(
         cmd.extend(["--omega-constraints"] + omega_constraints)
     if output_suffix:
         cmd.extend(["--output-suffix", output_suffix])
+    if use_residuals:
+        cmd.append("--use-residuals")
 
     try:
         result = subprocess.run(cmd, check=True, text=True)
@@ -236,6 +239,11 @@ def main():
         help=f"Omega constraint types to sweep (default: {DEFAULT_OMEGA_CONSTRAINTS}). "
              "When not 'none', L2 reg is ignored for that constraint.",
     )
+    parser.add_argument(
+        "--use-residuals",
+        action="store_true",
+        help="Use residuals (ACTUAL - MEAN_FORECAST) instead of raw actuals as target",
+    )
 
     args = parser.parse_args()
 
@@ -263,6 +271,7 @@ def main():
             omega_l2_regs=args.omega_l2_regs,
             scaler_types=args.scaler_types,
             omega_constraints=args.omega_constraints,
+            use_residuals=args.use_residuals,
         )
         if success:
             success_count += 1

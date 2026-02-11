@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 
 from conformal_prediction import train_wind_lower_model_weighted_conformal
 from data_processing import build_conformal_totals_df
+from plot_config import setup_plotting, IEEE_COL_WIDTH, IEEE_TWO_COL_WIDTH
 
 
 def load_rts_data():
@@ -160,47 +161,45 @@ def sweep_tau_values(
 
 def plot_tau_sweep(df_results: pd.DataFrame, alpha_target: float, output_dir: Path):
     """Create visualization of tau sweep results."""
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    setup_plotting()
+
+    fig, axes = plt.subplots(2, 2, figsize=(IEEE_TWO_COL_WIDTH, 5.5))
 
     # 1. Coverage vs Tau
     ax = axes[0, 0]
-    ax.plot(df_results['tau'], df_results['coverage'], 'o-', linewidth=2, markersize=8)
-    ax.axhline(alpha_target, color='red', linestyle='--', linewidth=2, label=f'Target ({alpha_target})')
-    ax.set_xlabel('Tau (Bandwidth)', fontsize=12)
-    ax.set_ylabel('Coverage', fontsize=12)
+    ax.plot(df_results['tau'], df_results['coverage'], 'o-', markersize=6)
+    ax.axhline(alpha_target, color='red', linestyle='--', label=f'Target ({alpha_target})')
+    ax.set_xlabel('Tau (Bandwidth)')
+    ax.set_ylabel('Coverage')
     ax.set_xscale('log')
-    ax.legend(fontsize=10)
-    ax.grid(True, alpha=0.3)
-    ax.set_title('Coverage vs Tau', fontsize=14, fontweight='bold')
+    ax.legend()
+    ax.set_title('Coverage vs Tau')
 
     # 2. Coverage Gap vs Tau
     ax = axes[0, 1]
-    ax.plot(df_results['tau'], df_results['gap'], 'o-', linewidth=2, markersize=8, color='orange')
-    ax.axhline(0.05, color='red', linestyle='--', linewidth=2, label='5% threshold')
-    ax.set_xlabel('Tau (Bandwidth)', fontsize=12)
-    ax.set_ylabel('Coverage Gap', fontsize=12)
+    ax.plot(df_results['tau'], df_results['gap'], 'o-', markersize=6, color='orange')
+    ax.axhline(0.05, color='red', linestyle='--', label='5% threshold')
+    ax.set_xlabel('Tau (Bandwidth)')
+    ax.set_ylabel('Coverage Gap')
     ax.set_xscale('log')
-    ax.legend(fontsize=10)
-    ax.grid(True, alpha=0.3)
-    ax.set_title('Coverage Gap vs Tau', fontsize=14, fontweight='bold')
+    ax.legend()
+    ax.set_title('Coverage Gap vs Tau')
 
     # 3. q_hat Mean vs Tau
     ax = axes[1, 0]
-    ax.plot(df_results['tau'], df_results['q_hat_mean'], 'o-', linewidth=2, markersize=8, color='green')
-    ax.set_xlabel('Tau (Bandwidth)', fontsize=12)
-    ax.set_ylabel('q_hat Mean', fontsize=12)
+    ax.plot(df_results['tau'], df_results['q_hat_mean'], 'o-', markersize=6, color='green')
+    ax.set_xlabel('Tau (Bandwidth)')
+    ax.set_ylabel('q_hat Mean')
     ax.set_xscale('log')
-    ax.grid(True, alpha=0.3)
-    ax.set_title('q_hat Mean vs Tau', fontsize=14, fontweight='bold')
+    ax.set_title('q_hat Mean vs Tau')
 
     # 4. q_hat Std vs Tau (spatial variation)
     ax = axes[1, 1]
-    ax.plot(df_results['tau'], df_results['q_hat_std'], 'o-', linewidth=2, markersize=8, color='purple')
-    ax.set_xlabel('Tau (Bandwidth)', fontsize=12)
-    ax.set_ylabel('q_hat Std (Spatial Variation)', fontsize=12)
+    ax.plot(df_results['tau'], df_results['q_hat_std'], 'o-', markersize=6, color='purple')
+    ax.set_xlabel('Tau (Bandwidth)')
+    ax.set_ylabel('q_hat Std (Spatial Variation)')
     ax.set_xscale('log')
-    ax.grid(True, alpha=0.3)
-    ax.set_title('q_hat Spatial Variation vs Tau', fontsize=14, fontweight='bold')
+    ax.set_title('q_hat Spatial Variation vs Tau')
 
     plt.tight_layout()
 

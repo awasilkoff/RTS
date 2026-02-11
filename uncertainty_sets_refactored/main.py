@@ -111,6 +111,7 @@ def run_integration_pipeline() -> None:
         grad_clip=10.0,
         max_iters=500,
         tol=0.0,
+        # k_fit=None: use all neighbors during training (empirically better)
     )
 
     omega_hat = fit_omega(

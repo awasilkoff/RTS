@@ -361,6 +361,152 @@ def build_XY_high_dim_8d(
     return X, Y, times, x_cols, y_cols
 
 
+def build_XY_high_dim_16d(
+    forecasts_filtered: pd.DataFrame,
+    actuals_filtered: pd.DataFrame,
+    *,
+    drop_any_nan_rows: bool = True,
+    time_col: str = "TIME_HOURLY",
+    resource_col: str = "ID_RESOURCE",
+    forecast_col: str = "FORECAST",
+    actual_col: str = "ACTUAL",
+    model_col: Optional[str] = "MODEL",
+    return_frames: bool = False,
+) -> Tuple[np.ndarray, np.ndarray, pd.DatetimeIndex, List[str], List[str]] | tuple:
+    """
+    High-dimensional 16D feature set for comprehensive omega learning.
+
+    Features (16):
+      Base (8):
+        1. SYS_MEAN - System-level forecast mean
+        2. SYS_STD - System-level ensemble std
+        3. WIND_122_MEAN - Farm 122 forecast mean
+        4. WIND_122_STD - Farm 122 ensemble std
+        5. WIND_309_MEAN - Farm 309 forecast mean
+        6. WIND_309_STD - Farm 309 ensemble std
+        7. WIND_317_MEAN - Farm 317 forecast mean
+        8. WIND_317_STD - Farm 317 ensemble std
+
+      Temporal/Cyclical (4):
+        9. HOUR_SIN - sin(2π·hour/24)
+        10. HOUR_COS - cos(2π·hour/24)
+        11. DOW_SIN - sin(2π·day_of_week/7)
+        12. DOW_COS - cos(2π·day_of_week/7)
+
+      Rolling/Derived (4):
+        13. SYS_MEAN_DELTA_3H - Change in forecast vs 3h ago (wind ramp)
+        14. SYS_MEAN_DELTA_1H - Change vs 1h ago (immediate ramp rate)
+        15. SYS_STD_ROLLING_6H - Rolling 6h mean of ensemble std (volatility regime)
+        16. FORECAST_SPREAD - Max - min farm mean (spatial dispersion)
+
+    Returns:
+      X: (T, 16) float64
+      Y: (T, M) float64 - per-unit actuals
+      times: DatetimeIndex
+      x_cols: list[str]
+      y_cols: list[str]
+
+    If return_frames=True, also returns (feat_df_aligned, Y_df_aligned) at the end.
+    """
+    # Get system-level features
+    feat_sys = build_features_system_total_mean_std(
+        forecasts_filtered=forecasts_filtered,
+        time_col=time_col,
+        resource_col=resource_col,
+        value_col=forecast_col,
+        model_col=model_col,
+    )
+
+    # Get per-unit features (includes both mean and std for each unit)
+    feat_per_unit = build_features_per_unit_mean_std(
+        forecasts_filtered=forecasts_filtered,
+        time_col=time_col,
+        resource_col=resource_col,
+        value_col=forecast_col,
+        model_col=model_col,
+        include_system=False,  # Only per-unit, not system
+    )
+
+    # Combine system and per-unit features
+    feat = pd.concat([feat_sys, feat_per_unit], axis=1)
+
+    # Rename columns to clean names (8D base)
+    feat.columns = [
+        "SYS_MEAN",
+        "SYS_STD",
+        "WIND_122_MEAN",
+        "WIND_122_STD",
+        "WIND_309_MEAN",
+        "WIND_309_STD",
+        "WIND_317_MEAN",
+        "WIND_317_STD",
+    ]
+
+    # Sort by time for rolling calculations
+    feat = feat.sort_index()
+
+    # -------------------------------------------------------------------------
+    # Temporal/Cyclical features (4)
+    # -------------------------------------------------------------------------
+    hour = feat.index.hour.to_numpy()
+    dow = feat.index.dayofweek.to_numpy()
+
+    feat["HOUR_SIN"] = np.sin(2 * np.pi * hour / 24.0)
+    feat["HOUR_COS"] = np.cos(2 * np.pi * hour / 24.0)
+    feat["DOW_SIN"] = np.sin(2 * np.pi * dow / 7.0)
+    feat["DOW_COS"] = np.cos(2 * np.pi * dow / 7.0)
+
+    # -------------------------------------------------------------------------
+    # Rolling/Derived features (4)
+    # -------------------------------------------------------------------------
+    # Delta features (change from N hours ago)
+    feat["SYS_MEAN_DELTA_3H"] = feat["SYS_MEAN"] - feat["SYS_MEAN"].shift(3)
+    feat["SYS_MEAN_DELTA_1H"] = feat["SYS_MEAN"] - feat["SYS_MEAN"].shift(1)
+
+    # Rolling 6h mean of ensemble std (volatility regime)
+    feat["SYS_STD_ROLLING_6H"] = feat["SYS_STD"].rolling(window=6, min_periods=1).mean()
+
+    # Forecast spread: max - min across farm means
+    farm_means = feat[["WIND_122_MEAN", "WIND_309_MEAN", "WIND_317_MEAN"]]
+    feat["FORECAST_SPREAD"] = farm_means.max(axis=1) - farm_means.min(axis=1)
+
+    # -------------------------------------------------------------------------
+    # Get targets
+    # -------------------------------------------------------------------------
+    Ywide = build_Y_actuals_matrix(
+        actuals_filtered,
+        time_col=time_col,
+        resource_col=resource_col,
+        value_col=actual_col,
+    )
+
+    # Align
+    common = feat.index.intersection(Ywide.index)
+    feat = feat.loc[common].sort_index()
+    Ywide = Ywide.loc[common].sort_index()
+
+    if drop_any_nan_rows:
+        mask = feat.notna().all(axis=1) & Ywide.notna().all(axis=1)
+        dropped = int((~mask).sum())
+        if dropped:
+            logger.info(
+                "build_XY_high_dim_16d: dropping %d rows due to NaNs", dropped
+            )
+        feat = feat.loc[mask]
+        Ywide = Ywide.loc[mask]
+
+    X = feat.to_numpy(dtype=np.float64)
+    Y = Ywide.to_numpy(dtype=np.float64)
+    times = feat.index
+    x_cols = feat.columns.tolist()
+    y_cols = [str(c) for c in Ywide.columns.tolist()]
+
+    if return_frames:
+        return X, Y, times, x_cols, y_cols, feat, Ywide
+
+    return X, Y, times, x_cols, y_cols
+
+
 # Feature set dispatch
 FEATURE_BUILDERS = {
     "temporal_3d": build_XY_temporal_nuisance_3d,
@@ -368,6 +514,7 @@ FEATURE_BUILDERS = {
     "unscaled_2d": build_XY_unscaled_2d,
     "focused_2d": build_XY_focused_2d,
     "high_dim_8d": build_XY_high_dim_8d,
+    "high_dim_16d": build_XY_high_dim_16d,
 }
 
 FEATURE_SET_DESCRIPTIONS = {
@@ -376,4 +523,5 @@ FEATURE_SET_DESCRIPTIONS = {
     "unscaled_2d": "2D unscaled (SYS_MEAN_MW, SYS_STD_MW in raw units)",
     "focused_2d": "2D focused baseline (SYS_MEAN, SYS_STD)",
     "high_dim_8d": "8D high-dimensional (SYS + all units' MEAN/STD)",
+    "high_dim_16d": "16D comprehensive (8D base + temporal + ramp + spread)",
 }

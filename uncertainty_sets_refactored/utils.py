@@ -93,8 +93,35 @@ def apply_scaler(X: np.ndarray, scaler: StandardScaler | MinMaxScaler | None) ->
     return scaler.transform(X)
 
 
-def _conformal_q_level(n: int, alpha_target: float) -> float:
+def _conformal_q_level(n: int, alpha_target: float, safety_margin: float = 0.0) -> float:
+    """
+    Compute conformal quantile level with optional safety margin.
+
+    Parameters
+    ----------
+    n : int
+        Calibration set size
+    alpha_target : float
+        Target coverage level (e.g., 0.95 for 95% coverage)
+    safety_margin : float, default=0.0
+        Additional buffer for conservativeness (e.g., 0.02 for 2% extra coverage)
+        Higher values = more conservative (wider bounds, higher coverage)
+
+    Returns
+    -------
+    q : float
+        Quantile level to use
+
+    Examples
+    --------
+    >>> _conformal_q_level(100, 0.95, safety_margin=0.0)   # Standard
+    0.96
+    >>> _conformal_q_level(100, 0.95, safety_margin=0.02)  # Conservative (+2%)
+    0.98
+    """
     if n <= 0:
         raise ValueError("n must be positive")
-    q = np.ceil((n + 1) * alpha_target) / n
+    # Add safety margin for conservativeness
+    alpha_adjusted = min(alpha_target + safety_margin, 1.0)
+    q = np.ceil((n + 1) * alpha_adjusted) / n
     return float(min(q, 1.0))

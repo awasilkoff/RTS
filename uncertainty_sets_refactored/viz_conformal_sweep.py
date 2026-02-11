@@ -93,13 +93,13 @@ def sweep_conformal_global_qhat(
 
 
 if __name__ == "__main__":
-    DATA_DIR = Path("/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets/data/")
+    DATA_DIR = Path(__file__).parent / "data"
     out_png = DATA_DIR / "viz_artifacts" / "conformal_global_qhat_sweep.png"
     out_png.parent.mkdir(parents=True, exist_ok=True)
 
     df = sweep_conformal_global_qhat(
-        actuals_parquet=DATA_DIR / "actuals_filtered_rts4_constellation_v1.parquet",
-        forecasts_parquet=DATA_DIR / "forecasts_filtered_rts4_constellation_v1.parquet",
+        actuals_parquet=DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet",
+        forecasts_parquet=DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet",
         out_png=out_png,
         train_end_time=None,  # or set to your covariance train end timestamp
     )

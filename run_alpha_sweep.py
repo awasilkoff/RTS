@@ -329,7 +329,8 @@ def main():
     if args.out_dir is None:
         net = "lines" if args.enforce_lines else "copper"
         alphas_tag = "_".join(f"{a:.2f}" for a in sorted(args.alphas))
-        args.out_dir = f"alpha_sweep/{net}_{args.hours}h_m{args.start_month:02d}d{args.start_day:02d}_a{alphas_tag}"
+        rlf = f"_rlf{args.rho_lines_frac:.2f}" if args.enforce_lines else ""
+        args.out_dir = f"alpha_sweep/{net}{rlf}_{args.hours}h_m{args.start_month:02d}d{args.start_day:02d}_a{alphas_tag}"
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

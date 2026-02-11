@@ -152,41 +152,35 @@ def _add_conformal_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def generate_uncertainty_sets(
+# ------------------------------------------------------------------------------
+# Pre-compute covariance (alpha-independent)
+# ------------------------------------------------------------------------------
+
+
+def pre_compute_covariance(
     config: UncertaintySetConfig,
     paths: CachedPaths,
-    output_dir: Path,
-    output_name: str = "sigma_rho",
-) -> Path:
+) -> dict:
     """
-    Generate pre-computed (mu, Sigma, rho) for all available hours.
+    Run the alpha-independent steps: load data, build features, train omega,
+    compute mu/Sigma for all timestamps, and build the conformal totals df.
 
-    Steps:
-    1. Load actuals and forecasts
-    2. Build X/Y matrices for covariance
-    3. Load or train omega
-    4. Train conformal model for lower bounds
-    5. For each hour: compute mu, Sigma, rho
-    6. Save to NPZ + metadata
-
-    Parameters
-    ----------
-    config : UncertaintySetConfig
-        Configuration for generation
-    paths : CachedPaths
-        Data file paths
-    output_dir : Path
-        Directory to save outputs
-    output_name : str
-        Base name for output files (without extension)
+    This is the expensive step (~5-10 min) that only needs to run once,
+    regardless of how many alpha values will be swept.
 
     Returns
     -------
-    Path
-        Path to generated NPZ file
+    dict with keys:
+        mu_all : np.ndarray (N, K) — conditional means for all timestamps
+        sigma_all : np.ndarray (N, K, K) — conditional covariances
+        omega_hat : np.ndarray (D,) — learned feature weights
+        Xs_cov : np.ndarray (N, D) — scaled covariance features
+        times_cov : np.ndarray — timestamps for covariance rows
+        times_train : np.ndarray — training timestamps
+        df_tot : pd.DataFrame — conformal totals df (with features added)
+        y_cols : list[str] — wind resource column names
+        x_cols : list[str] — feature column names
     """
-    _ensure_dir(output_dir)
-
     # -------------------------------------------------------------------------
     # Step 1: Load data
     # -------------------------------------------------------------------------
@@ -205,7 +199,6 @@ def generate_uncertainty_sets(
         "Building X/Y matrices for covariance (feature_set=%s)...", config.feature_set
     )
 
-    # Select feature builder based on config
     if config.feature_set not in FEATURE_BUILDERS:
         raise ValueError(
             f"Unknown feature_set '{config.feature_set}'. "
@@ -281,58 +274,13 @@ def generate_uncertainty_sets(
         logger.info("Learned omega: %s (sum=%.4f)", omega_hat, omega_hat.sum())
 
     # -------------------------------------------------------------------------
-    # Step 4: Train conformal model
-    # -------------------------------------------------------------------------
-    logger.info("Training conformal model for lower bounds...")
-    logger.info("  Features: %s", config.conformal_feature_cols)
-    logger.info(
-        "  Model: n_estimators=%d, lr=%.3f",
-        config.conformal_model_kwargs.get("n_estimators", 1000),
-        config.conformal_model_kwargs.get("learning_rate", 0.05),
-    )
-
-    df_tot = build_conformal_totals_df(actuals, forecasts)
-
-    # Add conformal features (dispersion + historical)
-    df_tot = _add_conformal_features(df_tot)
-
-    # Train conformal on same training period (by time)
-    train_end_time = times_train[-1]
-    df_train_conf = df_tot[df_tot["TIME_HOURLY"] <= train_end_time].copy()
-
-    bundle, conf_metrics, _df_test = train_wind_lower_model_conformal_binned(
-        df_train_conf,
-        feature_cols=config.conformal_feature_cols,
-        target_col="y",
-        scale_col="ens_std",
-        alpha_target=config.alpha_target,
-        quantile_alpha=config.quantile_alpha,
-        binning="y_pred",
-        n_bins=config.n_bins,
-        safety_margin=config.safety_margin,
-        model_kwargs=config.conformal_model_kwargs,
-    )
-    logger.info(
-        "Conformal trained: coverage=%.2f%%, rmse=%.4f",
-        100.0 * conf_metrics["coverage"],
-        conf_metrics["rmse"],
-    )
-
-    # Get conformal bounds for ALL timestamps (not just eval)
-    df_all_conf = df_tot.copy()
-    df_pred_all = bundle.predict_df(df_all_conf)
-    bounds_all = df_pred_all.set_index("TIME_HOURLY")["y_pred_conf"].sort_index()
-
-    # -------------------------------------------------------------------------
     # Step 5: Compute mu, Sigma for ALL timestamps
     # -------------------------------------------------------------------------
     logger.info("Computing conditional moments for all timestamps...")
 
-    # Predict for ALL timestamps (both train and eval)
-    # Use train set as reference for all predictions
     mu_all, sigma_all = predict_mu_sigma_topk_cross(
-        X_query=Xs_cov,  # ALL timestamps
-        X_ref=Xs_train,  # Training set only
+        X_query=Xs_cov,
+        X_ref=Xs_train,
         Y_ref=Y_train,
         omega=omega_hat,
         cfg=CovPredictConfig(tau=config.tau, ridge=config.ridge),
@@ -342,17 +290,128 @@ def generate_uncertainty_sets(
     logger.info("Moments computed: mu=%s, sigma=%s", mu_all.shape, sigma_all.shape)
 
     # -------------------------------------------------------------------------
+    # Build conformal totals df (alpha-independent preparation)
+    # -------------------------------------------------------------------------
+    logger.info("Building conformal totals dataframe...")
+    df_tot = build_conformal_totals_df(actuals, forecasts)
+    df_tot = _add_conformal_features(df_tot)
+
+    return {
+        "mu_all": mu_all,
+        "sigma_all": sigma_all,
+        "omega_hat": omega_hat,
+        "Xs_cov": Xs_cov,
+        "times_cov": times_cov,
+        "times_train": times_train,
+        "df_tot": df_tot,
+        "y_cols": y_cols,
+        "x_cols": x_cols,
+    }
+
+
+# ------------------------------------------------------------------------------
+# Generate uncertainty sets for a single alpha (alpha-dependent)
+# ------------------------------------------------------------------------------
+
+
+def generate_uncertainty_sets_for_alpha(
+    alpha_target: float,
+    mu_all: np.ndarray,
+    sigma_all: np.ndarray,
+    times_cov: np.ndarray,
+    times_train: np.ndarray,
+    df_tot: pd.DataFrame,
+    config: UncertaintySetConfig,
+    omega_hat: np.ndarray,
+    y_cols: list,
+    x_cols: list,
+    output_dir: Path,
+    output_name: str = "sigma_rho",
+) -> Path:
+    """
+    Generate uncertainty sets for a single alpha value using pre-computed
+    covariance data. Only runs the alpha-dependent steps (conformal training
+    + rho computation + save NPZ).
+
+    Parameters
+    ----------
+    alpha_target : float
+        Conformal coverage target (e.g. 0.90, 0.95, 0.99).
+    mu_all : np.ndarray (N, K)
+        Pre-computed conditional means.
+    sigma_all : np.ndarray (N, K, K)
+        Pre-computed conditional covariances.
+    times_cov : np.ndarray
+        Timestamps aligned to mu_all/sigma_all rows.
+    times_train : np.ndarray
+        Training period timestamps (for conformal split).
+    df_tot : pd.DataFrame
+        Conformal totals dataframe (with features already added).
+    config : UncertaintySetConfig
+        Used for conformal model params (n_bins, quantile_alpha, etc.).
+    omega_hat : np.ndarray (D,)
+        Learned feature weights.
+    y_cols : list[str]
+        Wind resource column names.
+    x_cols : list[str]
+        Feature column names.
+    output_dir : Path
+        Directory to save output NPZ.
+    output_name : str
+        Base name for the output file (without extension).
+
+    Returns
+    -------
+    Path
+        Path to the generated NPZ file.
+    """
+    _ensure_dir(output_dir)
+
+    # -------------------------------------------------------------------------
+    # Step 4: Train conformal model at this alpha
+    # -------------------------------------------------------------------------
+    logger.info(
+        "Training conformal model for alpha=%.3f...", alpha_target
+    )
+    logger.info("  Features: %s", config.conformal_feature_cols)
+
+    train_end_time = times_train[-1]
+    df_train_conf = df_tot[df_tot["TIME_HOURLY"] <= train_end_time].copy()
+
+    bundle, conf_metrics, _df_test = train_wind_lower_model_conformal_binned(
+        df_train_conf,
+        feature_cols=config.conformal_feature_cols,
+        target_col="y",
+        scale_col="ens_std",
+        alpha_target=alpha_target,
+        quantile_alpha=config.quantile_alpha,
+        binning="y_pred",
+        n_bins=config.n_bins,
+        safety_margin=config.safety_margin,
+        model_kwargs=config.conformal_model_kwargs,
+    )
+    logger.info(
+        "Conformal trained (alpha=%.3f): coverage=%.2f%%, rmse=%.4f",
+        alpha_target,
+        100.0 * conf_metrics["coverage"],
+        conf_metrics["rmse"],
+    )
+
+    # Get conformal bounds for ALL timestamps
+    df_all_conf = df_tot.copy()
+    df_pred_all = bundle.predict_df(df_all_conf)
+    bounds_all = df_pred_all.set_index("TIME_HOURLY")["y_pred_conf"].sort_index()
+
+    # -------------------------------------------------------------------------
     # Step 6: Compute rho for each timestamp
     # -------------------------------------------------------------------------
-    logger.info("Computing rho (ellipsoid radii) for each timestamp...")
+    logger.info("Computing rho (ellipsoid radii) for alpha=%.3f...", alpha_target)
 
-    # Store results for all valid timestamps
     valid_indices = []
     mu_list = []
     sigma_list = []
     rho_list = []
     times_list = []
-
     missing_bounds = 0
 
     for i, t in enumerate(times_cov):
@@ -387,7 +446,11 @@ def generate_uncertainty_sets(
             "Skipped %d timestamps with missing conformal bounds.", missing_bounds
         )
 
-    logger.info("Generated uncertainty sets for %d hours.", len(valid_indices))
+    logger.info(
+        "Generated uncertainty sets for %d hours (alpha=%.3f).",
+        len(valid_indices),
+        alpha_target,
+    )
 
     # Convert to arrays
     mu_arr = np.stack(mu_list, axis=0)
@@ -395,7 +458,6 @@ def generate_uncertainty_sets(
     rho_arr = np.array(rho_list, dtype=float)
     times_arr = pd.DatetimeIndex(times_list)
 
-    # Convert times to numpy
     times_np = (
         times_arr.tz_convert("UTC").tz_localize(None).to_numpy(dtype="datetime64[ns]")
     )
@@ -419,7 +481,6 @@ def generate_uncertainty_sets(
         x_cols=np.array(x_cols, dtype=object),
     )
 
-    # Save metadata
     metadata = {
         "created_at": datetime.now(timezone.utc).isoformat(),
         "data_source": "rts4_constellation_v1",
@@ -432,7 +493,7 @@ def generate_uncertainty_sets(
             "tau": config.tau,
             "ridge": config.ridge,
             "k": config.k,
-            "alpha_target": config.alpha_target,
+            "alpha_target": alpha_target,
             "n_bins": config.n_bins,
             "quantile_alpha": config.quantile_alpha,
             "safety_margin": config.safety_margin,
@@ -458,9 +519,73 @@ def generate_uncertainty_sets(
         json.dump(metadata, f, indent=2)
 
     logger.info("Saved metadata to %s", out_metadata)
-    logger.info("Success: generated %d hours of uncertainty sets.", len(rho_arr))
+    logger.info(
+        "Success: generated %d hours of uncertainty sets (alpha=%.3f).",
+        len(rho_arr),
+        alpha_target,
+    )
 
     return out_npz
+
+
+# ------------------------------------------------------------------------------
+# Original top-level function (unchanged API, now delegates to helpers)
+# ------------------------------------------------------------------------------
+
+
+def generate_uncertainty_sets(
+    config: UncertaintySetConfig,
+    paths: CachedPaths,
+    output_dir: Path,
+    output_name: str = "sigma_rho",
+) -> Path:
+    """
+    Generate pre-computed (mu, Sigma, rho) for all available hours.
+
+    Steps:
+    1. Load actuals and forecasts
+    2. Build X/Y matrices for covariance
+    3. Load or train omega
+    4. Train conformal model for lower bounds
+    5. For each hour: compute mu, Sigma, rho
+    6. Save to NPZ + metadata
+
+    Parameters
+    ----------
+    config : UncertaintySetConfig
+        Configuration for generation
+    paths : CachedPaths
+        Data file paths
+    output_dir : Path
+        Directory to save outputs
+    output_name : str
+        Base name for output files (without extension)
+
+    Returns
+    -------
+    Path
+        Path to generated NPZ file
+    """
+    _ensure_dir(output_dir)
+
+    # Phase 1: alpha-independent covariance pre-computation
+    cov = pre_compute_covariance(config, paths)
+
+    # Phase 2: alpha-dependent conformal + rho + save
+    return generate_uncertainty_sets_for_alpha(
+        alpha_target=config.alpha_target,
+        mu_all=cov["mu_all"],
+        sigma_all=cov["sigma_all"],
+        times_cov=cov["times_cov"],
+        times_train=cov["times_train"],
+        df_tot=cov["df_tot"],
+        config=config,
+        omega_hat=cov["omega_hat"],
+        y_cols=cov["y_cols"],
+        x_cols=cov["x_cols"],
+        output_dir=output_dir,
+        output_name=output_name,
+    )
 
 
 def main():

@@ -8,7 +8,7 @@ Per the execution policy, the user should run this manually:
 
     python run_price_of_robustness.py --rhos 1.0 3.0 --hours 6 --start-month 7 --start-day 15
 
-Full overnight run (~30-40 min for 8 rho at 12h copperplate):
+Full overnight run (~30-40 min for 8 rho at 12h with lines):
 
     python run_price_of_robustness.py --hours 12 --start-month 7 --start-day 15
 
@@ -208,7 +208,8 @@ def main():
     parser.add_argument("--start-month", type=int, default=7, help="Start month (default: 7)")
     parser.add_argument("--start-day", type=int, default=15, help="Start day (default: 15)")
     parser.add_argument("--start-hour", type=int, default=0, help="Start hour (default: 0)")
-    parser.add_argument("--enforce-lines", action="store_true", help="Enforce line flow limits (default: copperplate)")
+    parser.add_argument("--no-enforce-lines", dest="enforce_lines", action="store_false", help="Disable line flow limits (default: enforce lines)")
+    parser.set_defaults(enforce_lines=True)
     parser.add_argument("--rho-lines-frac", type=float, default=None, help="Fraction of rho for line constraints")
     parser.add_argument("--mip-gap", type=float, default=0.005, help="MIP gap (default: 0.005)")
     parser.add_argument("--out-dir", type=str, default="price_of_robustness", help="Output directory (default: price_of_robustness/)")

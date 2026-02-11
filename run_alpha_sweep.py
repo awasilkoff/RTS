@@ -20,7 +20,7 @@ Full overnight run (~40-60 min for 4 alphas at 12h with lines):
 
     python run_alpha_sweep.py --hours 12 --start-month 7 --start-day 15
 
-Outputs (in --out-dir, default alpha_sweep/):
+Outputs (in --out-dir, default auto-named e.g. alpha_sweep/lines_12h_m07d15_a0.80_0.90_0.95_0.99/):
     sweep_results.csv                - Metrics for each alpha
     fig_price_of_robustness_alpha.pdf - Cost vs alpha
     fig_curtailment_vs_alpha.pdf     - Wind curtailment vs alpha
@@ -321,9 +321,15 @@ def main():
     parser.add_argument("--mip-gap", type=float, default=0.005, help="MIP gap (default: 0.005)")
     parser.add_argument("--no-enforce-lines", dest="enforce_lines", action="store_false", help="Disable line flow limits (default: enforce lines)")
     parser.set_defaults(enforce_lines=True)
-    parser.add_argument("--out-dir", type=str, default="alpha_sweep", help="Output directory (default: alpha_sweep/)")
+    parser.add_argument("--out-dir", type=str, default=None, help="Output directory (default: auto-generated from params)")
     parser.add_argument("--data-dir", type=str, default="uncertainty_sets_refactored/data", help="Data directory for uncertainty set generation")
     args = parser.parse_args()
+
+    # Auto-generate output dir name from run parameters if not specified
+    if args.out_dir is None:
+        net = "lines" if args.enforce_lines else "copper"
+        alphas_tag = "_".join(f"{a:.2f}" for a in sorted(args.alphas))
+        args.out_dir = f"alpha_sweep/{net}_{args.hours}h_m{args.start_month:02d}d{args.start_day:02d}_a{alphas_tag}"
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

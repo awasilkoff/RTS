@@ -278,13 +278,13 @@ def build_XY_high_dim_8d(
     return_frames: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray, pd.DatetimeIndex, List[str], List[str]] | tuple:
     """
-    High-dimensional 8D: [SYS_MEAN, SYS_STD, WIND_122_MEAN, WIND_122_STD,
-                          WIND_309_MEAN, WIND_309_STD, WIND_317_MEAN, WIND_317_STD]
+    High-dimensional feature set: [SYS_MEAN, SYS_STD, WIND_<id>_MEAN, WIND_<id>_STD, ...]
 
+    Dimension = 2 + 2*N_farms (8D for RTS-3 with 3 farms, 10D for RTS-4 with 4 farms).
     Tests omega in higher dimensions. Which features does omega prioritize?
 
     Returns:
-      X: (T, 8) float64 - system + per-unit mean/std features
+      X: (T, 2+2*N_farms) float64 - system + per-unit mean/std features
       Y: (T, M) float64 - per-unit actuals
       times: DatetimeIndex
       x_cols: list[str]
@@ -314,17 +314,21 @@ def build_XY_high_dim_8d(
     # Combine system and per-unit features
     feat = pd.concat([feat_sys, feat_per_unit], axis=1)
 
-    # Rename per-unit columns to clean names
-    feat.columns = [
-        "SYS_MEAN",
-        "SYS_STD",
-        "WIND_122_MEAN",
-        "WIND_122_STD",
-        "WIND_309_MEAN",
-        "WIND_309_STD",
-        "WIND_317_MEAN",
-        "WIND_317_STD",
-    ]
+    # Rename per-unit columns to clean names (dynamic for any number of farms)
+    clean_names = ["SYS_MEAN", "SYS_STD"]
+    for col in feat_per_unit.columns:
+        # U_122_WIND_1_MEAN → WIND_122_MEAN, U_122_WIND_1_STD → WIND_122_STD
+        parts = col.split("_", 1)  # ["U", "122_WIND_1_MEAN"]
+        suffix = parts[1] if len(parts) > 1 else col
+        if suffix.endswith("_MEAN"):
+            short = suffix.split("_")[0]  # "122"
+            clean_names.append(f"WIND_{short}_MEAN")
+        elif suffix.endswith("_STD"):
+            short = suffix.split("_")[0]  # "122"
+            clean_names.append(f"WIND_{short}_STD")
+        else:
+            clean_names.append(col)
+    feat.columns = clean_names
 
     # Get targets
     Ywide = build_Y_actuals_matrix(
@@ -374,33 +378,24 @@ def build_XY_high_dim_16d(
     return_frames: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray, pd.DatetimeIndex, List[str], List[str]] | tuple:
     """
-    High-dimensional 16D feature set for comprehensive omega learning.
+    High-dimensional feature set for comprehensive omega learning.
 
-    Features (16):
-      Base (8):
-        1. SYS_MEAN - System-level forecast mean
-        2. SYS_STD - System-level ensemble std
-        3. WIND_122_MEAN - Farm 122 forecast mean
-        4. WIND_122_STD - Farm 122 ensemble std
-        5. WIND_309_MEAN - Farm 309 forecast mean
-        6. WIND_309_STD - Farm 309 ensemble std
-        7. WIND_317_MEAN - Farm 317 forecast mean
-        8. WIND_317_STD - Farm 317 ensemble std
+    Features (2+2*N_farms + 4 temporal + 4 derived):
+      Base (2+2*N_farms):
+        - SYS_MEAN, SYS_STD (system-level)
+        - WIND_<id>_MEAN, WIND_<id>_STD for each farm
 
       Temporal/Cyclical (4):
-        9. HOUR_SIN - sin(2π·hour/24)
-        10. HOUR_COS - cos(2π·hour/24)
-        11. DOW_SIN - sin(2π·day_of_week/7)
-        12. DOW_COS - cos(2π·day_of_week/7)
+        - HOUR_SIN, HOUR_COS, DOW_SIN, DOW_COS
 
       Rolling/Derived (4):
-        13. SYS_MEAN_DELTA_3H - Change in forecast vs 3h ago (wind ramp)
-        14. SYS_MEAN_DELTA_1H - Change vs 1h ago (immediate ramp rate)
-        15. SYS_STD_ROLLING_6H - Rolling 6h mean of ensemble std (volatility regime)
-        16. FORECAST_SPREAD - Max - min farm mean (spatial dispersion)
+        - SYS_MEAN_DELTA_3H, SYS_MEAN_DELTA_1H
+        - SYS_STD_ROLLING_6H, FORECAST_SPREAD
+
+    Total: 16D for RTS-3 (3 farms), 20D for RTS-4 (4 farms).
 
     Returns:
-      X: (T, 16) float64
+      X: (T, D) float64
       Y: (T, M) float64 - per-unit actuals
       times: DatetimeIndex
       x_cols: list[str]
@@ -430,17 +425,25 @@ def build_XY_high_dim_16d(
     # Combine system and per-unit features
     feat = pd.concat([feat_sys, feat_per_unit], axis=1)
 
-    # Rename columns to clean names (8D base)
-    feat.columns = [
-        "SYS_MEAN",
-        "SYS_STD",
-        "WIND_122_MEAN",
-        "WIND_122_STD",
-        "WIND_309_MEAN",
-        "WIND_309_STD",
-        "WIND_317_MEAN",
-        "WIND_317_STD",
-    ]
+    # Rename columns to clean names
+    # feat_sys always contributes [SYS_MEAN, SYS_STD]
+    # feat_per_unit contributes [U_<id>_MEAN, U_<id>_STD, ...] for each resource
+    clean_names = ["SYS_MEAN", "SYS_STD"]
+    for col in feat_per_unit.columns:
+        # U_122_WIND_1_MEAN → WIND_122_MEAN, U_122_WIND_1_STD → WIND_122_STD
+        parts = col.split("_", 1)  # ["U", "122_WIND_1_MEAN"]
+        suffix = parts[1] if len(parts) > 1 else col
+        if suffix.endswith("_MEAN"):
+            resource_id = suffix[:-5]  # "122_WIND_1"
+            short = resource_id.split("_")[0]  # "122"
+            clean_names.append(f"WIND_{short}_MEAN")
+        elif suffix.endswith("_STD"):
+            resource_id = suffix[:-4]  # "122_WIND_1"
+            short = resource_id.split("_")[0]  # "122"
+            clean_names.append(f"WIND_{short}_STD")
+        else:
+            clean_names.append(col)
+    feat.columns = clean_names
 
     # Sort by time for rolling calculations
     feat = feat.sort_index()
@@ -466,8 +469,9 @@ def build_XY_high_dim_16d(
     # Rolling 6h mean of ensemble std (volatility regime)
     feat["SYS_STD_ROLLING_6H"] = feat["SYS_STD"].rolling(window=6, min_periods=1).mean()
 
-    # Forecast spread: max - min across farm means
-    farm_means = feat[["WIND_122_MEAN", "WIND_309_MEAN", "WIND_317_MEAN"]]
+    # Forecast spread: max - min across farm means (dynamic for any number of farms)
+    farm_mean_cols = [c for c in feat.columns if c.startswith("WIND_") and c.endswith("_MEAN")]
+    farm_means = feat[farm_mean_cols]
     feat["FORECAST_SPREAD"] = farm_means.max(axis=1) - farm_means.min(axis=1)
 
     # -------------------------------------------------------------------------

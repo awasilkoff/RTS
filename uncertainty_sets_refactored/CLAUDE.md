@@ -21,6 +21,7 @@ This subdirectory implements **kernel-weighted covariance estimation** and **con
 | `data_processing_extended.py` | Extended feature builders (2D through 16D) | `FEATURE_BUILDERS`, `FEATURE_SET_DESCRIPTIONS`, `build_XY_*` |
 | `utils.py` | Scalers, conformal helpers | `fit_scaler`, `apply_scaler`, `StandardScaler`, `MinMaxScaler` |
 | `plot_config.py` | IEEE plot styling, colors, constants | `setup_plotting`, `IEEE_COL_WIDTH`, `IEEE_TWO_COL_WIDTH`, `COLORS` |
+| `generate_uncertainty_sets.py` | Batch pre-computation of time-varying (mu, Sigma, rho) for ARUC | `UncertaintySetConfig`, `pre_compute_covariance`, `generate_uncertainty_sets` |
 | `mapping.py` | SPP-to-RTS resource mapping and scaling | `cache_matched_rts_named_data`, `compute_scale_factors` |
 
 ## Key Function Locations
@@ -66,6 +67,15 @@ build_XY_high_dim_8d      :268  — [SYS + per-farm MEAN/STD]
 build_XY_temporal_nuisance_3d :27 — [SYS_MEAN, SYS_STD, HOUR_SIN]
 build_XY_per_resource_4d  :101  — [WIND_122, WIND_309, WIND_317, HOUR_SIN]
 build_XY_unscaled_2d      :183  — [SYS_MEAN_MW, SYS_STD_MW] raw units
+```
+
+### generate_uncertainty_sets.py
+```
+UncertaintySetConfig              :66   — Dataclass: all config (tau, k, alpha, omega_path, etc.)
+pre_compute_covariance            :160  — Fit omega + predict (mu, Sigma) for all hours
+generate_uncertainty_sets_for_alpha :317 — Generate sets at a single alpha (conformal + rho)
+generate_uncertainty_sets         :536  — Full pipeline: covariance + conformal at multiple alphas
+main                              :591  — CLI entry point
 ```
 
 ### sweep_and_viz_feature_set.py
@@ -161,7 +171,6 @@ These scripts were created for specific experiments and are NOT part of the acti
 | `experiment_absolute_vs_scaled_scores.py` | Absolute vs scaled score experiment |
 | `experiment_weighting_schemes.py` | Weighting scheme comparison |
 | `generate_multiple_kernel_comparisons.py` | Multi-kernel comparison figures |
-| `generate_uncertainty_sets.py` | Uncertainty set generation for ARUC |
 | `improve_conformal_coverage.py` | Coverage improvement experiment |
 | `quick_test_absolute_scores.py` | Quick diagnostic |
 | `run_minmax_experiments.py` | MinMax normalization experiments |
@@ -188,7 +197,8 @@ These scripts were created for specific experiments and are NOT part of the acti
 4. **`conformal_prediction.py`** — Conformal prediction library (imported, not run directly).
 5. **`covariance_optimization.py`** — Covariance estimation library (imported, not run directly).
 6. **`mapping.py`** — SPP data mapping. Run with: `cd uncertainty_sets_refactored && python mapping.py`
-7. **`main.py`** — Original integration pipeline.
+7. **`generate_uncertainty_sets.py`** — Batch pre-computation of (mu, Sigma, rho) for ARUC. Run with: `cd uncertainty_sets_refactored && python generate_uncertainty_sets.py`
+8. **`main.py`** — Original integration pipeline.
 
 ## Generating Paper Figures
 

@@ -9,9 +9,15 @@ build/
 # IDE
 .idea/
 
+# OS
+.DS_Store
+
 # Generated outputs
 dam_outputs/
 aruc_outputs/
+daruc_outputs/
+comparison_outputs/
+price_of_robustness/
 aruc_debug/
 
 # Old uncertainty sets (superseded by uncertainty_sets_refactored/)

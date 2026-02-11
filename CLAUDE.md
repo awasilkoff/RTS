@@ -220,12 +220,54 @@ This writes v2 files alongside existing v1 files — no existing scripts are aff
 
 **Wind block capacity fix:** Wind generators in gen.csv have `Output_pct_1/2/3 = 0` (no heat rate curve), which previously caused `block_cap = [0,0,0]` and forced zero dispatch. `io_rts.py` now sets `block_cap[i,0] = Pmax[i]` for wind generators with zero marginal cost, allowing dispatch up to the time-varying `Pmax_2d` forecast.
 
+### ARUC vs DARUC Comparison Pipeline
+
+| Module | Purpose |
+|--------|---------|
+| `run_comparison.py` | Orchestrator: runs DARUC + ARUC with identical params, then generates all comparison outputs |
+| `compare_aruc_vs_daruc.py` | Figure/summary generation: commitment heatmaps, dispatch bars, cost breakdown, Z heatmaps, wind curtailment |
+
+**Quick comparison run:**
+```bash
+python run_comparison.py --hours 6 --start-month 7 --start-day 15 --rho 2.0
+```
+
+**Outputs** (in `comparison_outputs/<run_tag>/`):
+- `fig_commitment_cost.pdf` — 3-panel: commitment diff heatmap + dispatch by gen type + cost bars
+- `fig_z_comparison.pdf` — Side-by-side Z coefficient norm heatmaps
+- `fig_wind_curtailment.pdf` — 2-panel: curtailment time series + per-farm bar chart
+- `comparison_summary.txt` — Text summary with objectives, costs, commitments, curtailment
+
+**Wind curtailment analysis:**
+- `compute_wind_curtailment()` computes `Pmax_2d[wind,t] - p0[wind,t]` per formulation
+- Shows structural conservatism: ARUC hedges more → curtails more wind → higher cost
+- Included in both figures and text summary
+
+### Price of Robustness Sweep
+
+`run_price_of_robustness.py` sweeps rho values and measures cost/curtailment for DAM, DARUC, and ARUC.
+
+**This is a long-running script — run manually:**
+```bash
+python run_price_of_robustness.py --rhos 1.0 3.0 --hours 6 --start-month 7 --start-day 15
+```
+
+**Full overnight run (~30-40 min):**
+```bash
+python run_price_of_robustness.py --hours 12 --start-month 7 --start-day 15
+```
+
+**Outputs** (in `price_of_robustness/`):
+- `sweep_results.csv` — rho, objectives, costs, curtailment, unit-hours per formulation
+- `fig_price_of_robustness.pdf` — Cost vs rho (DAM baseline + DARUC + ARUC, shaded gap)
+- `fig_curtailment_vs_rho.pdf` — Wind curtailment vs rho
+
 ### Data Location
 
 - **Static data:** `RTS_Data/SourceData/` (bus.csv, gen.csv, branch.csv)
 - **Time series:** `RTS_Data/timeseries_data_files/` (Load/, WIND/, PV/, HYDRO/)
 - **SPP forecasts (v2):** `uncertainty_sets_refactored/data/*_v2.parquet` (scaled, SUBMODEL-filtered)
-- **Outputs:** `dam_outputs/`, `aruc_outputs/`, `daruc_outputs/` (generated at runtime)
+- **Outputs:** `dam_outputs/`, `aruc_outputs/`, `daruc_outputs/`, `comparison_outputs/`, `price_of_robustness/` (generated at runtime)
 
 ## Key Concepts
 

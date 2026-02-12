@@ -1,0 +1,12 @@
+numpy
+pandas
+matplotlib
+gurobipy
+pydantic
+scikit-learn
+lightgbm
+torch
+scipy
+plotly
+seaborn
+tqdm

@@ -23,6 +23,7 @@ import gurobipy as gp
 
 from models import DAMData
 from aruc_model import build_aruc_ldr_model, align_uncertainty_to_aruc
+from aruc_warm_start import warm_start_aruc_from_dam
 from run_rts_dam import run_rts_dam
 from run_rts_aruc import (
     build_uncertainty_set,
@@ -214,6 +215,7 @@ def run_rts_daruc(
     mip_gap: float = 0.005,
     incremental_obj: bool = False,
     dispatch_cost_scale: float = 0.1,
+    gurobi_numeric_mode: str = "balanced",
 ) -> Dict[str, Any]:
     """
     Two-step DARUC pipeline (Setup 1):
@@ -323,7 +325,17 @@ def run_rts_daruc(
         mip_gap=mip_gap,
         incremental_obj=incremental_obj,
         dispatch_cost_scale=dispatch_cost_scale,
+        gurobi_numeric_mode=gurobi_numeric_mode,
     )
+
+    # Warm start ARUC from DAM solution
+    dam_model = dam_outputs.get("model")
+    dam_vars = dam_outputs.get("vars")
+    if dam_model is not None and dam_vars is not None:
+        from gurobipy import GRB as _GRB
+        if dam_model.Status in [_GRB.OPTIMAL, _GRB.SUBOPTIMAL]:
+            warm_start_aruc_from_dam(model, vars_dict, dam_vars, data)
+
     print("  Model built. Starting optimization...")
 
     model.optimize()

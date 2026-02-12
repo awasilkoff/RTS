@@ -79,6 +79,7 @@ def build_aruc_ldr_model(
     mip_gap: float = 0.005,
     incremental_obj: bool = False,
     dispatch_cost_scale: float = 0.1,
+    gurobi_numeric_mode: str = "balanced",
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Adaptive robust UC with linear decision rules:
@@ -170,6 +171,9 @@ def build_aruc_ldr_model(
     is_z_eligible = np.array(
         [gt.upper() in ("THERMAL", "WIND") for gt in data.gen_type]
     )
+    z_elig = [i for i in range(I) if is_z_eligible[i]]
+    z_elig_set = set(z_elig)
+    thermal_idx = [i for i in range(I) if is_z_eligible[i] and not is_wind[i]]
 
     # Dimension of uncertainty vector r:
     # simplest: one r per wind generator (aggregate over time),
@@ -268,7 +272,12 @@ def build_aruc_ldr_model(
     # ------------------------------------------------------------------
     # Z encodes sensitivity of p(i,t) to each component of r:
     #   p(i,t)(r) = p0[i,t] + sum_k Z[i,t,k] * r_k
-    Z = m.addVars(I, T, K, vtype=GRB.CONTINUOUS, lb=-GRB.INFINITY, name="Z")
+    # Only z-eligible generators (thermal + wind) participate; solar/hydro
+    # have zero uncertainty response, so we skip them entirely.
+    Z = m.addVars(
+        [(i, t, k) for i in z_elig for t in range(T) for k in range(K)],
+        vtype=GRB.CONTINUOUS, lb=-GRB.INFINITY, name="Z",
+    )
 
     # ------------------------------------------------------------------
     # Objective
@@ -314,8 +323,14 @@ def build_aruc_ldr_model(
     # We introduce auxiliary variables z_gen[i,t] >= ||y_gen[i,t,:]||
     # where y_gen[i,t,:] = L_t @ Z_{i,t}
 
-    z_gen = m.addVars(I, T, lb=0.0, name="z_gen")
-    y_gen = m.addVars(I, T, K, lb=-GRB.INFINITY, name="y_gen")
+    z_gen = m.addVars(
+        [(i, t) for i in thermal_idx for t in range(T)],
+        lb=0.0, name="z_gen",
+    )
+    y_gen = m.addVars(
+        [(i, t, k) for i in thermal_idx for t in range(T) for k in range(K)],
+        lb=-GRB.INFINITY, name="y_gen",
+    )
 
     for i in range(I):
         for t in range(T):
@@ -349,9 +364,6 @@ def build_aruc_ldr_model(
 
             # --- Solar/Hydro: no uncertainty response, nominal constraints only ---
             if not is_z_eligible[i]:
-                for k in range(K):
-                    Z[i, t, k].lb = 0.0
-                    Z[i, t, k].ub = 0.0
                 m.addConstr(
                     p0[i, t] <= Pmax_2d[i, t] * u[i, t],
                     name=f"p0_max_nom_i{i}_t{t}",
@@ -522,7 +534,7 @@ def build_aruc_ldr_model(
         # zero-net-response condition on Z (keeps balance for all r)
         for k in range(K):
             m.addConstr(
-                gp.quicksum(Z[i, t, k] for i in range(I)) == 0.0,
+                gp.quicksum(Z[i, t, k] for i in z_elig) == 0.0,
                 name=f"bal_Z_t{t}_k{k}",
             )
 
@@ -550,6 +562,8 @@ def build_aruc_ldr_model(
                 # 2) a_expr[k] = d(flow) / d r_k
                 a_expr = [gp.LinExpr() for _ in range(K)]
                 for i in range(I):
+                    if i not in z_elig_set:
+                        continue
                     n = int(gen_to_bus[i])
                     if abs(PTDF[l, n]) < 1e-10:
                         continue
@@ -640,10 +654,21 @@ def build_aruc_ldr_model(
             )
 
     # Gurobi params — numeric tuning for MISOCP with wide coefficient range
+    _NUMERIC_MODES = {
+        "fast":     {"NumericFocus": 0, "BarHomogeneous": -1, "ScaleFlag": 1},
+        "balanced": {"NumericFocus": 1, "BarHomogeneous": -1, "ScaleFlag": 1},
+        "robust":   {"NumericFocus": 2, "BarHomogeneous": 1,  "ScaleFlag": 2},
+    }
+    if gurobi_numeric_mode not in _NUMERIC_MODES:
+        raise ValueError(
+            f"Unknown gurobi_numeric_mode={gurobi_numeric_mode!r}; "
+            f"choose from {list(_NUMERIC_MODES)}"
+        )
+    _nmode = _NUMERIC_MODES[gurobi_numeric_mode]
     m.Params.OutputFlag = 1
-    m.Params.NumericFocus = 2       # Extra care with numerics (0-3)
-    m.Params.BarHomogeneous = 1     # More robust barrier (handles ill-conditioned SOC)
-    m.Params.ScaleFlag = 2          # Aggressive scaling
+    m.Params.NumericFocus = _nmode["NumericFocus"]
+    m.Params.BarHomogeneous = _nmode["BarHomogeneous"]
+    m.Params.ScaleFlag = _nmode["ScaleFlag"]
     m.Params.MIPGap = mip_gap       # Default 0.5% — UC doesn't need 0.01% precision
 
     vars_dict: Dict[str, object] = {

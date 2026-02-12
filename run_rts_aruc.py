@@ -355,6 +355,7 @@ def run_rts_aruc(
     enforce_lines: bool = True,
     rho_lines_frac: Optional[float] = None,
     mip_gap: float = 0.005,
+    gurobi_numeric_mode: str = "balanced",
 ) -> Dict[str, Any]:
     """
     Full pipeline for ARUC-LDR:
@@ -454,6 +455,7 @@ def run_rts_aruc(
         model_name=model_name,
         enforce_lines=enforce_lines,
         mip_gap=mip_gap,
+        gurobi_numeric_mode=gurobi_numeric_mode,
     )
     print("  Model built. Starting optimization...")
 

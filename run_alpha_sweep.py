@@ -121,6 +121,7 @@ def run_alpha_point(
     mip_gap: float,
     provider_start: int,
     incremental_obj: bool = False,
+    gurobi_numeric_mode: str = "balanced",
 ) -> dict | None:
     """Run DARUC + ARUC with a given NPZ and return metrics row."""
     print(f"\n{'#' * 70}")
@@ -141,6 +142,7 @@ def run_alpha_point(
             uncertainty_provider_path=str(npz_path),
             provider_start_idx=provider_start,
             incremental_obj=incremental_obj,
+            gurobi_numeric_mode=gurobi_numeric_mode,
         )
         data = daruc_out["data"]
         daruc_res = daruc_out["daruc_results"]
@@ -177,6 +179,7 @@ def run_alpha_point(
             mip_gap=mip_gap,
             uncertainty_provider_path=str(npz_path),
             provider_start_idx=provider_start,
+            gurobi_numeric_mode=gurobi_numeric_mode,
         )
         aruc_res = aruc_out["results"]
         aruc_obj = aruc_res["obj"]
@@ -465,6 +468,13 @@ def main():
         help="Use incremental DARUC objective (commitment costs for additional units only)",
     )
     parser.add_argument(
+        "--gurobi-numeric-mode",
+        type=str,
+        default="balanced",
+        choices=["fast", "balanced", "robust"],
+        help="Gurobi numeric tuning mode (default: balanced)",
+    )
+    parser.add_argument(
         "--out-dir",
         type=str,
         default=None,
@@ -506,6 +516,7 @@ def main():
     print(f"  Network:  {'with line limits' if args.enforce_lines else 'copperplate'}")
     print(f"  rho_lines_frac: {args.rho_lines_frac}")
     print(f"  Incremental obj: {args.incremental_obj}")
+    print(f"  Gurobi mode: {args.gurobi_numeric_mode}")
     print(f"  MIP gap:  {args.mip_gap}")
     print(f"  Output:   {out_dir}")
     print("=" * 70)
@@ -547,6 +558,7 @@ def main():
             mip_gap=args.mip_gap,
             provider_start=args.provider_start,
             incremental_obj=args.incremental_obj,
+            gurobi_numeric_mode=args.gurobi_numeric_mode,
         )
         if row is not None:
             rows.append(row)

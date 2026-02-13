@@ -69,20 +69,22 @@ VIZ_ARTIFACTS = DATA_DIR / "viz_artifacts"
 OUTPUT_DIR = VIZ_ARTIFACTS / "paper_final"
 
 # --- Residuals mode toggle ---
-USE_RESIDUALS = False  # Set True to use Y = actual - forecast
+USE_RESIDUALS = True  # Set True to use Y = actual - forecast
 
 if USE_RESIDUALS:
     ACTUALS_PARQUET = DATA_DIR / "residuals_filtered_rts3_constellation_v1.parquet"
     ACTUAL_COL = "RESIDUAL"
     OUTPUT_DIR = VIZ_ARTIFACTS / "paper_final_residuals"
+    _SUFFIX = "_residuals"
 else:
     ACTUALS_PARQUET = DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
     ACTUAL_COL = "ACTUAL"
+    _SUFFIX = ""
 
 # Experiment data paths
-FOCUSED_2D_DIR = VIZ_ARTIFACTS / "focused_2d"
-HIGH_DIM_16D_DIR = VIZ_ARTIFACTS / "high_dim_16d"
-KNN_SWEEP_DIR = VIZ_ARTIFACTS / "knn_k_sweep"
+FOCUSED_2D_DIR = VIZ_ARTIFACTS / f"focused_2d{_SUFFIX}"
+HIGH_DIM_16D_DIR = VIZ_ARTIFACTS / f"high_dim_16d{_SUFFIX}"
+KNN_SWEEP_DIR = VIZ_ARTIFACTS / f"knn_k_sweep{_SUFFIX}"
 PAPER_FIGURES_DIR = VIZ_ARTIFACTS / "paper_figures"
 
 # Anonymized wind resource labels (Y columns are sorted: 122, 309, 317)
@@ -90,7 +92,7 @@ WIND_LABELS = {0: "Wind 1", 1: "Wind 2", 2: "Wind 3"}
 
 # Extreme eval-set indices (high SYS_STD, far from centroid in mean/std space)
 # Found via standardized Euclidean distance from centroid of eval set
-EXTREME_SAMPLE_IDX = 353      # Highest std: mean=122.7, std=74.1 MW
+EXTREME_SAMPLE_IDX = 353  # Highest std: mean=122.7, std=74.1 MW
 EXTREME_SAMPLES = [353, 264, 482]  # High-std, high-mean+std corner, high-mean+std
 
 
@@ -168,9 +170,7 @@ def fig1_kernel_distance_comparison(
         output_path = OUTPUT_DIR / "figures" / "fig1_kernel_distance"
 
     # Load data
-    actuals = pd.read_parquet(
-        ACTUALS_PARQUET
-    )
+    actuals = pd.read_parquet(ACTUALS_PARQUET)
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
@@ -303,9 +303,7 @@ def fig2_3d_ellipsoid_comparison(
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
-    actuals = pd.read_parquet(
-        ACTUALS_PARQUET
-    )
+    actuals = pd.read_parquet(ACTUALS_PARQUET)
 
     config = _load_feature_config(feature_set_dir)
     feature_set_name = config.get("feature_set", "high_dim_16d")
@@ -807,7 +805,10 @@ def fig3b_4b_hyperparameter_sweeps(
         output_path = OUTPUT_DIR / "figures" / "fig3b_4b_hyperparameter_sweeps"
 
     fig, (ax_k, ax_tau) = plt.subplots(
-        1, 2, figsize=(IEEE_TWO_COL_WIDTH, 2.8), sharey=True,
+        1,
+        2,
+        figsize=(IEEE_TWO_COL_WIDTH, 2.8),
+        sharey=True,
     )
 
     # ------------------------------------------------------------------
@@ -826,20 +827,33 @@ def fig3b_4b_hyperparameter_sweeps(
         nll_std_k = np.zeros_like(nll_mean_k)
 
     ax_k.plot(
-        k_vals, nll_mean_k, "o-", linewidth=2, markersize=5,
-        color=COLORS["knn"], label="k-NN",
+        k_vals,
+        nll_mean_k,
+        "o-",
+        linewidth=2,
+        markersize=5,
+        color=COLORS["knn"],
+        label="k-NN",
     )
     ax_k.fill_between(
-        k_vals, nll_mean_k - nll_std_k, nll_mean_k + nll_std_k,
-        alpha=0.25, color=COLORS["knn"],
+        k_vals,
+        nll_mean_k - nll_std_k,
+        nll_mean_k + nll_std_k,
+        alpha=0.25,
+        color=COLORS["knn"],
     )
 
     # Mark best k
     best_k_idx = np.argmin(nll_mean_k)
     ax_k.scatter(
-        [k_vals[best_k_idx]], [nll_mean_k[best_k_idx]],
-        s=150, c=COLORS["knn"], marker="*", zorder=10,
-        edgecolors="black", linewidths=1,
+        [k_vals[best_k_idx]],
+        [nll_mean_k[best_k_idx]],
+        s=150,
+        c=COLORS["knn"],
+        marker="*",
+        zorder=10,
+        edgecolors="black",
+        linewidths=1,
         label=f"Best: k={k_vals[best_k_idx]}",
     )
 
@@ -852,7 +866,9 @@ def fig3b_4b_hyperparameter_sweeps(
         best_tau = best_learned["tau"]
     else:
         df_sweep = _load_sweep_results(feature_set_dir)
-        mask = (df_sweep["omega_constraint"] == "none") & (df_sweep["omega_l2_reg"] == 0.0)
+        mask = (df_sweep["omega_constraint"] == "none") & (
+            df_sweep["omega_l2_reg"] == 0.0
+        )
         best_row = df_sweep[mask].sort_values("val_nll_learned").iloc[0]
         nll_learned_best = best_row["val_nll_learned"]
         best_tau = best_row["tau"]
@@ -861,12 +877,18 @@ def fig3b_4b_hyperparameter_sweeps(
     nll_global = df_sweep.iloc[0]["val_nll_global"]
 
     ax_k.axhline(
-        nll_learned_best, linestyle="--", linewidth=1.5,
-        color=COLORS["learned"], label=f"Learned ω (τ={best_tau:g})",
+        nll_learned_best,
+        linestyle="--",
+        linewidth=1.5,
+        color=COLORS["learned"],
+        label=f"Learned ω (τ={best_tau:g})",
     )
     ax_k.axhline(
-        nll_global, linestyle=":", linewidth=1.5,
-        color=COLORS["global"], label="Global",
+        nll_global,
+        linestyle=":",
+        linewidth=1.5,
+        color=COLORS["global"],
+        label="Global",
     )
 
     ax_k.set_xlabel("k (Number of Neighbors)")
@@ -875,8 +897,13 @@ def fig3b_4b_hyperparameter_sweeps(
     ax_k.legend(fontsize=6, loc="upper left")
     ax_k.grid(True, alpha=0.3)
     ax_k.text(
-        0.02, 0.98, "(a)", transform=ax_k.transAxes,
-        fontsize=10, fontweight="bold", va="top",
+        0.02,
+        0.98,
+        "(a)",
+        transform=ax_k.transAxes,
+        fontsize=10,
+        fontweight="bold",
+        va="top",
     )
 
     # ------------------------------------------------------------------
@@ -889,39 +916,60 @@ def fig3b_4b_hyperparameter_sweeps(
         nll_std_tau = tau_stats["val_nll_std"].values
     else:
         df_sweep = _load_sweep_results(feature_set_dir)
-        mask = (df_sweep["omega_constraint"] == "none") & (df_sweep["omega_l2_reg"] == 0.0)
+        mask = (df_sweep["omega_constraint"] == "none") & (
+            df_sweep["omega_l2_reg"] == 0.0
+        )
         df_filt = df_sweep[mask].sort_values("tau")
         tau_vals = df_filt["tau"].values
         nll_mean_tau = df_filt["val_nll_learned"].values
         nll_std_tau = np.zeros_like(nll_mean_tau)
 
     ax_tau.plot(
-        tau_vals, nll_mean_tau, "o-", linewidth=2, markersize=5,
-        color=COLORS["learned"], label="Learned ω",
+        tau_vals,
+        nll_mean_tau,
+        "o-",
+        linewidth=2,
+        markersize=5,
+        color=COLORS["learned"],
+        label="Learned ω",
     )
     ax_tau.fill_between(
-        tau_vals, nll_mean_tau - nll_std_tau, nll_mean_tau + nll_std_tau,
-        alpha=0.25, color=COLORS["learned"],
+        tau_vals,
+        nll_mean_tau - nll_std_tau,
+        nll_mean_tau + nll_std_tau,
+        alpha=0.25,
+        color=COLORS["learned"],
     )
 
     # Mark best tau
     best_tau_idx = np.argmin(nll_mean_tau)
     ax_tau.scatter(
-        [tau_vals[best_tau_idx]], [nll_mean_tau[best_tau_idx]],
-        s=150, c=COLORS["learned"], marker="*", zorder=10,
-        edgecolors="black", linewidths=1,
+        [tau_vals[best_tau_idx]],
+        [nll_mean_tau[best_tau_idx]],
+        s=150,
+        c=COLORS["learned"],
+        marker="*",
+        zorder=10,
+        edgecolors="black",
+        linewidths=1,
         label=f"Best: τ={tau_vals[best_tau_idx]:g}",
     )
 
     # Baselines: best k-NN and global
     nll_knn_best = nll_mean_k[best_k_idx]
     ax_tau.axhline(
-        nll_knn_best, linestyle="--", linewidth=1.5,
-        color=COLORS["knn"], label=f"k-NN (k={k_vals[best_k_idx]})",
+        nll_knn_best,
+        linestyle="--",
+        linewidth=1.5,
+        color=COLORS["knn"],
+        label=f"k-NN (k={k_vals[best_k_idx]})",
     )
     ax_tau.axhline(
-        nll_global, linestyle=":", linewidth=1.5,
-        color=COLORS["global"], label="Global",
+        nll_global,
+        linestyle=":",
+        linewidth=1.5,
+        color=COLORS["global"],
+        label="Global",
     )
 
     ax_tau.set_xlabel("τ (Kernel Bandwidth)")
@@ -929,8 +977,13 @@ def fig3b_4b_hyperparameter_sweeps(
     ax_tau.legend(fontsize=6, loc="upper left")
     ax_tau.grid(True, alpha=0.3)
     ax_tau.text(
-        0.02, 0.98, "(b)", transform=ax_tau.transAxes,
-        fontsize=10, fontweight="bold", va="top",
+        0.02,
+        0.98,
+        "(b)",
+        transform=ax_tau.transAxes,
+        fontsize=10,
+        fontweight="bold",
+        va="top",
     )
 
     plt.tight_layout()
@@ -1031,9 +1084,7 @@ def fig5b_nll_boxplot(
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
-    actuals = pd.read_parquet(
-        ACTUALS_PARQUET
-    )
+    actuals = pd.read_parquet(ACTUALS_PARQUET)
 
     build_fn = FEATURE_BUILDERS.get("high_dim_16d")
     if build_fn is None:
@@ -1143,9 +1194,7 @@ def fig6_calibration_curve(
         alpha_values = [0.80, 0.85, 0.90, 0.95, 0.99]
 
     # Load data
-    actuals = pd.read_parquet(
-        ACTUALS_PARQUET
-    )
+    actuals = pd.read_parquet(ACTUALS_PARQUET)
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
@@ -1272,9 +1321,7 @@ def fig6b_calibration_no_tolerance(
         alpha_values = [0.80, 0.85, 0.90, 0.95, 0.99]
 
     # Load data
-    actuals = pd.read_parquet(
-        ACTUALS_PARQUET
-    )
+    actuals = pd.read_parquet(ACTUALS_PARQUET)
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
@@ -1380,9 +1427,7 @@ def fig6c_calibration_points_only(
         alpha_values = [0.80, 0.85, 0.90, 0.95, 0.99]
 
     # Load data
-    actuals = pd.read_parquet(
-        ACTUALS_PARQUET
-    )
+    actuals = pd.read_parquet(ACTUALS_PARQUET)
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
@@ -1477,9 +1522,7 @@ def fig7_conformal_corrections(
         alpha_values = [0.80, 0.85, 0.90, 0.95, 0.99]
 
     # Load data
-    actuals = pd.read_parquet(
-        ACTUALS_PARQUET
-    )
+    actuals = pd.read_parquet(ACTUALS_PARQUET)
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
@@ -1571,9 +1614,7 @@ def fig7b_normalized_lower_bound(
         alpha_values = [0.80, 0.85, 0.90, 0.95, 0.99]
 
     # Load data
-    actuals = pd.read_parquet(
-        ACTUALS_PARQUET
-    )
+    actuals = pd.read_parquet(ACTUALS_PARQUET)
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
@@ -1683,9 +1724,7 @@ def fig7c_lower_bound_decomposition(
         alpha_values = [0.80, 0.85, 0.90, 0.95, 0.99]
 
     # Load data
-    actuals = pd.read_parquet(
-        ACTUALS_PARQUET
-    )
+    actuals = pd.read_parquet(ACTUALS_PARQUET)
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
@@ -1838,7 +1877,8 @@ def fig8_ellipse_grid(
     n_samples = len(sample_indices)
     n_k = len(k_values)
     fig, axes = plt.subplots(
-        n_samples, n_k,
+        n_samples,
+        n_k,
         figsize=(2.8 * n_k, 2.8 * n_samples),
     )
 
@@ -1870,8 +1910,10 @@ def fig8_ellipse_grid(
         pad_x = (row_xmax - row_xmin) * 0.1
         pad_y = (row_ymax - row_ymin) * 0.1
         ellipses_data[("lim", row)] = (
-            row_xmin - pad_x, row_xmax + pad_x,
-            row_ymin - pad_y, row_ymax + pad_y,
+            row_xmin - pad_x,
+            row_xmax + pad_x,
+            row_ymin - pad_y,
+            row_ymax + pad_y,
         )
 
     for row, sample_idx in enumerate(sample_indices):
@@ -2046,29 +2088,44 @@ def fig11_tau_sweep_unconstrained(
 
     # Learned omega curve
     ax.plot(
-        tau_values, nll_learned,
-        "o-", linewidth=2, markersize=5,
-        color=COLORS["learned"], label="Learned ω",
+        tau_values,
+        nll_learned,
+        "o-",
+        linewidth=2,
+        markersize=5,
+        color=COLORS["learned"],
+        label="Learned ω",
     )
 
     # k-NN baseline (horizontal — same value at all tau)
     ax.axhline(
-        nll_knn[0], linestyle="--", linewidth=1.5,
-        color=COLORS["knn"], label="k-NN (k=16)",
+        nll_knn[0],
+        linestyle="--",
+        linewidth=1.5,
+        color=COLORS["knn"],
+        label="k-NN (k=16)",
     )
 
     # Global baseline (horizontal)
     ax.axhline(
-        nll_global[0], linestyle=":", linewidth=1.5,
-        color=COLORS["global"], label="Global",
+        nll_global[0],
+        linestyle=":",
+        linewidth=1.5,
+        color=COLORS["global"],
+        label="Global",
     )
 
     # Mark best tau
     best_idx = np.argmin(nll_learned)
     ax.scatter(
-        [tau_values[best_idx]], [nll_learned[best_idx]],
-        s=150, c=COLORS["learned"], marker="*",
-        zorder=10, edgecolors="black", linewidths=1,
+        [tau_values[best_idx]],
+        [nll_learned[best_idx]],
+        s=150,
+        c=COLORS["learned"],
+        marker="*",
+        zorder=10,
+        edgecolors="black",
+        linewidths=1,
         label=f"Best: τ={tau_values[best_idx]}",
     )
 
@@ -2389,9 +2446,7 @@ def fig_nll_heatmap(
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
-    actuals = pd.read_parquet(
-        ACTUALS_PARQUET
-    )
+    actuals = pd.read_parquet(ACTUALS_PARQUET)
 
     build_fn = FEATURE_BUILDERS[feature_set_name]
     X_raw, Y, times, x_cols, y_cols = build_fn(
@@ -2405,7 +2460,7 @@ def fig_nll_heatmap(
     n_train = int(0.5 * n)
     n_val = int(0.25 * n)
     train_idx = indices[:n_train]
-    test_idx = indices[n_train + n_val:]
+    test_idx = indices[n_train + n_val :]
 
     # Scale
     scaler = fit_scaler(X_raw[train_idx], scaler_type)
@@ -2419,14 +2474,23 @@ def fig_nll_heatmap(
     # Predict with learned omega
     pred_cfg = CovPredictConfig(tau=tau, ridge=ridge)
     Mu_learned, Sigma_learned = predict_mu_sigma_topk_cross(
-        X_test, X_train, Y_train, omega, pred_cfg, k=k,
+        X_test,
+        X_train,
+        Y_train,
+        omega,
+        pred_cfg,
+        k=k,
         exclude_self_if_same=False,
     )
     nll_learned = _per_point_gaussian_nll(Y_test, Mu_learned, Sigma_learned)
 
     # Predict with Euclidean k-NN baseline (k=64)
     Mu_knn, Sigma_knn = predict_mu_sigma_knn(
-        X_test, X_train, Y_train, k=64, ridge=ridge,
+        X_test,
+        X_train,
+        Y_train,
+        k=64,
+        ridge=ridge,
     )
     nll_knn = _per_point_gaussian_nll(Y_test, Mu_knn, Sigma_knn)
 
@@ -2443,6 +2507,7 @@ def fig_nll_heatmap(
 
     # Two-panel figure with dedicated colorbar axis
     from matplotlib.gridspec import GridSpec
+
     fig = plt.figure(figsize=(IEEE_TWO_COL_WIDTH, 3.0))
     gs = GridSpec(1, 3, figure=fig, width_ratios=[1, 1, 0.04], wspace=0.25)
     ax_left = fig.add_subplot(gs[0, 0])
@@ -2454,8 +2519,15 @@ def fig_nll_heatmap(
         (ax_right, nll_learned, f"Learned ω (τ={tau}, k={k})"),
     ]:
         sc = ax.scatter(
-            xs, ys, c=nll, cmap="viridis_r", s=12, alpha=0.7,
-            vmin=vmin, vmax=vmax, rasterized=True,
+            xs,
+            ys,
+            c=nll,
+            cmap="viridis_r",
+            s=12,
+            alpha=0.7,
+            vmin=vmin,
+            vmax=vmax,
+            rasterized=True,
         )
         ax.set_xlabel(xlabel)
         ax.set_title(title, fontsize=9)
@@ -2527,9 +2599,7 @@ def fig_nll_delta_surface(
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
-    actuals = pd.read_parquet(
-        ACTUALS_PARQUET
-    )
+    actuals = pd.read_parquet(ACTUALS_PARQUET)
 
     build_fn = FEATURE_BUILDERS[feature_set_name]
     X_raw, Y, times, x_cols, y_cols = build_fn(
@@ -2543,7 +2613,7 @@ def fig_nll_delta_surface(
     n_train = int(0.5 * n)
     n_val = int(0.25 * n)
     train_idx = indices[:n_train]
-    test_idx = indices[n_train + n_val:]
+    test_idx = indices[n_train + n_val :]
 
     scaler = fit_scaler(X_raw[train_idx], scaler_type)
     X = apply_scaler(X_raw, scaler)
@@ -2564,14 +2634,23 @@ def fig_nll_delta_surface(
     # Predict: learned omega
     pred_cfg = CovPredictConfig(tau=tau, ridge=ridge)
     Mu_learned, Sigma_learned = predict_mu_sigma_topk_cross(
-        X_test, X_train, Y_train, omega, pred_cfg, k=k,
+        X_test,
+        X_train,
+        Y_train,
+        omega,
+        pred_cfg,
+        k=k,
         exclude_self_if_same=False,
     )
     nll_learned = _per_point_gaussian_nll(Y_test, Mu_learned, Sigma_learned)
 
     # Predict: Euclidean k-NN
     Mu_knn, Sigma_knn = predict_mu_sigma_knn(
-        X_test, X_train, Y_train, k=knn_k, ridge=ridge,
+        X_test,
+        X_train,
+        Y_train,
+        k=knn_k,
+        ridge=ridge,
     )
     nll_knn = _per_point_gaussian_nll(Y_test, Mu_knn, Sigma_knn)
 
@@ -2600,6 +2679,7 @@ def fig_nll_delta_surface(
 
     # Density mask: blank out grid cells far from any data point
     from scipy.spatial import cKDTree
+
     tree = cKDTree(np.column_stack([xs, ys]))
     grid_pts = np.column_stack([Xi.ravel(), Yi.ravel()])
     dists, _ = tree.query(grid_pts, k=1)
@@ -2607,7 +2687,7 @@ def fig_nll_delta_surface(
     dx = (x_hi - x_lo) / grid_res
     dy = (y_hi - y_lo) / grid_res
     dist_thresh = 2.5 * np.sqrt(dx**2 + dy**2)
-    sparse_mask = (dists.reshape(Xi.shape) > dist_thresh)
+    sparse_mask = dists.reshape(Xi.shape) > dist_thresh
     Zi_smooth[sparse_mask] = np.nan
 
     # Clip colorbar symmetrically at 95th percentile of |ΔNLL|
@@ -2615,6 +2695,7 @@ def fig_nll_delta_surface(
 
     # Figure
     from matplotlib.gridspec import GridSpec
+
     fig = plt.figure(figsize=(IEEE_TWO_COL_WIDTH * 0.6, 3.5))
     gs = GridSpec(1, 2, figure=fig, width_ratios=[1, 0.04], wspace=0.05)
     ax = fig.add_subplot(gs[0, 0])
@@ -2623,27 +2704,47 @@ def fig_nll_delta_surface(
     # Filled contour: smoothed ΔNLL surface
     levels = np.linspace(-abs_limit, abs_limit, 31)
     cf = ax.contourf(
-        Xi, Yi, Zi_smooth, levels=levels, cmap="RdBu",
-        vmin=-abs_limit, vmax=abs_limit, extend="both",
+        Xi,
+        Yi,
+        Zi_smooth,
+        levels=levels,
+        cmap="RdBu",
+        vmin=-abs_limit,
+        vmax=abs_limit,
+        extend="both",
     )
 
     # Zero contour (boundary where methods are equal)
     ax.contour(
-        Xi, Yi, Zi_smooth, levels=[0.0],
-        colors="black", linewidths=1.2, linestyles="--",
+        Xi,
+        Yi,
+        Zi_smooth,
+        levels=[0.0],
+        colors="black",
+        linewidths=1.2,
+        linestyles="--",
     )
 
     # Scatter overlay (small dots for context)
     ax.scatter(
-        xs, ys, c=delta_nll, cmap="RdBu", s=8, alpha=0.5,
-        vmin=-abs_limit, vmax=abs_limit,
-        edgecolors="k", linewidths=0.2, rasterized=True,
+        xs,
+        ys,
+        c=delta_nll,
+        cmap="RdBu",
+        s=8,
+        alpha=0.5,
+        vmin=-abs_limit,
+        vmax=abs_limit,
+        edgecolors="k",
+        linewidths=0.2,
+        rasterized=True,
     )
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_title(
-        f"ΔNLL (k-NN k={knn_k} − Learned ω)", fontsize=9,
+        f"ΔNLL (k-NN k={knn_k} − Learned ω)",
+        fontsize=9,
     )
     ax.grid(True, alpha=0.2)
 
@@ -2740,7 +2841,8 @@ def generate_all_figures():
     print("\n[2e/15] 3D ellipsoid comparison (extreme hour)...")
     try:
         fig2_3d_ellipsoid_comparison(
-            knn_k=16, tau=0.07,
+            knn_k=16,
+            tau=0.07,
             sample_idx=EXTREME_SAMPLE_IDX,
             output_path=OUTPUT_DIR / "figures" / "fig2_ellipsoid_3d_extreme",
         )

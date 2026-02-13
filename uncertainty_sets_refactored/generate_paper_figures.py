@@ -69,7 +69,7 @@ VIZ_ARTIFACTS = DATA_DIR / "viz_artifacts"
 OUTPUT_DIR = VIZ_ARTIFACTS / "paper_final"
 
 # --- Residuals mode toggle ---
-USE_RESIDUALS = True  # Set True to use Y = actual - forecast
+USE_RESIDUALS = False  # Set True to use Y = actual - forecast
 
 if USE_RESIDUALS:
     ACTUALS_PARQUET = DATA_DIR / "residuals_filtered_rts3_constellation_v1.parquet"
@@ -674,7 +674,7 @@ def fig3_nll_vs_k(
 # ============================================================================
 # FIGURE 4: NLL vs tau Sweep (multi-seed)
 # ============================================================================
-TAU_DIAGNOSIS_DIR = VIZ_ARTIFACTS / "tau_omega_diagnosis"
+TAU_DIAGNOSIS_DIR = VIZ_ARTIFACTS / f"tau_omega_diagnosis{_SUFFIX}"
 
 
 def fig4_nll_vs_tau(

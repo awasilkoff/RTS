@@ -34,7 +34,7 @@ from covariance_optimization import (
 
 
 DATA_DIR = Path(__file__).parent / "data"
-OUTPUT_DIR = DATA_DIR / "viz_artifacts" / "tau_omega_diagnosis"
+OUTPUT_DIR = DATA_DIR / "viz_artifacts" / "tau_omega_diagnosis"  # overridden by --use-residuals
 
 
 def _mean_gaussian_nll(Y: np.ndarray, Mu: np.ndarray, Sigma: np.ndarray) -> float:
@@ -131,23 +131,26 @@ def run_multi_seed_sweep(
     n_seeds: int = 10,
     k: int = 128,
     ridge: float = 1e-3,
+    actual_col: str = "ACTUAL",
+    actuals_parquet: Path = None,
 ) -> pd.DataFrame:
     """Run omega optimization with multiple seeds for each tau."""
 
     if tau_values is None:
         tau_values = [0.01, 0.02, 0.04, 0.07, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0]
 
+    if actuals_parquet is None:
+        actuals_parquet = DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
+
     # Load data
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
-    actuals = pd.read_parquet(
-        DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
-    )
+    actuals = pd.read_parquet(actuals_parquet)
 
     build_fn = FEATURE_BUILDERS[feature_set]
     X_raw, Y, times, x_cols, y_cols = build_fn(
-        forecasts, actuals, drop_any_nan_rows=True
+        forecasts, actuals, drop_any_nan_rows=True, actual_col=actual_col
     )
 
     # Split
@@ -421,6 +424,8 @@ def run_diagnosis(
     feature_set: str = "focused_2d",
     tau_values: list[float] = None,
     n_seeds: int = 10,
+    actual_col: str = "ACTUAL",
+    actuals_parquet: Path = None,
 ):
     """Run full multi-seed diagnosis."""
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -430,7 +435,10 @@ def run_diagnosis(
     print("=" * 80)
 
     # Run sweep
-    df, x_cols = run_multi_seed_sweep(feature_set, tau_values, n_seeds)
+    df, x_cols = run_multi_seed_sweep(
+        feature_set, tau_values, n_seeds,
+        actual_col=actual_col, actuals_parquet=actuals_parquet,
+    )
 
     # Compute statistics
     stats = compute_statistics(df)
@@ -508,11 +516,26 @@ if __name__ == "__main__":
         default=[0.01, 0.02, 0.04, 0.07, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0],
         help="Tau values to test",
     )
+    parser.add_argument(
+        "--use-residuals",
+        action="store_true",
+        help="Use residuals (ACTUAL - MEAN_FORECAST) instead of raw actuals",
+    )
 
     args = parser.parse_args()
+
+    if args.use_residuals:
+        actual_col = "RESIDUAL"
+        actuals_pq = DATA_DIR / "residuals_filtered_rts3_constellation_v1.parquet"
+        OUTPUT_DIR = DATA_DIR / "viz_artifacts" / "tau_omega_diagnosis_residuals"
+    else:
+        actual_col = "ACTUAL"
+        actuals_pq = None
 
     run_diagnosis(
         feature_set=args.feature_set,
         tau_values=args.tau_values,
         n_seeds=args.n_seeds,
+        actual_col=actual_col,
+        actuals_parquet=actuals_pq,
     )

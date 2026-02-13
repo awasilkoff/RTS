@@ -67,9 +67,9 @@ class UncertaintySetConfig:
     """Configuration for uncertainty set generation."""
 
     # Covariance kernel parameters
-    tau: float = 5.0
+    tau: float = 0.1
     ridge: float = 1e-3
-    k: int = 64
+    k: int = 128
 
     # Omega (learned feature weights)
     omega_path: Optional[Path] = None  # Load pre-trained omega
@@ -78,7 +78,7 @@ class UncertaintySetConfig:
 
     # Omega training parameters (used if retraining)
     fit_max_iters: int = 500
-    fit_step_size: float = 0.03
+    fit_step_size: float = 0.1
     fit_grad_clip: float = 10.0
 
     # Conformal prediction parameters
@@ -88,8 +88,8 @@ class UncertaintySetConfig:
     safety_margin: float = 0.0  # No extra buffer - always 0
 
     # Data processing
-    scaler_type: str = "minmax"  # "standard", "minmax", or "none"
-    feature_set: str = "focused_2d"  # Feature set for covariance (SYS_MEAN, SYS_STD)
+    scaler_type: str = "standard"  # "standard", "minmax", or "none"
+    feature_set: str = "high_dim_16d"  # Feature set for covariance (SYS_MEAN, SYS_STD)
     train_frac: float = 0.75  # Fraction for training
 
     # Conformal feature columns (day-ahead safe)
@@ -370,9 +370,7 @@ def generate_uncertainty_sets_for_alpha(
     # -------------------------------------------------------------------------
     # Step 4: Train conformal model at this alpha
     # -------------------------------------------------------------------------
-    logger.info(
-        "Training conformal model for alpha=%.3f...", alpha_target
-    )
+    logger.info("Training conformal model for alpha=%.3f...", alpha_target)
     logger.info("  Features: %s", config.conformal_feature_cols)
 
     train_end_time = times_train[-1]

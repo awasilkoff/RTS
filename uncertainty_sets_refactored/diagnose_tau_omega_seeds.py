@@ -65,6 +65,7 @@ def run_single_seed(
     k: int = 128,
     ridge: float = 1e-3,
     max_iters: int = 300,
+    zero_mean: bool = False,
 ) -> dict:
     """Run omega optimization with a specific random seed."""
     rng = np.random.RandomState(seed)
@@ -76,7 +77,7 @@ def run_single_seed(
     X_train, Y_train = X[train_idx], Y[train_idx]
     X_val, Y_val = X[val_idx], Y[val_idx]
 
-    cfg = KernelCovConfig(tau=float(tau), ridge=float(ridge), zero_mean=False)
+    cfg = KernelCovConfig(tau=float(tau), ridge=float(ridge), zero_mean=zero_mean)
     fit_cfg = FitConfig(
         max_iters=max_iters,
         step_size=0.1,
@@ -101,7 +102,8 @@ def run_single_seed(
 
     # Evaluate on validation
     pred_cfg = CovPredictConfig(
-        tau=float(tau), ridge=float(ridge), enforce_nonneg_omega=True
+        tau=float(tau), ridge=float(ridge), enforce_nonneg_omega=True,
+        zero_mean=zero_mean,
     )
     Mu_val, Sigma_val = predict_mu_sigma_topk_cross(
         X_val, X_train, Y_train, omega=omega_hat, cfg=pred_cfg, k=k
@@ -133,6 +135,7 @@ def run_multi_seed_sweep(
     ridge: float = 1e-3,
     actual_col: str = "ACTUAL",
     actuals_parquet: Path = None,
+    zero_mean: bool = False,
 ) -> pd.DataFrame:
     """Run omega optimization with multiple seeds for each tau."""
 
@@ -178,7 +181,7 @@ def run_multi_seed_sweep(
     for tau in tau_values:
         print(f"tau={tau}:")
         for seed in range(n_seeds):
-            result = run_single_seed(X, Y, train_idx, val_idx, tau, seed, k, ridge)
+            result = run_single_seed(X, Y, train_idx, val_idx, tau, seed, k, ridge, zero_mean=zero_mean)
             results.append(result)
             omega_str = ", ".join([f"{w:.3f}" for w in result["omega"]])
             print(f"  seed={seed}: val_NLL={result['val_nll']:.4f}, ω=[{omega_str}]")
@@ -426,9 +429,22 @@ def run_diagnosis(
     n_seeds: int = 10,
     actual_col: str = "ACTUAL",
     actuals_parquet: Path = None,
+    zero_mean: bool = False,
 ):
     """Run full multi-seed diagnosis."""
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Write config metadata
+    import json as _json
+    config_meta = {
+        "feature_set": feature_set,
+        "actual_col": actual_col,
+        "zero_mean": zero_mean,
+        "n_seeds": n_seeds,
+        "tau_values": tau_values,
+        "created_at": pd.Timestamp.now().isoformat(),
+    }
+    (OUTPUT_DIR / "config.json").write_text(_json.dumps(config_meta, indent=2))
 
     print("=" * 80)
     print("TAU-OMEGA MULTI-SEED DIAGNOSIS")
@@ -438,6 +454,7 @@ def run_diagnosis(
     df, x_cols = run_multi_seed_sweep(
         feature_set, tau_values, n_seeds,
         actual_col=actual_col, actuals_parquet=actuals_parquet,
+        zero_mean=zero_mean,
     )
 
     # Compute statistics
@@ -524,13 +541,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.use_residuals:
-        actual_col = "RESIDUAL"
-        actuals_pq = DATA_DIR / "residuals_filtered_rts3_constellation_v1.parquet"
-        OUTPUT_DIR = DATA_DIR / "viz_artifacts" / "tau_omega_diagnosis_residuals"
-    else:
-        actual_col = "ACTUAL"
-        actuals_pq = None
+    from viz_artifacts_utils import resolve_residuals_config
+    rcfg = resolve_residuals_config(args.use_residuals, DATA_DIR)
+    actual_col = rcfg["actual_col"]
+    actuals_pq = rcfg["actuals_parquet"] if args.use_residuals else None
+    zero_mean = rcfg["zero_mean"]
+    OUTPUT_DIR = DATA_DIR / "viz_artifacts" / f"tau_omega_diagnosis{rcfg['suffix']}"
 
     run_diagnosis(
         feature_set=args.feature_set,
@@ -538,4 +554,5 @@ if __name__ == "__main__":
         n_seeds=args.n_seeds,
         actual_col=actual_col,
         actuals_parquet=actuals_pq,
+        zero_mean=zero_mean,
     )

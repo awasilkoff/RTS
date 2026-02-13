@@ -12,6 +12,27 @@ import json
 from typing import Any
 
 
+def resolve_residuals_config(use_residuals: bool, data_dir: Path) -> dict[str, Any]:
+    """
+    Single source of truth for residuals-mode configuration.
+
+    Returns dict with keys: actuals_parquet, actual_col, zero_mean, suffix.
+    """
+    if use_residuals:
+        return {
+            "actuals_parquet": data_dir / "residuals_filtered_rts3_constellation_v1.parquet",
+            "actual_col": "RESIDUAL",
+            "zero_mean": True,
+            "suffix": "_residuals",
+        }
+    return {
+        "actuals_parquet": data_dir / "actuals_filtered_rts3_constellation_v1.parquet",
+        "actual_col": "ACTUAL",
+        "zero_mean": False,
+        "suffix": "",
+    }
+
+
 def setup_feature_set_directory(
     feature_set_name: str,
     feature_config: dict[str, Any],

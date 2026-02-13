@@ -57,6 +57,7 @@ from plot_config import (
     COLORS,
     FIGURE_DEFAULTS,
 )
+from viz_artifacts_utils import resolve_residuals_config
 
 # Apply global plotting config
 setup_plotting()
@@ -66,26 +67,33 @@ setup_plotting()
 # ============================================================================
 DATA_DIR = Path(__file__).parent / "data"
 VIZ_ARTIFACTS = DATA_DIR / "viz_artifacts"
+
+# --- Residuals mode defaults (overridden by configure_residuals_mode) ---
+USE_RESIDUALS = False
+ACTUALS_PARQUET = DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
+ACTUAL_COL = "ACTUAL"
 OUTPUT_DIR = VIZ_ARTIFACTS / "paper_final"
-
-# --- Residuals mode toggle ---
-USE_RESIDUALS = False  # Set True to use Y = actual - forecast
-
-if USE_RESIDUALS:
-    ACTUALS_PARQUET = DATA_DIR / "residuals_filtered_rts3_constellation_v1.parquet"
-    ACTUAL_COL = "RESIDUAL"
-    OUTPUT_DIR = VIZ_ARTIFACTS / "paper_final_residuals"
-    _SUFFIX = "_residuals"
-else:
-    ACTUALS_PARQUET = DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
-    ACTUAL_COL = "ACTUAL"
-    _SUFFIX = ""
-
-# Experiment data paths
-FOCUSED_2D_DIR = VIZ_ARTIFACTS / f"focused_2d{_SUFFIX}"
-HIGH_DIM_16D_DIR = VIZ_ARTIFACTS / f"high_dim_16d{_SUFFIX}"
-KNN_SWEEP_DIR = VIZ_ARTIFACTS / f"knn_k_sweep{_SUFFIX}"
+FOCUSED_2D_DIR = VIZ_ARTIFACTS / "focused_2d"
+HIGH_DIM_16D_DIR = VIZ_ARTIFACTS / "high_dim_16d"
+KNN_SWEEP_DIR = VIZ_ARTIFACTS / "knn_k_sweep"
 PAPER_FIGURES_DIR = VIZ_ARTIFACTS / "paper_figures"
+
+
+def configure_residuals_mode(use_residuals: bool) -> None:
+    """Set all module-level globals from a single residuals-mode flag."""
+    global USE_RESIDUALS, ACTUALS_PARQUET, ACTUAL_COL, OUTPUT_DIR
+    global FOCUSED_2D_DIR, HIGH_DIM_16D_DIR, KNN_SWEEP_DIR, TAU_DIAGNOSIS_DIR
+
+    rcfg = resolve_residuals_config(use_residuals, DATA_DIR)
+    USE_RESIDUALS = use_residuals
+    ACTUALS_PARQUET = rcfg["actuals_parquet"]
+    ACTUAL_COL = rcfg["actual_col"]
+    suffix = rcfg["suffix"]
+    OUTPUT_DIR = VIZ_ARTIFACTS / f"paper_final{suffix}"
+    FOCUSED_2D_DIR = VIZ_ARTIFACTS / f"focused_2d{suffix}"
+    HIGH_DIM_16D_DIR = VIZ_ARTIFACTS / f"high_dim_16d{suffix}"
+    KNN_SWEEP_DIR = VIZ_ARTIFACTS / f"knn_k_sweep{suffix}"
+    TAU_DIAGNOSIS_DIR = VIZ_ARTIFACTS / f"tau_omega_diagnosis{suffix}"
 
 # Anonymized wind resource labels (Y columns are sorted: 122, 309, 317)
 WIND_LABELS = {0: "Wind 1", 1: "Wind 2", 2: "Wind 3"}
@@ -674,7 +682,7 @@ def fig3_nll_vs_k(
 # ============================================================================
 # FIGURE 4: NLL vs tau Sweep (multi-seed)
 # ============================================================================
-TAU_DIAGNOSIS_DIR = VIZ_ARTIFACTS / f"tau_omega_diagnosis{_SUFFIX}"
+TAU_DIAGNOSIS_DIR = VIZ_ARTIFACTS / "tau_omega_diagnosis"
 
 
 def fig4_nll_vs_tau(
@@ -1140,7 +1148,10 @@ def fig5b_nll_boxplot(
     nll_knn = per_point_nll(Y_val, Mu_knn, Sigma_knn)
 
     # Learned omega
-    pred_cfg = CovPredictConfig(tau=tau, ridge=ridge, enforce_nonneg_omega=True)
+    pred_cfg = CovPredictConfig(
+        tau=tau, ridge=ridge, enforce_nonneg_omega=True,
+        zero_mean=(ACTUAL_COL == "RESIDUAL"),
+    )
     Mu_learned, Sigma_learned = predict_mu_sigma_topk_cross(
         X_val, X_train, Y_train, omega=omega, cfg=pred_cfg, k=k
     )
@@ -2472,7 +2483,9 @@ def fig_nll_heatmap(
     omega = _load_omega(feature_set_dir)
 
     # Predict with learned omega
-    pred_cfg = CovPredictConfig(tau=tau, ridge=ridge)
+    pred_cfg = CovPredictConfig(
+        tau=tau, ridge=ridge, zero_mean=(ACTUAL_COL == "RESIDUAL"),
+    )
     Mu_learned, Sigma_learned = predict_mu_sigma_topk_cross(
         X_test,
         X_train,
@@ -2632,7 +2645,9 @@ def fig_nll_delta_surface(
     ylabel = x_cols[iy] if iy < len(x_cols) else f"Feature {iy}"
 
     # Predict: learned omega
-    pred_cfg = CovPredictConfig(tau=tau, ridge=ridge)
+    pred_cfg = CovPredictConfig(
+        tau=tau, ridge=ridge, zero_mean=(ACTUAL_COL == "RESIDUAL"),
+    )
     Mu_learned, Sigma_learned = predict_mu_sigma_topk_cross(
         X_test,
         X_train,
@@ -2783,6 +2798,8 @@ def save_metadata(figures_generated: list[str], tables_generated: list[str]):
     """Save generation metadata."""
     metadata = {
         "generated_at": pd.Timestamp.now().isoformat(),
+        "use_residuals": USE_RESIDUALS,
+        "actual_col": ACTUAL_COL,
         "figures": figures_generated,
         "tables": tables_generated,
         "data_sources": {
@@ -2802,8 +2819,9 @@ def save_metadata(figures_generated: list[str], tables_generated: list[str]):
 # ============================================================================
 # MAIN ORCHESTRATOR
 # ============================================================================
-def generate_all_figures():
+def generate_all_figures(use_residuals: bool = False):
     """Generate all paper figures and tables."""
+    configure_residuals_mode(use_residuals)
     print("=" * 80)
     print("PAPER FIGURE GENERATION")
     print("=" * 80)
@@ -3061,4 +3079,13 @@ def generate_all_figures():
 
 
 if __name__ == "__main__":
-    generate_all_figures()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Generate all IEEE paper figures")
+    parser.add_argument(
+        "--use-residuals",
+        action="store_true",
+        help="Use residuals (actual - forecast) instead of raw actuals",
+    )
+    args = parser.parse_args()
+    generate_all_figures(use_residuals=args.use_residuals)

@@ -42,6 +42,7 @@ from viz_artifacts_utils import (
     setup_feature_set_directory,
     save_sweep_summary,
     update_readme_file_list,
+    resolve_residuals_config,
 )
 from viz_projections import (
     plot_kernel_distance_2d_projection,
@@ -772,13 +773,12 @@ def main():
     output_suffix = args.output_suffix
 
     # Determine data source and target column based on --use-residuals flag
+    rcfg = resolve_residuals_config(args.use_residuals, DATA_DIR)
+    data_parquet = rcfg["actuals_parquet"]
+    target_col = rcfg["actual_col"]
     if args.use_residuals:
-        data_parquet = DATA_DIR / "residuals_filtered_rts3_constellation_v1.parquet"
-        target_col = "RESIDUAL"
         print("\n*** Using RESIDUALS as target (ACTUAL - MEAN_FORECAST) ***\n")
     else:
-        data_parquet = DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
-        target_col = "ACTUAL"
         print("\n*** Using raw ACTUALS as target ***\n")
 
     # Auto-append _residuals suffix when using residuals and no explicit suffix given

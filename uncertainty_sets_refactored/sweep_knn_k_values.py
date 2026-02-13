@@ -340,13 +340,14 @@ def compute_learned_omega_baseline(
     tau: float = 5.0,
     k: int = 64,
     ridge: float = 1e-4,
+    zero_mean: bool = False,
 ):
     """
     Compute predictions using learned omega (kernel-weighted local covariance).
 
     Returns dict with nll, Mu, Sigma.
     """
-    cfg = CovPredictConfig(tau=tau, ridge=ridge)
+    cfg = CovPredictConfig(tau=tau, ridge=ridge, zero_mean=zero_mean)
 
     Mu_eval, Sigma_eval = predict_mu_sigma_topk_cross(
         X_eval, X_train, Y_train, omega=omega, k=k, cfg=cfg
@@ -930,6 +931,7 @@ def run_knn_k_sweep(
     feature_set: str = "high_dim_16d",
     use_residuals: bool = False,
     actual_col: str = "ACTUAL",
+    zero_mean: bool = False,
 ):
     """
     Run complete k-NN k-value sweep and visualization.
@@ -965,6 +967,8 @@ def run_knn_k_sweep(
     actual_col : str
         Column name to use as Y target. Pass "RESIDUAL" to use pre-computed
         residuals from the actuals parquet.
+    zero_mean : bool
+        If True, force Mu=0 in learned omega predictions (for residuals mode).
     """
     if k_values is None:
         k_values = [8, 16, 32, 64, 128, 256, 512, 1024]
@@ -1027,6 +1031,7 @@ def run_knn_k_sweep(
                 omega=omega,
                 tau=omega_tau,
                 k=omega_k,
+                zero_mean=zero_mean,
             )
             print(f"  Learned omega NLL: {learned_omega_result['nll']:.4f}")
         else:
@@ -1058,6 +1063,18 @@ def run_knn_k_sweep(
     output_dir = Path("data/viz_artifacts") / output_subdir
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"\nOutput directory: {output_dir}\n")
+
+    # Write config metadata
+    import json
+    config_meta = {
+        "k_values": k_values,
+        "feature_set": feature_set,
+        "actual_col": actual_col,
+        "use_residuals": use_residuals,
+        "zero_mean": zero_mean,
+        "created_at": pd.Timestamp.now().isoformat(),
+    }
+    (output_dir / "config.json").write_text(json.dumps(config_meta, indent=2))
 
     # Generate visualizations
     print("Generating visualizations...\n")
@@ -1300,18 +1317,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Derive actual_col and actuals parquet from --use-residuals
-    if args.use_residuals:
-        actual_col = "RESIDUAL"
-        actuals_pq = Path("data/residuals_filtered_rts3_constellation_v1.parquet")
-    else:
-        actual_col = "ACTUAL"
-        actuals_pq = None  # let functions use their defaults
+    from viz_artifacts_utils import resolve_residuals_config
+    rcfg = resolve_residuals_config(args.use_residuals, Path("data"))
+    actual_col = rcfg["actual_col"]
+    actuals_pq = rcfg["actuals_parquet"] if args.use_residuals else None
+    zero_mean = rcfg["zero_mean"]
 
     # Default omega path from focused_2d experiments
     default_omega_path = "data/viz_artifacts/focused_2d/best_omega.npy"
 
     # Use separate output directory for residuals
-    output_subdir = "knn_k_sweep_residuals" if args.use_residuals else "knn_k_sweep"
+    output_subdir = f"knn_k_sweep{rcfg['suffix']}"
 
     if args.multi_split:
         run_multi_split_k_sweep(
@@ -1325,7 +1341,7 @@ if __name__ == "__main__":
         )
     else:
         results, df_summary = run_knn_k_sweep(
-            k_values=[32, 64, 128, 256, 512, 1024, 2048],
+            k_values=[8, 16, 32, 64, 128, 256, 512, 1024, 2048],
             output_subdir=output_subdir,
             dims=(0, 1),
             rho=2.0,
@@ -1352,4 +1368,5 @@ if __name__ == "__main__":
             use_residuals=args.use_residuals,
             actual_col=actual_col,
             actuals_parquet=actuals_pq,
+            zero_mean=zero_mean,
         )

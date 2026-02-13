@@ -2,7 +2,7 @@ numpy
 pandas
 pyarrow
 matplotlib
-gurobipy
+gurobipy>=12.0,<14
 pydantic
 scikit-learn
 lightgbm

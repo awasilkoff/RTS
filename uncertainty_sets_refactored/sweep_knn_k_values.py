@@ -1310,6 +1310,9 @@ if __name__ == "__main__":
     # Default omega path from focused_2d experiments
     default_omega_path = "data/viz_artifacts/focused_2d/best_omega.npy"
 
+    # Use separate output directory for residuals
+    output_subdir = "knn_k_sweep_residuals" if args.use_residuals else "knn_k_sweep"
+
     if args.multi_split:
         run_multi_split_k_sweep(
             k_values=[8, 16, 32, 64, 128, 256, 512, 1024, 2048],
@@ -1318,11 +1321,12 @@ if __name__ == "__main__":
             use_residuals=args.use_residuals,
             actual_col=actual_col,
             actuals_parquet=actuals_pq,
+            output_subdir=output_subdir,
         )
     else:
         results, df_summary = run_knn_k_sweep(
             k_values=[32, 64, 128, 256, 512, 1024, 2048],
-            output_subdir="knn_k_sweep",
+            output_subdir=output_subdir,
             dims=(0, 1),
             rho=2.0,
             omega_path=None,  # default_omega_path,

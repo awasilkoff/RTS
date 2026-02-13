@@ -781,6 +781,10 @@ def main():
         target_col = "ACTUAL"
         print("\n*** Using raw ACTUALS as target ***\n")
 
+    # Auto-append _residuals suffix when using residuals and no explicit suffix given
+    if args.use_residuals and not output_suffix:
+        output_suffix = "_residuals"
+
     # Build output directory name with optional suffix
     output_name = f"{feature_set}{output_suffix}" if output_suffix else feature_set
 

@@ -1,0 +1,21 @@
+name: RTS
+channels:
+  - conda-forge
+  - pytorch
+  - defaults
+dependencies:
+  - python=3.11
+  - numpy<2
+  - pandas
+  - matplotlib
+  - scipy
+  - scikit-learn
+  - lightgbm
+  - pydantic
+  - plotly
+  - tqdm
+  - cpuonly
+  - pytorch
+  - pip
+  - pip:
+    - gurobipy

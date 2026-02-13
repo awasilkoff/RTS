@@ -139,6 +139,7 @@ def build_conformal_totals_df(
     forecasts_filtered: pd.DataFrame,
     *,
     time_col: str = "TIME_HOURLY",
+    value_col: str = "ACTUAL",
 ) -> pd.DataFrame:
     """
     Prepare the main dataframe for conformal prediction on system totals.
@@ -147,7 +148,7 @@ def build_conformal_totals_df(
       - y, ens_mean, ens_std, ens_min, ens_max, n_models
       - hour, dow, month
     """
-    y = build_total_actuals(actuals_filtered, time_col=time_col)
+    y = build_total_actuals(actuals_filtered, time_col=time_col, value_col=value_col)
     feat = build_total_forecast_ensemble_features(forecasts_filtered, time_col=time_col)
 
     df = (

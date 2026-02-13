@@ -68,6 +68,17 @@ DATA_DIR = Path(__file__).parent / "data"
 VIZ_ARTIFACTS = DATA_DIR / "viz_artifacts"
 OUTPUT_DIR = VIZ_ARTIFACTS / "paper_final"
 
+# --- Residuals mode toggle ---
+USE_RESIDUALS = False  # Set True to use Y = actual - forecast
+
+if USE_RESIDUALS:
+    ACTUALS_PARQUET = DATA_DIR / "residuals_filtered_rts3_constellation_v1.parquet"
+    ACTUAL_COL = "RESIDUAL"
+    OUTPUT_DIR = VIZ_ARTIFACTS / "paper_final_residuals"
+else:
+    ACTUALS_PARQUET = DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
+    ACTUAL_COL = "ACTUAL"
+
 # Experiment data paths
 FOCUSED_2D_DIR = VIZ_ARTIFACTS / "focused_2d"
 HIGH_DIM_16D_DIR = VIZ_ARTIFACTS / "high_dim_16d"
@@ -158,14 +169,14 @@ def fig1_kernel_distance_comparison(
 
     # Load data
     actuals = pd.read_parquet(
-        DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
+        ACTUALS_PARQUET
     )
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
 
     X, Y, times, x_cols, y_cols = build_XY_for_covariance_system_only(
-        forecasts, actuals, drop_any_nan_rows=True
+        forecasts, actuals, drop_any_nan_rows=True, actual_col=ACTUAL_COL
     )
 
     # Standardize
@@ -293,7 +304,7 @@ def fig2_3d_ellipsoid_comparison(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
     actuals = pd.read_parquet(
-        DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
+        ACTUALS_PARQUET
     )
 
     config = _load_feature_config(feature_set_dir)
@@ -303,7 +314,7 @@ def fig2_3d_ellipsoid_comparison(
         build_fn = FEATURE_BUILDERS["high_dim_16d"]
 
     X_raw, Y, times, x_cols, y_cols = build_fn(
-        forecasts, actuals, drop_any_nan_rows=True
+        forecasts, actuals, drop_any_nan_rows=True, actual_col=ACTUAL_COL
     )
 
     # Split and standardize (same seed as sweep)
@@ -1021,7 +1032,7 @@ def fig5b_nll_boxplot(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
     actuals = pd.read_parquet(
-        DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
+        ACTUALS_PARQUET
     )
 
     build_fn = FEATURE_BUILDERS.get("high_dim_16d")
@@ -1030,7 +1041,7 @@ def fig5b_nll_boxplot(
         return None
 
     X_raw, Y, times, x_cols, y_cols = build_fn(
-        forecasts, actuals, drop_any_nan_rows=True
+        forecasts, actuals, drop_any_nan_rows=True, actual_col=ACTUAL_COL
     )
 
     # Split data (same as sweep)
@@ -1133,12 +1144,12 @@ def fig6_calibration_curve(
 
     # Load data
     actuals = pd.read_parquet(
-        DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
+        ACTUALS_PARQUET
     )
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
-    df_tot = build_conformal_totals_df(actuals, forecasts)
+    df_tot = build_conformal_totals_df(actuals, forecasts, value_col=ACTUAL_COL)
 
     feature_cols = [
         "ens_mean",
@@ -1262,12 +1273,12 @@ def fig6b_calibration_no_tolerance(
 
     # Load data
     actuals = pd.read_parquet(
-        DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
+        ACTUALS_PARQUET
     )
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
-    df_tot = build_conformal_totals_df(actuals, forecasts)
+    df_tot = build_conformal_totals_df(actuals, forecasts, value_col=ACTUAL_COL)
 
     feature_cols = [
         "ens_mean",
@@ -1370,12 +1381,12 @@ def fig6c_calibration_points_only(
 
     # Load data
     actuals = pd.read_parquet(
-        DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
+        ACTUALS_PARQUET
     )
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
-    df_tot = build_conformal_totals_df(actuals, forecasts)
+    df_tot = build_conformal_totals_df(actuals, forecasts, value_col=ACTUAL_COL)
 
     feature_cols = [
         "ens_mean",
@@ -1467,12 +1478,12 @@ def fig7_conformal_corrections(
 
     # Load data
     actuals = pd.read_parquet(
-        DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
+        ACTUALS_PARQUET
     )
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
-    df_tot = build_conformal_totals_df(actuals, forecasts)
+    df_tot = build_conformal_totals_df(actuals, forecasts, value_col=ACTUAL_COL)
 
     feature_cols = [
         "ens_mean",
@@ -1561,12 +1572,12 @@ def fig7b_normalized_lower_bound(
 
     # Load data
     actuals = pd.read_parquet(
-        DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
+        ACTUALS_PARQUET
     )
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
-    df_tot = build_conformal_totals_df(actuals, forecasts)
+    df_tot = build_conformal_totals_df(actuals, forecasts, value_col=ACTUAL_COL)
 
     feature_cols = [
         "ens_mean",
@@ -1673,12 +1684,12 @@ def fig7c_lower_bound_decomposition(
 
     # Load data
     actuals = pd.read_parquet(
-        DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
+        ACTUALS_PARQUET
     )
     forecasts = pd.read_parquet(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
-    df_tot = build_conformal_totals_df(actuals, forecasts)
+    df_tot = build_conformal_totals_df(actuals, forecasts, value_col=ACTUAL_COL)
 
     feature_cols = [
         "ens_mean",
@@ -1804,7 +1815,8 @@ def fig8_ellipse_grid(
     # Load data
     X_train, Y_train, X_eval, Y_eval, x_cols, y_cols, _, _ = load_data(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet",
-        DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet",
+        ACTUALS_PARQUET,
+        actual_col=ACTUAL_COL,
     )
 
     N_train = X_train.shape[0]
@@ -1950,7 +1962,8 @@ def fig10_ellipse_overlay(
     # Load data
     X_train, Y_train, X_eval, Y_eval, x_cols, y_cols, _, _ = load_data(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet",
-        DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet",
+        ACTUALS_PARQUET,
+        actual_col=ACTUAL_COL,
     )
 
     N_train = X_train.shape[0]
@@ -2377,12 +2390,12 @@ def fig_nll_heatmap(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
     actuals = pd.read_parquet(
-        DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
+        ACTUALS_PARQUET
     )
 
     build_fn = FEATURE_BUILDERS[feature_set_name]
     X_raw, Y, times, x_cols, y_cols = build_fn(
-        forecasts, actuals, drop_any_nan_rows=True
+        forecasts, actuals, drop_any_nan_rows=True, actual_col=ACTUAL_COL
     )
 
     # 50/25/25 split (same seed as sweep)
@@ -2515,12 +2528,12 @@ def fig_nll_delta_surface(
         DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
     )
     actuals = pd.read_parquet(
-        DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
+        ACTUALS_PARQUET
     )
 
     build_fn = FEATURE_BUILDERS[feature_set_name]
     X_raw, Y, times, x_cols, y_cols = build_fn(
-        forecasts, actuals, drop_any_nan_rows=True
+        forecasts, actuals, drop_any_nan_rows=True, actual_col=ACTUAL_COL
     )
 
     # 50/25/25 split (same seed as sweep)

@@ -268,6 +268,7 @@ def load_data(
     random_seed: int = 42,
     feature_set: str = "high_dim_16d",
     use_residuals: bool = False,
+    actual_col: str = "ACTUAL",
 ):
     """Load and prepare data for k-NN sweep.
 
@@ -276,6 +277,9 @@ def load_data(
     use_residuals : bool
         If True, Y becomes (actual - ensemble_mean_forecast) per resource
         instead of raw actuals. This models the forecast error distribution.
+    actual_col : str
+        Column name to use as Y target. Pass "RESIDUAL" to use pre-computed
+        residuals from the actuals parquet.
     """
     actuals = pd.read_parquet(actuals_parquet)
     forecasts = pd.read_parquet(forecasts_parquet)
@@ -283,12 +287,12 @@ def load_data(
     build_fn = FEATURE_BUILDERS.get(feature_set)
     if build_fn is not None:
         X, Y, times, x_cols, y_cols = build_fn(
-            forecasts, actuals, drop_any_nan_rows=True
+            forecasts, actuals, drop_any_nan_rows=True, actual_col=actual_col
         )
     else:
         # Fallback to system-only 2D
         X, Y, times, x_cols, y_cols = build_XY_for_covariance_system_only(
-            forecasts, actuals, drop_any_nan_rows=True
+            forecasts, actuals, drop_any_nan_rows=True, actual_col=actual_col
         )
 
     if use_residuals:

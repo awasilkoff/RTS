@@ -477,9 +477,9 @@ def main():
     parser.set_defaults(enforce_lines=True)
     parser.add_argument(
         "--incremental-obj",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=True,
-        help="Use incremental DARUC objective (commitment costs for additional units only, default: on)",
+        help="Use incremental DARUC objective (default: on, use --no-incremental-obj to disable)",
     )
     parser.add_argument(
         "--gurobi-numeric-mode",

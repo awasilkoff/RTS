@@ -70,8 +70,8 @@ def _unit_hours(u_df: pd.DataFrame, times: list[str]) -> int:
 def build_covariance_artifacts(data_dir: Path) -> dict:
     """Run alpha-independent covariance pre-computation once."""
     paths = CachedPaths(
-        actuals_parquet=data_dir / "actuals_filtered_rts4_constellation_v1.parquet",
-        forecasts_parquet=data_dir / "forecasts_filtered_rts4_constellation_v1.parquet",
+        actuals_parquet=data_dir / "actuals_filtered_rts4_constellation_v2.parquet",
+        forecasts_parquet=data_dir / "forecasts_filtered_rts4_constellation_v2.parquet",
     )
     config = UncertaintySetConfig()  # defaults: softmax, focused_2d, etc.
     return pre_compute_covariance(config, paths), config, paths
@@ -327,16 +327,29 @@ def plot_commitment_cost_vs_alpha(df: pd.DataFrame, out_dir: Path):
         label="DAM (baseline)",
     )
     ax.plot(
-        df["alpha"], daruc_commit, "o-",
-        color="#ff7f0e", linewidth=1.5, markersize=5, label="DARUC",
+        df["alpha"],
+        daruc_commit,
+        "o-",
+        color="#ff7f0e",
+        linewidth=1.5,
+        markersize=5,
+        label="DARUC",
     )
     ax.plot(
-        df["alpha"], aruc_commit, "s-",
-        color="#1f77b4", linewidth=1.5, markersize=5, label="ARUC",
+        df["alpha"],
+        aruc_commit,
+        "s-",
+        color="#1f77b4",
+        linewidth=1.5,
+        markersize=5,
+        label="ARUC",
     )
     ax.fill_between(
-        df["alpha"], daruc_commit, aruc_commit,
-        alpha=0.15, color="#1f77b4",
+        df["alpha"],
+        daruc_commit,
+        aruc_commit,
+        alpha=0.15,
+        color="#1f77b4",
     )
 
     ax.set_xlabel(r"Conformal coverage $\alpha$", fontsize=10)
@@ -358,7 +371,8 @@ def plot_commitment_cost_vs_alpha(df: pd.DataFrame, out_dir: Path):
     for ext in ["pdf", "png"]:
         fig.savefig(
             out_dir / f"fig_commitment_cost_vs_alpha.{ext}",
-            dpi=300, bbox_inches="tight",
+            dpi=300,
+            bbox_inches="tight",
         )
     plt.close(fig)
     print("  Saved fig_commitment_cost_vs_alpha.pdf/.png")
@@ -448,8 +462,8 @@ def main():
     parser.add_argument(
         "--rho-lines-frac",
         type=float,
-        default=0.25,
-        help="Fraction of rho for line constraints (default: 0.25)",
+        default=1.0,
+        help="Fraction of rho for line constraints (default: 1.0)",
     )
     parser.add_argument(
         "--mip-gap", type=float, default=0.01, help="MIP gap (default: 0.01)"
@@ -464,8 +478,8 @@ def main():
     parser.add_argument(
         "--incremental-obj",
         action="store_true",
-        default=False,
-        help="Use incremental DARUC objective (commitment costs for additional units only)",
+        default=True,
+        help="Use incremental DARUC objective (commitment costs for additional units only, default: on)",
     )
     parser.add_argument(
         "--gurobi-numeric-mode",

@@ -215,4 +215,4 @@ Output: `data/viz_artifacts/paper_final/figures/` and `tables/`
 
 Runtime: ~3-5 minutes (loads saved sweep data, generates conformal figures fresh).
 
-Prerequisites: must have run `sweep_and_viz_feature_set.py --n-seeds 10` for focused_2d and high_dim_16d (multi-seed data enables error bars in fig4), and `sweep_knn_k_values.py --multi-split`.
+Prerequisites: must have run `sweep_and_viz_feature_set.py --n-seeds 5` for focused_2d and high_dim_16d (multi-seed data enables error bars in fig4), and `sweep_knn_k_values.py --multi-split`.

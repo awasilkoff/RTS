@@ -929,6 +929,7 @@ def run_knn_k_sweep(
     plot_3d: bool = False,
     feature_set: str = "high_dim_16d",
     use_residuals: bool = False,
+    actual_col: str = "ACTUAL",
 ):
     """
     Run complete k-NN k-value sweep and visualization.
@@ -961,6 +962,9 @@ def run_knn_k_sweep(
         If None, uses [0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0]
     plot_3d : bool
         If True, generate 3D ellipsoid visualization for 3 wind farms
+    actual_col : str
+        Column name to use as Y target. Pass "RESIDUAL" to use pre-computed
+        residuals from the actuals parquet.
     """
     if k_values is None:
         k_values = [8, 16, 32, 64, 128, 256, 512, 1024]
@@ -987,11 +991,12 @@ def run_knn_k_sweep(
         actuals_parquet,
         feature_set=feature_set,
         use_residuals=use_residuals,
+        actual_col=actual_col,
     )
 
     print(f"Training set: {X_train.shape[0]} samples")
     print(f"Evaluation set: {X_eval.shape[0]} samples")
-    if use_residuals:
+    if use_residuals or actual_col == "RESIDUAL":
         print("Target: residuals (actual - ensemble mean forecast)")
     print(f"Features: {x_cols}")
     print(f"Targets: {y_cols}\n")
@@ -1171,6 +1176,7 @@ def run_multi_split_k_sweep(
     ridge: float = 1e-4,
     feature_set: str = "high_dim_16d",
     use_residuals: bool = False,
+    actual_col: str = "ACTUAL",
 ) -> pd.DataFrame:
     """
     Run k-NN k-value sweep with multiple random train/val splits.
@@ -1188,6 +1194,8 @@ def run_multi_split_k_sweep(
         Specific seeds to use. If None, uses range(n_splits).
     use_residuals : bool
         If True, model forecast error (actual - forecast mean) instead of raw actuals.
+    actual_col : str
+        Column name to use as Y target. Pass "RESIDUAL" to use pre-computed residuals.
     """
     if k_values is None:
         k_values = [32, 64, 128, 256, 512, 1024, 2048]
@@ -1223,6 +1231,7 @@ def run_multi_split_k_sweep(
             random_seed=seed,
             feature_set=feature_set,
             use_residuals=use_residuals,
+            actual_col=actual_col,
         )
         print(f"  Train: {X_train.shape[0]}, Eval: {X_eval.shape[0]}")
 
@@ -1290,6 +1299,14 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # Derive actual_col and actuals parquet from --use-residuals
+    if args.use_residuals:
+        actual_col = "RESIDUAL"
+        actuals_pq = Path("data/residuals_filtered_rts3_constellation_v1.parquet")
+    else:
+        actual_col = "ACTUAL"
+        actuals_pq = None  # let functions use their defaults
+
     # Default omega path from focused_2d experiments
     default_omega_path = "data/viz_artifacts/focused_2d/best_omega.npy"
 
@@ -1299,6 +1316,8 @@ if __name__ == "__main__":
             n_splits=args.n_splits,
             feature_set=args.feature_set,
             use_residuals=args.use_residuals,
+            actual_col=actual_col,
+            actuals_parquet=actuals_pq,
         )
     else:
         results, df_summary = run_knn_k_sweep(
@@ -1327,4 +1346,6 @@ if __name__ == "__main__":
             plot_3d=True,
             feature_set=args.feature_set,
             use_residuals=args.use_residuals,
+            actual_col=actual_col,
+            actuals_parquet=actuals_pq,
         )

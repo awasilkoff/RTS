@@ -530,6 +530,159 @@ def run_sweep(
     )
 
 
+def run_multi_seed_validation(
+    feature_set: str,
+    forecasts_parquet: Path,
+    actuals_parquet: Path,
+    *,
+    best_config: dict,
+    taus: tuple[float, ...],
+    n_seeds: int = 10,
+    k: int = 64,
+    max_iters: int = 250,
+    step_size: float = 0.1,
+    target_col: str = "ACTUAL",
+    train_frac: float = 0.5,
+    val_frac: float = 0.25,
+):
+    """
+    Multi-seed validation: re-run omega optimization at each tau with N random
+    omega initializations, using the best config's l2_reg and constraint.
+
+    Returns (results_df, stats_df, best_omega) where best_omega has lowest
+    val_nll across all (tau, seed) combinations.
+    """
+    build_fn = FEATURE_BUILDERS[feature_set]
+    actuals = pd.read_parquet(actuals_parquet)
+    forecasts = pd.read_parquet(forecasts_parquet)
+    X_raw, Y, times, x_cols, y_cols = build_fn(
+        forecasts, actuals, actual_col=target_col, drop_any_nan_rows=True
+    )
+
+    # Same split as run_sweep (seed=42)
+    n = X_raw.shape[0]
+    n_train = int(train_frac * n)
+    n_val = int(val_frac * n)
+    rng_split = np.random.RandomState(42)
+    indices = rng_split.permutation(n)
+    train_idx = np.sort(indices[:n_train])
+    val_idx = np.sort(indices[n_train : n_train + n_val])
+
+    # Apply best scaler
+    scaler_type = best_config.get("scaler_type", "standard")
+    scaler = fit_scaler(X_raw[train_idx], scaler_type)
+    X = apply_scaler(X_raw, scaler)
+    X_train, Y_train = X[train_idx], Y[train_idx]
+    X_val, Y_val = X[val_idx], Y[val_idx]
+
+    omega_constraint = best_config.get("omega_constraint", "none")
+    omega_l2_reg = best_config.get("omega_l2_reg", 0.0)
+    ridge = best_config.get("ridge", 1e-3)
+    use_zero_mean = target_col == "RESIDUAL"
+    d = X.shape[1]
+
+    print(f"\n{'=' * 80}")
+    print(f"MULTI-SEED VALIDATION ({n_seeds} seeds x {len(taus)} taus)")
+    print(f"  constraint={omega_constraint}, l2_reg={omega_l2_reg}, scaler={scaler_type}")
+    print(f"{'=' * 80}")
+
+    rows = []
+    best_nll = float("inf")
+    best_omega = None
+
+    for tau in taus:
+        print(f"\ntau={tau}:")
+        for seed in range(n_seeds):
+            rng = np.random.RandomState(seed)
+            omega0 = np.abs(rng.randn(d)) + 0.5
+
+            cfg = KernelCovConfig(tau=float(tau), ridge=float(ridge), zero_mean=use_zero_mean)
+            fit_cfg = FitConfig(
+                max_iters=max_iters,
+                step_size=float(step_size),
+                grad_clip=10.0,
+                tol=1e-7,
+                verbose_every=999999,
+                dtype="float32",
+                device="cpu",
+                omega_l2_reg=float(omega_l2_reg),
+                omega_constraint=omega_constraint,
+            )
+
+            omega_hat, hist = fit_omega(
+                X, Y, omega0=omega0, train_idx=train_idx,
+                cfg=cfg, fit_cfg=fit_cfg, return_history=True,
+            )
+
+            dfh = pd.DataFrame(hist)
+            train_nll = float(dfh.iloc[-1].get("nll_loss", dfh.iloc[-1]["loss"]))
+            n_iters = len(dfh)
+
+            pred_cfg = CovPredictConfig(
+                tau=float(tau), ridge=float(ridge),
+                enforce_nonneg_omega=True, dtype="float32", device="cpu",
+                zero_mean=use_zero_mean,
+            )
+            Mu_val, Sigma_val = predict_mu_sigma_topk_cross(
+                X_val, X_train, Y_train, omega=omega_hat, cfg=pred_cfg, k=k,
+                exclude_self_if_same=False, return_type="numpy",
+            )
+            val_nll = _mean_gaussian_nll(Y_val, Mu_val, Sigma_val)
+
+            row = {
+                "tau": tau,
+                "seed": seed,
+                "val_nll": val_nll,
+                "train_nll": train_nll,
+                "n_iters": n_iters,
+                "converged": n_iters < max_iters,
+            }
+            for i in range(len(omega_hat)):
+                row[f"omega_{i}"] = float(omega_hat[i])
+            rows.append(row)
+
+            if val_nll < best_nll:
+                best_nll = val_nll
+                best_omega = omega_hat.copy()
+
+            omega_str = ", ".join([f"{w:.3f}" for w in omega_hat])
+            print(f"  seed={seed}: val_NLL={val_nll:.4f}, ω=[{omega_str}]")
+
+    results_df = pd.DataFrame(rows)
+
+    # Compute per-tau statistics
+    omega_cols = [c for c in results_df.columns if re.match(r"^omega_\d+$", c)]
+    stats_agg = (
+        results_df.groupby("tau")
+        .agg({
+            "val_nll": ["mean", "std", "min", "max"],
+            "train_nll": ["mean", "std"],
+        })
+        .reset_index()
+    )
+    stats_agg.columns = [
+        "tau", "val_nll_mean", "val_nll_std", "val_nll_min", "val_nll_max",
+        "train_nll_mean", "train_nll_std",
+    ]
+    for col in omega_cols:
+        omega_agg = results_df.groupby("tau")[col].agg(["mean", "std"]).reset_index()
+        stats_agg[f"{col}_mean"] = omega_agg["mean"]
+        stats_agg[f"{col}_std"] = omega_agg["std"]
+
+    stats_df = stats_agg
+
+    best_tau_idx = stats_df["val_nll_mean"].idxmin()
+    best_tau = stats_df.loc[best_tau_idx, "tau"]
+    best_mean = stats_df.loc[best_tau_idx, "val_nll_mean"]
+    best_std = stats_df.loc[best_tau_idx, "val_nll_std"]
+    print(f"\nBest tau (by mean): {best_tau} (NLL = {best_mean:.4f} ± {best_std:.4f})")
+    print(f"Best overall: tau={results_df.loc[results_df['val_nll'].idxmin(), 'tau']}, "
+          f"seed={results_df.loc[results_df['val_nll'].idxmin(), 'seed']}, "
+          f"NLL={best_nll:.4f}")
+
+    return results_df, stats_df, best_omega
+
+
 def plot_nll_vs_tau(
     sweep_df: pd.DataFrame,
     artifact_dir: Path,
@@ -765,6 +918,12 @@ def main():
         action="store_true",
         help="Use residuals (ACTUAL - MEAN_FORECAST) instead of raw actuals as target",
     )
+    parser.add_argument(
+        "--n-seeds",
+        type=int,
+        default=1,
+        help="Multi-seed validation at best config (default: 1 = skip)",
+    )
 
     args = parser.parse_args()
 
@@ -837,6 +996,33 @@ def main():
     save_sweep_summary(
         artifact_dir, sweep_df, best_row_idx, omega_best, test_results=test_results
     )
+
+    # Multi-seed validation (optional)
+    if args.n_seeds > 1:
+        best_row_ms = sweep_df.iloc[best_row_idx]
+        best_config = {
+            "tau": float(best_row_ms["tau"]),
+            "omega_l2_reg": float(best_row_ms["omega_l2_reg"]),
+            "omega_constraint": str(best_row_ms.get("omega_constraint", "none")),
+            "scaler_type": str(best_row_ms["scaler_type"]),
+            "ridge": 1e-3,
+        }
+        ms_results, ms_stats, ms_best_omega = run_multi_seed_validation(
+            feature_set=feature_set,
+            forecasts_parquet=DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet",
+            actuals_parquet=data_parquet,
+            best_config=best_config,
+            taus=tuple(args.taus),
+            n_seeds=args.n_seeds,
+            k=args.k,
+            target_col=target_col,
+        )
+        ms_results.to_csv(artifact_dir / "multi_seed_results.csv", index=False)
+        ms_stats.to_csv(artifact_dir / "multi_seed_stats.csv", index=False)
+        # Update best_omega if multi-seed found better
+        np.save(artifact_dir / "best_omega.npy", ms_best_omega)
+        omega_best = ms_best_omega
+        print(f"\nSaved multi-seed results to {artifact_dir}/")
 
     # Update config with actual feature info
     best_row = sweep_df.iloc[best_row_idx]

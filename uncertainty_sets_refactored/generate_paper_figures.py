@@ -82,7 +82,7 @@ PAPER_FIGURES_DIR = VIZ_ARTIFACTS / "paper_figures"
 def configure_residuals_mode(use_residuals: bool) -> None:
     """Set all module-level globals from a single residuals-mode flag."""
     global USE_RESIDUALS, ACTUALS_PARQUET, ACTUAL_COL, OUTPUT_DIR
-    global FOCUSED_2D_DIR, HIGH_DIM_16D_DIR, KNN_SWEEP_DIR, TAU_DIAGNOSIS_DIR
+    global FOCUSED_2D_DIR, HIGH_DIM_16D_DIR, KNN_SWEEP_DIR
 
     rcfg = resolve_residuals_config(use_residuals, DATA_DIR)
     USE_RESIDUALS = use_residuals
@@ -93,7 +93,6 @@ def configure_residuals_mode(use_residuals: bool) -> None:
     FOCUSED_2D_DIR = VIZ_ARTIFACTS / f"focused_2d{suffix}"
     HIGH_DIM_16D_DIR = VIZ_ARTIFACTS / f"high_dim_16d{suffix}"
     KNN_SWEEP_DIR = VIZ_ARTIFACTS / f"knn_k_sweep{suffix}"
-    TAU_DIAGNOSIS_DIR = VIZ_ARTIFACTS / f"tau_omega_diagnosis{suffix}"
 
 # Anonymized wind resource labels (Y columns are sorted: 122, 309, 317)
 WIND_LABELS = {0: "Wind 1", 1: "Wind 2", 2: "Wind 3"}
@@ -682,23 +681,25 @@ def fig3_nll_vs_k(
 # ============================================================================
 # FIGURE 4: NLL vs tau Sweep (multi-seed)
 # ============================================================================
-TAU_DIAGNOSIS_DIR = VIZ_ARTIFACTS / "tau_omega_diagnosis"
 
 
 def fig4_nll_vs_tau(
+    feature_set_dir: Path = None,
     output_path: Path = None,
 ) -> plt.Figure:
     """
     Plot learned omega NLL as function of tau, with multi-seed error bars.
 
-    Reads multi_seed_stats.csv from tau_omega_diagnosis directory.
+    Reads multi_seed_stats.csv from the feature set directory (e.g. high_dim_16d/).
     Falls back to single-seed sweep_results.csv if multi-seed data unavailable.
     """
+    if feature_set_dir is None:
+        feature_set_dir = HIGH_DIM_16D_DIR
     if output_path is None:
         output_path = OUTPUT_DIR / "figures" / "fig4_nll_vs_tau"
 
     # Try multi-seed data first
-    stats_path = TAU_DIAGNOSIS_DIR / "multi_seed_stats.csv"
+    stats_path = feature_set_dir / "multi_seed_stats.csv"
     if stats_path.exists():
         stats = pd.read_csv(stats_path)
 
@@ -866,7 +867,7 @@ def fig3b_4b_hyperparameter_sweeps(
     )
 
     # Baselines: learned omega and global
-    tau_stats_path = TAU_DIAGNOSIS_DIR / "multi_seed_stats.csv"
+    tau_stats_path = feature_set_dir / "multi_seed_stats.csv"
     if tau_stats_path.exists():
         tau_stats = pd.read_csv(tau_stats_path)
         best_learned = tau_stats.loc[tau_stats["val_nll_mean"].idxmin()]
@@ -2162,7 +2163,7 @@ def table_nll_summary(
     """
     LaTeX table: learned omega (best tau), k-NN (k=16, k=512), and global NLL.
 
-    Reads learned NLL from multi-seed tau sweep (tau_omega_diagnosis) if available,
+    Reads learned NLL from multi-seed stats in the feature set directory if available,
     otherwise falls back to single-seed sweep_results.csv.
     """
     if output_path is None:
@@ -2171,7 +2172,7 @@ def table_nll_summary(
     # Learned omega NLL — prefer multi-seed data (has finer tau grid)
     best_tau = None
     nll_learned = None
-    multi_seed_path = TAU_DIAGNOSIS_DIR / "multi_seed_stats.csv"
+    multi_seed_path = feature_set_dir / "multi_seed_stats.csv"
     if multi_seed_path.exists():
         tau_stats = pd.read_csv(multi_seed_path)
         best_row = tau_stats.loc[tau_stats["val_nll_mean"].idxmin()]

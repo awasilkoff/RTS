@@ -80,9 +80,10 @@ main                              :591  — CLI entry point
 
 ### sweep_and_viz_feature_set.py
 ```
-run_sweep                 :83   — Main hyperparameter sweep (tau, l2_reg, constraint)
-_per_point_gaussian_nll   :55   — Per-point NLL (canonical copy)
-_mean_gaussian_nll        :78   — Mean NLL wrapper
+run_sweep                    :83   — Main hyperparameter sweep (tau, l2_reg, constraint)
+run_multi_seed_validation    :533  — Multi-seed omega re-run at each tau (--n-seeds)
+_per_point_gaussian_nll      :55   — Per-point NLL (canonical copy)
+_mean_gaussian_nll           :78   — Mean NLL wrapper
 ```
 
 ### sweep_knn_k_values.py
@@ -105,11 +106,15 @@ data/
     ├── focused_2d/                   — 2D sweep results (softmax constraint)
     │   ├── best_omega.npy
     │   ├── feature_config.json
-    │   └── sweep_results.csv
+    │   ├── sweep_results.csv
+    │   ├── multi_seed_results.csv    — Per (tau, seed) results (from --n-seeds)
+    │   └── multi_seed_stats.csv      — Per-tau aggregated stats (mean/std/min/max)
     ├── high_dim_16d/                 — 16D sweep results (unconstrained)
     │   ├── best_omega.npy            — Trained at tau=0.1, constraint=none, l2_reg=0.0
     │   ├── feature_config.json
-    │   └── sweep_results.csv
+    │   ├── sweep_results.csv
+    │   ├── multi_seed_results.csv    — Per (tau, seed) results (from --n-seeds)
+    │   └── multi_seed_stats.csv      — Per-tau aggregated stats (mean/std/min/max)
     ├── knn_k_sweep/                  — k-NN baseline sweep
     ├── paper_final/                  — Generated paper figures and tables
     │   ├── figures/
@@ -166,7 +171,7 @@ These scripts were created for specific experiments and are NOT part of the acti
 | `compare_weighted_vs_binned.py` | Weighted vs binned conformal comparison |
 | `create_comprehensive_comparison.py` | Four-baseline comprehensive comparison |
 | `diagnose_kernel_equal_outliers.py` | One-off kernel diagnosis |
-| `diagnose_tau_omega_seeds.py` | Tau/omega seed sensitivity |
+| `diagnose_tau_omega_seeds.py` | Tau/omega seed sensitivity (superseded by `sweep_and_viz_feature_set.py --n-seeds`) |
 | `example_weighted_conformal.py` | Tutorial example |
 | `experiment_absolute_vs_scaled_scores.py` | Absolute vs scaled score experiment |
 | `experiment_weighting_schemes.py` | Weighting scheme comparison |
@@ -192,7 +197,7 @@ These scripts were created for specific experiments and are NOT part of the acti
 ## Active Scripts (the ones that matter)
 
 1. **`generate_paper_figures.py`** — All IEEE paper figures. Run with: `cd uncertainty_sets_refactored && python generate_paper_figures.py`
-2. **`sweep_and_viz_feature_set.py`** — Hyperparameter sweep for a feature set. Long-running (~30 min).
+2. **`sweep_and_viz_feature_set.py`** — Hyperparameter sweep for a feature set. Use `--n-seeds N` for multi-seed validation at best config. Long-running (~30 min, longer with `--n-seeds`).
 3. **`sweep_knn_k_values.py`** — k-NN baseline k sweep. Long-running.
 4. **`conformal_prediction.py`** — Conformal prediction library (imported, not run directly).
 5. **`covariance_optimization.py`** — Covariance estimation library (imported, not run directly).
@@ -210,4 +215,4 @@ Output: `data/viz_artifacts/paper_final/figures/` and `tables/`
 
 Runtime: ~3-5 minutes (loads saved sweep data, generates conformal figures fresh).
 
-Prerequisites: must have run `sweep_and_viz_feature_set.py` for focused_2d and high_dim_16d, and `sweep_knn_k_values.py`.
+Prerequisites: must have run `sweep_and_viz_feature_set.py --n-seeds 10` for focused_2d and high_dim_16d (multi-seed data enables error bars in fig4), and `sweep_knn_k_values.py --multi-split`.

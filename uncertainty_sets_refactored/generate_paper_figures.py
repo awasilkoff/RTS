@@ -2148,13 +2148,26 @@ def fig11_tau_sweep_unconstrained(
 
     df = _load_sweep_results(feature_set_dir)
 
-    # Filter to unconstrained, no regularization
+    # Filter to unconstrained, no regularization — fall back to best available
     mask = (df["omega_constraint"] == "none") & (df["omega_l2_reg"] == 0.0)
     df_filtered = df[mask].sort_values("tau")
 
     if df_filtered.empty:
-        print("  Warning: no rows with omega_constraint=none, omega_l2_reg=0")
-        return None
+        # Residuals sweeps may only have softmax constraint; fall back to l2_reg=0
+        mask = df["omega_l2_reg"] == 0.0
+        df_filtered = df[mask].sort_values("tau")
+        if df_filtered.empty:
+            # Last resort: use all rows, pick best per tau
+            df_filtered = df.sort_values("tau")
+        constraint_used = df_filtered.iloc[0]["omega_constraint"]
+        print(f"  No unconstrained rows; using constraint={constraint_used}, l2_reg=0")
+        # Deduplicate: keep best NLL per tau
+        df_filtered = (
+            df_filtered.sort_values("val_nll_learned")
+            .groupby("tau", as_index=False)
+            .first()
+            .sort_values("tau")
+        )
 
     tau_values = df_filtered["tau"].values
     nll_learned = df_filtered["val_nll_learned"].values
@@ -2530,6 +2543,8 @@ def fig_nll_heatmap(
     # Load config
     config = _load_feature_config(feature_set_dir)
     feature_set_name = config.get("feature_set", "focused_2d")
+    # feature_set_base strips suffixes like _residuals for FEATURE_BUILDERS lookup
+    feature_set_base = config.get("feature_set_base", feature_set_name)
     tau = config.get("tau", 1.0)
     k = config.get("k", 128)
     ridge = config.get("ridge", 1e-4)
@@ -2545,7 +2560,7 @@ def fig_nll_heatmap(
     )
     actuals = pd.read_parquet(ACTUALS_PARQUET)
 
-    build_fn = FEATURE_BUILDERS[feature_set_name]
+    build_fn = FEATURE_BUILDERS[feature_set_base]
     X_raw, Y, times, x_cols, y_cols = build_fn(
         forecasts, actuals, drop_any_nan_rows=True, actual_col=ACTUAL_COL
     )
@@ -2689,6 +2704,8 @@ def fig_nll_delta_surface(
     # Load config
     config = _load_feature_config(feature_set_dir)
     feature_set_name = config.get("feature_set", "high_dim_16d")
+    # feature_set_base strips suffixes like _residuals for FEATURE_BUILDERS lookup
+    feature_set_base = config.get("feature_set_base", feature_set_name)
     tau = config.get("tau", 1.0)
     k = config.get("k", 128)
     ridge = config.get("ridge", 1e-4)
@@ -2703,7 +2720,7 @@ def fig_nll_delta_surface(
     )
     actuals = pd.read_parquet(ACTUALS_PARQUET)
 
-    build_fn = FEATURE_BUILDERS[feature_set_name]
+    build_fn = FEATURE_BUILDERS[feature_set_base]
     X_raw, Y, times, x_cols, y_cols = build_fn(
         forecasts, actuals, drop_any_nan_rows=True, actual_col=ACTUAL_COL
     )

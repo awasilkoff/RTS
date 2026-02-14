@@ -134,21 +134,35 @@ def _load_feature_config(feature_set_dir: Path) -> dict:
         return json.load(f)
 
 
-def _filter_diverged_taus(tau_values, nll_values, *other_arrays, factor=2.0):
-    """Filter out tau values where NLL diverged (> factor * median).
+def _filter_diverged_taus(tau_values, nll_values, *other_arrays, factor=2.0,
+                          nll_std=None, std_factor=0.5):
+    """Filter out tau values where NLL diverged or has high variance.
 
     Very small tau can produce near-singular covariance estimates with
-    pathologically large NLL. This filters those points from charts.
+    pathologically large NLL or highly variable results across seeds.
+    This filters those points from charts.
 
-    Returns filtered copies of all input arrays plus the boolean mask.
+    Parameters
+    ----------
+    nll_std : array, optional
+        If provided, also filter taus where std > std_factor * median_nll
+        (coefficient of variation too high for reliable estimates).
+    std_factor : float
+        Threshold for std filter: drop if std > std_factor * median(nll).
+
+    Returns filtered copies of all input arrays.
     """
     median_nll = np.median(nll_values)
     keep = nll_values <= factor * median_nll
+    if nll_std is not None:
+        std_threshold = std_factor * median_nll
+        keep &= nll_std <= std_threshold
     n_dropped = (~keep).sum()
     if n_dropped > 0:
         dropped_taus = tau_values[~keep]
         print(f"  Divergence filter: dropped {n_dropped} tau(s) {dropped_taus.tolist()} "
-              f"(NLL > {factor}x median {median_nll:.1f})")
+              f"(NLL > {factor}x median {median_nll:.1f}"
+              f"{f' or std > {std_factor}x median' if nll_std is not None else ''})")
     result = [tau_values[keep], nll_values[keep]]
     for arr in other_arrays:
         result.append(arr[keep])
@@ -176,7 +190,7 @@ def _load_calibration_metadata() -> dict:
 # FIGURE 1: Kernel Distance Comparison (Learned vs Euclidean k-NN)
 # ============================================================================
 def fig1_kernel_distance_comparison(
-    feature_set_dir: Path = FOCUSED_2D_DIR,
+    feature_set_dir: Path = None,  # resolved at call time via FOCUSED_2D_DIR
     output_path: Path = None,
     k: int = 64,
     tau: float = 1.0,
@@ -194,6 +208,8 @@ def fig1_kernel_distance_comparison(
     from data_processing import build_XY_for_covariance_system_only
     from utils import fit_standard_scaler
 
+    if feature_set_dir is None:
+        feature_set_dir = FOCUSED_2D_DIR
     if output_path is None:
         output_path = OUTPUT_DIR / "figures" / "fig1_kernel_distance"
 
@@ -301,7 +317,7 @@ def fig1_kernel_distance_comparison(
 # FIGURE 2: 3D Ellipsoid Comparison (Learned, k-NN, Global)
 # ============================================================================
 def fig2_3d_ellipsoid_comparison(
-    feature_set_dir: Path = HIGH_DIM_16D_DIR,
+    feature_set_dir: Path = None,  # resolved at call time via HIGH_DIM_16D_DIR
     output_path: Path = None,
     sample_idx: int = 0,
     knn_k: int = 16,
@@ -324,6 +340,8 @@ def fig2_3d_ellipsoid_comparison(
     from data_processing_extended import FEATURE_BUILDERS
     from utils import fit_scaler, apply_scaler
 
+    if feature_set_dir is None:
+        feature_set_dir = HIGH_DIM_16D_DIR
     if output_path is None:
         output_path = OUTPUT_DIR / "figures" / "fig2_ellipsoid_3d"
 
@@ -732,7 +750,7 @@ def fig4_nll_vs_tau(
 
         # Filter diverged taus (very small tau → near-singular covariance)
         tau_values, nll_mean, nll_std, nll_min, nll_max = _filter_diverged_taus(
-            tau_values, nll_mean, nll_std, nll_min, nll_max
+            tau_values, nll_mean, nll_std, nll_min, nll_max, nll_std=nll_std
         )
 
         fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, 2.5))
@@ -832,7 +850,7 @@ def fig4_nll_vs_tau(
 # FIGURE 3b + 4b: Combined hyperparameter sweeps with baselines
 # ============================================================================
 def fig3b_4b_hyperparameter_sweeps(
-    feature_set_dir: Path = HIGH_DIM_16D_DIR,
+    feature_set_dir: Path = None,  # resolved at call time via HIGH_DIM_16D_DIR
     output_path: Path = None,
 ) -> plt.Figure:
     """
@@ -842,6 +860,8 @@ def fig3b_4b_hyperparameter_sweeps(
     Panel (a) enhances fig3 with learned omega + global horizontal lines.
     Panel (b) merges fig4 + fig11: multi-seed tau sweep with baselines.
     """
+    if feature_set_dir is None:
+        feature_set_dir = HIGH_DIM_16D_DIR
     if output_path is None:
         output_path = OUTPUT_DIR / "figures" / "fig3b_4b_hyperparameter_sweeps"
 
@@ -965,9 +985,9 @@ def fig3b_4b_hyperparameter_sweeps(
         nll_mean_tau = df_filt["val_nll_learned"].values
         nll_std_tau = np.zeros_like(nll_mean_tau)
 
-    # Filter diverged taus
+    # Filter diverged taus (also filter high-variance points by std)
     tau_vals, nll_mean_tau, nll_std_tau = _filter_diverged_taus(
-        tau_vals, nll_mean_tau, nll_std_tau
+        tau_vals, nll_mean_tau, nll_std_tau, nll_std=nll_std_tau
     )
 
     ax_tau.plot(
@@ -1042,12 +1062,14 @@ def fig3b_4b_hyperparameter_sweeps(
 # FIGURE 5: NLL Comparison Bar Chart (16D)
 # ============================================================================
 def fig5_nll_16d_comparison(
-    feature_set_dir: Path = HIGH_DIM_16D_DIR,
+    feature_set_dir: Path = None,  # resolved at call time via HIGH_DIM_16D_DIR
     output_path: Path = None,
 ) -> plt.Figure:
     """
     Bar chart comparing NLL across methods for 16D feature set.
     """
+    if feature_set_dir is None:
+        feature_set_dir = HIGH_DIM_16D_DIR
     if output_path is None:
         output_path = OUTPUT_DIR / "figures" / "fig5_nll_16d"
 
@@ -1099,7 +1121,7 @@ def fig5_nll_16d_comparison(
 # FIGURE 5b: NLL Box and Whisker Plot (16D)
 # ============================================================================
 def fig5b_nll_boxplot(
-    feature_set_dir: Path = HIGH_DIM_16D_DIR,
+    feature_set_dir: Path = None,  # resolved at call time via HIGH_DIM_16D_DIR
     output_path: Path = None,
 ) -> plt.Figure:
     """
@@ -1114,6 +1136,8 @@ def fig5b_nll_boxplot(
         CovPredictConfig,
     )
 
+    if feature_set_dir is None:
+        feature_set_dir = HIGH_DIM_16D_DIR
     if output_path is None:
         output_path = OUTPUT_DIR / "figures" / "fig5b_nll_boxplot"
 
@@ -1995,7 +2019,7 @@ def fig8_ellipse_grid(
 # FIGURE 9: Omega Bar Chart (Feature Weights)
 # ============================================================================
 def fig9_omega_bar_chart(
-    feature_set_dir: Path = HIGH_DIM_16D_DIR,
+    feature_set_dir: Path = None,  # resolved at call time via HIGH_DIM_16D_DIR
     output_path: Path = None,
 ) -> plt.Figure:
     """
@@ -2003,6 +2027,8 @@ def fig9_omega_bar_chart(
 
     Uses saved data from feature set experiments.
     """
+    if feature_set_dir is None:
+        feature_set_dir = HIGH_DIM_16D_DIR
     if output_path is None:
         output_path = OUTPUT_DIR / "figures" / "fig9_omega_bar_chart"
 
@@ -2107,7 +2133,7 @@ def fig10_ellipse_overlay(
 # FIGURE 11: Tau Sweep for Learned Omega (unconstrained, no regularization)
 # ============================================================================
 def fig11_tau_sweep_unconstrained(
-    feature_set_dir: Path = HIGH_DIM_16D_DIR,
+    feature_set_dir: Path = None,  # resolved at call time via HIGH_DIM_16D_DIR
     output_path: Path = None,
 ) -> plt.Figure:
     """
@@ -2115,6 +2141,8 @@ def fig11_tau_sweep_unconstrained(
 
     Shows learned omega NLL alongside k-NN (k=16) and global baselines.
     """
+    if feature_set_dir is None:
+        feature_set_dir = HIGH_DIM_16D_DIR
     if output_path is None:
         output_path = OUTPUT_DIR / "figures" / "fig11_tau_sweep_unconstrained"
 
@@ -2199,7 +2227,7 @@ def fig11_tau_sweep_unconstrained(
 # TABLE: Summary NLL comparison (one-line)
 # ============================================================================
 def table_nll_summary(
-    feature_set_dir: Path = HIGH_DIM_16D_DIR,
+    feature_set_dir: Path = None,  # resolved at call time via HIGH_DIM_16D_DIR
     output_path: Path = None,
 ) -> str:
     """
@@ -2208,6 +2236,8 @@ def table_nll_summary(
     Reads learned NLL from multi-seed stats in the feature set directory if available,
     otherwise falls back to single-seed sweep_results.csv.
     """
+    if feature_set_dir is None:
+        feature_set_dir = HIGH_DIM_16D_DIR
     if output_path is None:
         output_path = OUTPUT_DIR / "tables" / "tab_nll_summary.tex"
 
@@ -2281,12 +2311,14 @@ Method & NLL \\
 # LATEX TABLE GENERATION
 # ============================================================================
 def table_nll_vs_tau(
-    feature_set_dir: Path = HIGH_DIM_16D_DIR,
+    feature_set_dir: Path = None,  # resolved at call time via HIGH_DIM_16D_DIR
     output_path: Path = None,
 ) -> str:
     """
     Generate LaTeX table: NLL at different tau values.
     """
+    if feature_set_dir is None:
+        feature_set_dir = HIGH_DIM_16D_DIR
     if output_path is None:
         output_path = OUTPUT_DIR / "tables" / "tab_nll_vs_tau.tex"
 
@@ -2467,7 +2499,7 @@ def _per_point_gaussian_nll(
 
 
 def fig_nll_heatmap(
-    feature_set_dir: Path = FOCUSED_2D_DIR,
+    feature_set_dir: Path = None,  # resolved at call time via FOCUSED_2D_DIR
     output_path: Path = None,
 ) -> plt.Figure:
     """
@@ -2491,6 +2523,9 @@ def fig_nll_heatmap(
         predict_mu_sigma_topk_cross,
         predict_mu_sigma_knn,
     )
+
+    if feature_set_dir is None:
+        feature_set_dir = FOCUSED_2D_DIR
 
     # Load config
     config = _load_feature_config(feature_set_dir)
@@ -2610,7 +2645,7 @@ def fig_nll_heatmap(
 
 
 def fig_nll_delta_surface(
-    feature_set_dir: Path = HIGH_DIM_16D_DIR,
+    feature_set_dir: Path = None,  # resolved at call time via HIGH_DIM_16D_DIR
     output_path: Path = None,
     knn_k: int = 64,
     grid_res: int = 80,
@@ -2647,6 +2682,9 @@ def fig_nll_delta_surface(
         predict_mu_sigma_topk_cross,
         predict_mu_sigma_knn,
     )
+
+    if feature_set_dir is None:
+        feature_set_dir = HIGH_DIM_16D_DIR
 
     # Load config
     config = _load_feature_config(feature_set_dir)

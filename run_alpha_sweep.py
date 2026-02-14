@@ -566,8 +566,24 @@ def main():
     # ------------------------------------------------------------------
     # Phase 2+3: For each alpha, generate NPZ then run DARUC + ARUC
     # ------------------------------------------------------------------
+    csv_path = out_dir / "sweep_results.csv"
+
+    # Resume support: load previously completed alphas
+    completed_alphas: set[float] = set()
     rows = []
+    if csv_path.exists():
+        prev_df = pd.read_csv(csv_path)
+        if not prev_df.empty and "alpha" in prev_df.columns:
+            completed_alphas = set(prev_df["alpha"].tolist())
+            rows = prev_df.to_dict("records")
+            print(f"\n  Resuming: {len(completed_alphas)} alpha(s) already done: "
+                  f"{sorted(completed_alphas)}")
+
     for alpha in sorted(args.alphas):
+        if alpha in completed_alphas:
+            print(f"\n  Skipping alpha={alpha} (already in {csv_path.name})")
+            continue
+
         print(f"\n{'=' * 70}")
         print(f"PHASE 2: GENERATE NPZ FOR ALPHA={alpha}")
         print(f"{'=' * 70}")
@@ -595,6 +611,9 @@ def main():
         )
         if row is not None:
             rows.append(row)
+            # Flush to CSV after each alpha so progress survives interruption
+            pd.DataFrame(rows).to_csv(csv_path, index=False)
+            print(f"  Saved incremental results to {csv_path}")
 
     # ------------------------------------------------------------------
     # Phase 4: Aggregate and plot
@@ -604,7 +623,8 @@ def main():
         print("\nNo successful runs. Exiting.")
         return
 
-    csv_path = out_dir / "sweep_results.csv"
+    # Final write (ensures correct sort order)
+    df = df.sort_values("alpha").reset_index(drop=True)
     df.to_csv(csv_path, index=False)
 
     print("\n" + "=" * 70)

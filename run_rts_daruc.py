@@ -30,6 +30,7 @@ from run_rts_aruc import (
     extract_solution,
     print_brief_summary,
     analyze_Z_patterns,
+    reshape_uncertainty_for_variable_intervals,
 )
 from uncertainty_set_provider import UncertaintySetProvider
 
@@ -216,6 +217,8 @@ def run_rts_daruc(
     incremental_obj: bool = False,
     dispatch_cost_scale: float = 0.1,
     gurobi_numeric_mode: str = "balanced",
+    day2_interval_hours: int = 1,
+    day1_only_robust: bool = False,
 ) -> Dict[str, Any]:
     """
     Two-step DARUC pipeline (Setup 1):
@@ -263,6 +266,7 @@ def run_rts_daruc(
         spp_forecasts_parquet=spp_forecasts_parquet,
         spp_start_idx=spp_start_idx,
         enforce_lines=enforce_lines,
+        day2_interval_hours=day2_interval_hours,
     )
 
     dam_results = dam_outputs["results"]
@@ -287,8 +291,15 @@ def run_rts_daruc(
     print("=" * 70)
 
     # Build uncertainty set
+    T = data.n_periods
     time_varying = False
     sqrt_Sigma = None
+
+    # Build robust_mask
+    robust_mask = None
+    if day1_only_robust and T > 24:
+        robust_mask = np.array([True] * 24 + [False] * (T - 24))
+        print(f"  day1_only_robust: {int(robust_mask.sum())} robust + {T - int(robust_mask.sum())} nominal periods")
 
     if uncertainty_provider_path is not None:
         print(f"\nLoading time-varying uncertainty from {uncertainty_provider_path}...")
@@ -300,6 +311,14 @@ def run_rts_daruc(
             horizon, data, provider.get_wind_gen_ids()
         )
         time_varying = True
+
+        # Reshape if using variable intervals
+        if data.period_duration is not None:
+            Sigma, rho_arr, sqrt_Sigma = reshape_uncertainty_for_variable_intervals(
+                Sigma, rho_arr, data.period_duration, sqrt_Sigma
+            )
+            print(f"  Reshaped uncertainty to {T} variable-interval periods")
+
         print(f"  Sigma shape: {Sigma.shape}")
         print(f"  rho range: [{rho_arr.min():.3f}, {rho_arr.max():.3f}]")
         model_name = "DARUC_TimeVarying"
@@ -326,6 +345,7 @@ def run_rts_daruc(
         incremental_obj=incremental_obj,
         dispatch_cost_scale=dispatch_cost_scale,
         gurobi_numeric_mode=gurobi_numeric_mode,
+        robust_mask=robust_mask,
     )
 
     # Warm start ARUC from DAM solution

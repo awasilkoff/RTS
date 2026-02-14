@@ -83,6 +83,8 @@ def build_dam_model(
     d = data.d
     gen_to_bus = data.gen_to_bus  # shape (I,)
 
+    dt = data.dt  # period durations in hours, shape (T,)
+
     u_init = data.u_init
     init_up = data.init_up_time
     init_down = data.init_down_time
@@ -139,14 +141,14 @@ def build_dam_model(
 
     for i in range(I):
         for t in range(T):
-            obj.addTerms(C_NL[i], u[i, t])
-            obj.addTerms(C_SU[i], v[i, t])
-            obj.addTerms(C_SD[i], w[i, t])
+            obj.addTerms(C_NL[i] * dt[t], u[i, t])      # no-load: $/hr × hours
+            obj.addTerms(C_SU[i], v[i, t])                # startup: one-time
+            obj.addTerms(C_SD[i], w[i, t])                # shutdown: one-time
             for b in range(B):
-                obj.addTerms(block_cost[i, b], p_block[i, t, b])
+                obj.addTerms(block_cost[i, b] * dt[t], p_block[i, t, b])  # energy: $/MWh × MW × hours
 
     for t in range(T):
-        obj.addTerms(M_p, s_p[t])
+        obj.addTerms(M_p * dt[t], s_p[t])
 
     m.setObjective(obj, GRB.MINIMIZE)
 
@@ -192,22 +194,23 @@ def build_dam_model(
             )
 
     # (18f) Ramping up (within horizon):
-    #   p[i,t] - p[i,t-1] ≤ RU[i]*u[i,t-1] + R_SU[i]*v[i,t], t >= 1
-    # Approximate R_SU[i] := RU[i].
+    #   p[i,t] - p[i,t-1] ≤ RU[i]*dt_ramp*u[i,t-1] + RU[i]*dt_ramp*v[i,t]
+    # dt_ramp = (dt[t-1] + dt[t]) / 2  (transition time between period midpoints)
     for i in range(I):
         for t in range(1, T):
+            dt_ramp = (dt[t - 1] + dt[t]) / 2.0
             m.addConstr(
-                p[i, t] - p[i, t - 1] <= RU[i] * u[i, t - 1] + RU[i] * v[i, t],
+                p[i, t] - p[i, t - 1] <= RU[i] * dt_ramp * u[i, t - 1] + RU[i] * dt_ramp * v[i, t],
                 name=f"ramp_up_i{i}_t{t}",
             )
 
     # (18g) Ramping down (within horizon):
-    #   p[i,t-1] - p[i,t] ≤ RD[i]*u[i,t] + R_SD[i]*w[i,t], t >= 1
-    # Approximate R_SD[i] := RD[i].
+    #   p[i,t-1] - p[i,t] ≤ RD[i]*dt_ramp*u[i,t] + RD[i]*dt_ramp*w[i,t]
     for i in range(I):
         for t in range(1, T):
+            dt_ramp = (dt[t - 1] + dt[t]) / 2.0
             m.addConstr(
-                p[i, t - 1] - p[i, t] <= RD[i] * u[i, t] + RD[i] * w[i, t],
+                p[i, t - 1] - p[i, t] <= RD[i] * dt_ramp * u[i, t] + RD[i] * dt_ramp * w[i, t],
                 name=f"ramp_down_i{i}_t{t}",
             )
 
@@ -269,33 +272,43 @@ def build_dam_model(
     #                     name=f"init_min_down_fix_i{i}_t{t}",
     #                 )
 
-    # (18i) Minimum up time within horizon:
-    #   sum_{t' = t - MUT[i] + 1}^t v[i,t'] ≤ u[i,t], for t in [MUT[i], T]
-    # Interpreted over horizon indices; history is partially captured by the
-    # fixed early-period constraints above.
+    # (18i) Minimum up time — look-forward, counting hours not periods.
+    # If v[i,t]=1 (startup), then u must stay on for enough future periods
+    # to accumulate MUT hours.
     for i in range(I):
-        mut_i = int(MUT[i])
-        if mut_i <= 0:
+        mut_hrs = float(MUT[i])
+        if mut_hrs <= 0:
             continue
-        for t in range(mut_i - 1, T):
-            lhs = gp.quicksum(v[i, tau] for tau in range(t - mut_i + 1, t + 1))
-            m.addConstr(
-                lhs <= u[i, t],
-                name=f"min_up_i{i}_t{t}",
-            )
+        for t in range(T):
+            cum = 0.0
+            must_on = []
+            for s in range(t, T):
+                must_on.append(s)
+                cum += dt[s]
+                if cum >= mut_hrs:
+                    break
+            n = len(must_on)
+            if n > 0:
+                lhs = gp.quicksum(u[i, s] for s in must_on)
+                m.addConstr(lhs >= n * v[i, t], name=f"mut_i{i}_t{t}")
 
-    # (18j) Minimum down time within horizon:
-    #   sum_{t' = t - MDT[i] + 1}^t w[i,t'] ≤ 1 - u[i,t], for t in [MDT[i], T]
+    # (18j) Minimum down time — look-forward, counting hours not periods.
     for i in range(I):
-        mdt_i = int(MDT[i])
-        if mdt_i <= 0:
+        mdt_hrs = float(MDT[i])
+        if mdt_hrs <= 0:
             continue
-        for t in range(mdt_i - 1, T):
-            lhs = gp.quicksum(w[i, tau] for tau in range(t - mdt_i + 1, t + 1))
-            m.addConstr(
-                lhs <= 1 - u[i, t],
-                name=f"min_down_i{i}_t{t}",
-            )
+        for t in range(T):
+            cum = 0.0
+            must_off = []
+            for s in range(t, T):
+                must_off.append(s)
+                cum += dt[s]
+                if cum >= mdt_hrs:
+                    break
+            n = len(must_off)
+            if n > 0:
+                lhs = gp.quicksum((1 - u[i, s]) for s in must_off)
+                m.addConstr(lhs >= n * w[i, t], name=f"mdt_i{i}_t{t}")
 
     # Network / line flow constraints:
     #   -Fmax[l] ≤ sum_n PTDF[l,n] * ( sum_{i ∈ I_n} p[i,t] - d[n,t] ) ≤ Fmax[l]

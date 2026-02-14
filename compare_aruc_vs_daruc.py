@@ -139,6 +139,7 @@ def compute_cost_breakdown(u_df: pd.DataFrame, p0_df: pd.DataFrame, data) -> dic
     u = np.round(u_df.values).astype(float)
     p0 = p0_df.values
     I, T = u.shape
+    dt = data.dt  # (T,) period durations
 
     # Startup detection: v[i,t] = max(0, u[i,t] - u[i,t-1])
     v = np.zeros_like(u)
@@ -154,11 +155,13 @@ def compute_cost_breakdown(u_df: pd.DataFrame, p0_df: pd.DataFrame, data) -> dic
     if T > 1:
         w[:, 1:] = np.maximum(0.0, u[:, :-1] - u[:, 1:])
 
-    no_load = float((data.no_load_cost[:, None] * u).sum())
+    # No-load cost: $/hr × hours per period
+    no_load = float((data.no_load_cost[:, None] * u * dt[None, :]).sum())
+    # Startup/shutdown: one-time events, don't scale by duration
     startup = float((data.startup_cost[:, None] * v).sum())
     shutdown = float((data.shutdown_cost[:, None] * w).sum())
 
-    # Energy cost: full dispatch through cost blocks (blocks start at 0)
+    # Energy cost: $/MWh × MW × hours per period
     energy = 0.0
     block_cap = data.block_cap   # (I, B)
     block_cost = data.block_cost  # (I, B)
@@ -168,17 +171,17 @@ def compute_cost_breakdown(u_df: pd.DataFrame, p0_df: pd.DataFrame, data) -> dic
             remaining = max(0.0, p0[i, t])
             for b in range(B):
                 allocated = min(remaining, block_cap[i, b])
-                energy += allocated * block_cost[i, b]
+                energy += allocated * block_cost[i, b] * dt[t]
                 remaining -= allocated
                 if remaining <= 1e-9:
                     break
 
-    # Slack penalty: total generation shortfall × M_p
+    # Slack penalty: weight by dt
     total_gen = p0.sum(axis=0)  # (T,)
     total_load = data.d.sum(axis=0)[:T]  # (T,)
     slack = np.maximum(0.0, total_load - total_gen)
     m_penalty = 1e4  # must match M_PENALTY in runner scripts
-    slack_cost = float(m_penalty * slack.sum())
+    slack_cost = float(m_penalty * (slack * dt).sum())
 
     total = no_load + startup + shutdown + energy + slack_cost
     return {
@@ -503,6 +506,7 @@ def compute_wind_curtailment(p0_df: pd.DataFrame, data, common_times: list[str])
     wind_ids = [data.gen_ids[i] for i in wind_idx]
 
     pmax_2d = data.Pmax_2d()  # (I, T)
+    dt = data.dt  # (T,) period durations
     T = len(common_times)
 
     # Map common_times to column positions in the full time axis
@@ -510,6 +514,9 @@ def compute_wind_curtailment(p0_df: pd.DataFrame, data, common_times: list[str])
     time_list = [str(t) for t in data.time]
     common_str = [str(t) for t in common_times]
     time_pos = [time_list.index(t) for t in common_str]
+
+    # Map time_pos to dt values for duration weighting
+    dt_mapped = np.array([dt[tp] for tp in time_pos])
 
     total_curtail_ts = np.zeros(T)
     per_farm_ts = {}
@@ -523,10 +530,11 @@ def compute_wind_curtailment(p0_df: pd.DataFrame, data, common_times: list[str])
         per_farm_ts[gid] = curtail
         per_farm_avg[gid] = float(curtail.mean())
 
+    # Weight by duration for MWh totals
     total_avail = sum(
-        sum(pmax_2d[wi, tp] for tp in time_pos) for wi in wind_idx
+        sum(pmax_2d[wi, tp] * dt[tp] for tp in time_pos) for wi in wind_idx
     )
-    total_mwh = float(total_curtail_ts.sum())
+    total_mwh = float((total_curtail_ts * dt_mapped).sum())
     pct = 100.0 * total_mwh / total_avail if total_avail > 0 else 0.0
 
     return {

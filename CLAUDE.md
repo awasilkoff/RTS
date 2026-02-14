@@ -157,6 +157,24 @@ The `DAMData` Pydantic model (in `models.py`) is the canonical interface between
 
 Generator types: `"THERMAL"`, `"WIND"`, `"SOLAR"`, `"HYDRO"` (stored in `gen_type` list)
 
+### Variable-Duration Periods
+
+When `day2_interval_hours > 1`, the 48-hour horizon uses hourly periods for day 1 (24 periods) and multi-hour blocks for day 2. For example, `day2_interval_hours=2` gives T=36 periods: 24×1h + 12×2h.
+
+- **`period_duration`** (on `DAMData`): Optional `(T,)` array of period durations in hours. `None` = all 1.0 (backward compatible).
+- **`data.dt`** property: Returns period durations (always available, defaults to ones).
+- **`data.total_hours`** property: Sum of all period durations.
+- **Load/Pmax**: Averaged across hours in each block.
+- **Objective**: No-load and energy costs scale by `dt[t]`; startup/shutdown are one-time events.
+- **Ramp**: Scales by transition time `(dt[t-1] + dt[t]) / 2`.
+- **MUT/MDT**: Look-forward, counting hours not periods (a 2-hour block = 2 hours toward MUT).
+
+### Day-1-Only Robustness
+
+When `day1_only_robust=True`, the ARUC/DARUC model only creates Z variables and SOC constraints for the first 24 periods. Day 2 uses nominal (DAM-like) constraints. This significantly reduces solve time by eliminating all SOC constraints for day 2.
+
+- **`robust_mask`** (on `build_aruc_ldr_model`): Optional `(T,)` bool array. `True` = robust period. `None` = all robust (backward compatible).
+
 ### ARUC Model Variables
 
 - `u[i,t]`: Binary commitment status

@@ -173,6 +173,15 @@ class DAMData(BaseModel):
         description="Nominal net load at each bus and time (after any fixed injections). shape (N, T).",
     )
 
+    # ---------- Variable-duration periods ----------
+    # When using variable-duration periods (e.g. hourly day 1, 2-hour day 2),
+    # period_duration[t] gives the length in hours of period t.
+    # None = all periods are 1 hour (backward compatible).
+    period_duration: Optional[np.ndarray] = Field(
+        default=None,
+        description="Duration of each period in hours. shape (T,). None = all 1.0.",
+    )
+
     # ---------- Optional debug / provenance ----------
     # These are not required for the optimization model; they are for debugging / introspection.
     gens_df: Optional[pd.DataFrame] = Field(
@@ -213,6 +222,19 @@ class DAMData(BaseModel):
     def n_blocks(self) -> int:
         # Handle possible 1D edge cases gracefully
         return int(self.block_cap.shape[1]) if self.block_cap.ndim == 2 else 0
+
+    # ---------- Period duration helpers ----------
+    @property
+    def dt(self) -> np.ndarray:
+        """Period durations in hours. Shape (T,)."""
+        if self.period_duration is not None:
+            return self.period_duration
+        return np.ones(self.n_periods)
+
+    @property
+    def total_hours(self) -> float:
+        """Total horizon length in hours (sum of all period durations)."""
+        return float(self.dt.sum())
 
     # ---------- Convenience masks for generator types ----------
     @property
@@ -337,6 +359,12 @@ class DAMData(BaseModel):
             N,
             T,
         ), f"d must have shape ({N}, {T}) but has {self.d.shape}"
+
+        # Period duration (optional)
+        if self.period_duration is not None:
+            assert self.period_duration.shape == (
+                T,
+            ), f"period_duration must have shape ({T},) but has {self.period_duration.shape}"
 
 
 if __name__ == "__main__":

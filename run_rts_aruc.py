@@ -123,6 +123,63 @@ def build_uncertainty_set(
 
 
 # ---------------------------------------------------------------------------
+# Uncertainty reshaping for variable intervals
+# ---------------------------------------------------------------------------
+
+
+def reshape_uncertainty_for_variable_intervals(
+    Sigma_hourly: np.ndarray,
+    rho_hourly: np.ndarray,
+    period_duration: np.ndarray,
+    sqrt_Sigma_hourly: np.ndarray | None = None,
+) -> tuple:
+    """Map hourly uncertainty arrays to variable-interval periods.
+
+    Day 1 (hourly): direct copy.
+    Day 2 (multi-hour blocks): average Sigma pairs, average rho.
+    When day1_only_robust=True, day 2 values are dummy (never accessed).
+
+    Parameters
+    ----------
+    Sigma_hourly : (T_hourly, K, K)
+    rho_hourly : (T_hourly,)
+    period_duration : (T_periods,) — e.g. [1]*24 + [2]*12
+    sqrt_Sigma_hourly : (T_hourly, K, K) or None
+
+    Returns
+    -------
+    Sigma_out : (T_periods, K, K)
+    rho_out : (T_periods,)
+    sqrt_Sigma_out : (T_periods, K, K) or None
+    """
+    T_periods = len(period_duration)
+    K = Sigma_hourly.shape[1]
+
+    Sigma_out = np.zeros((T_periods, K, K))
+    rho_out = np.zeros(T_periods)
+    sqrt_Sigma_out = np.zeros((T_periods, K, K)) if sqrt_Sigma_hourly is not None else None
+
+    h = 0  # hourly index
+    for t in range(T_periods):
+        dt_t = int(period_duration[t])
+        if dt_t == 1:
+            Sigma_out[t] = Sigma_hourly[h]
+            rho_out[t] = rho_hourly[h]
+            if sqrt_Sigma_out is not None:
+                sqrt_Sigma_out[t] = sqrt_Sigma_hourly[h]
+        else:
+            # Average over the block hours
+            Sigma_out[t] = Sigma_hourly[h:h + dt_t].mean(axis=0)
+            rho_out[t] = rho_hourly[h:h + dt_t].mean()
+            if sqrt_Sigma_out is not None:
+                # Recompute Cholesky from averaged Sigma
+                sqrt_Sigma_out[t] = np.linalg.cholesky(Sigma_out[t])
+        h += dt_t
+
+    return Sigma_out, rho_out, sqrt_Sigma_out
+
+
+# ---------------------------------------------------------------------------
 # Helpers for extracting results
 # ---------------------------------------------------------------------------
 
@@ -356,6 +413,8 @@ def run_rts_aruc(
     rho_lines_frac: Optional[float] = None,
     mip_gap: float = 0.005,
     gurobi_numeric_mode: str = "balanced",
+    day2_interval_hours: int = 1,
+    day1_only_robust: bool = False,
 ) -> Dict[str, Any]:
     """
     Full pipeline for ARUC-LDR:
@@ -408,12 +467,20 @@ def run_rts_aruc(
         horizon_hours=horizon_hours,
         spp_forecasts_parquet=spp_forecasts_parquet,
         spp_start_idx=spp_start_idx,
+        day2_interval_hours=day2_interval_hours,
     )
+    T = data.n_periods
     print("  Done. Data shapes:")
     print(f"    n_gens   = {data.n_gens}")
     print(f"    n_buses  = {data.n_buses}")
     print(f"    n_lines  = {data.n_lines}")
-    print(f"    n_periods= {data.n_periods}")
+    print(f"    n_periods= {T} (total_hours={data.total_hours:.0f})")
+
+    # Build robust_mask
+    robust_mask = None
+    if day1_only_robust and T > 24:
+        robust_mask = np.array([True] * 24 + [False] * (T - 24))
+        print(f"  day1_only_robust: {int(robust_mask.sum())} robust + {T - int(robust_mask.sum())} nominal periods")
 
     # Determine whether to use time-varying or static uncertainty
     time_varying = False
@@ -431,6 +498,13 @@ def run_rts_aruc(
             horizon, data, provider.get_wind_gen_ids()
         )
         time_varying = True
+
+        # Reshape if using variable intervals
+        if data.period_duration is not None:
+            Sigma, rho, sqrt_Sigma = reshape_uncertainty_for_variable_intervals(
+                Sigma, rho, data.period_duration, sqrt_Sigma
+            )
+            print(f"  Reshaped uncertainty to {T} variable-interval periods")
 
         print(f"  Wind IDs from provider: {provider.get_wind_gen_ids()}")
         print(f"  Sigma shape: {Sigma.shape}")
@@ -456,6 +530,7 @@ def run_rts_aruc(
         enforce_lines=enforce_lines,
         mip_gap=mip_gap,
         gurobi_numeric_mode=gurobi_numeric_mode,
+        robust_mask=robust_mask,
     )
     print("  Model built. Starting optimization...")
 

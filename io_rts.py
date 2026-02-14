@@ -428,6 +428,28 @@ def build_nodal_load_array(
     return d
 
 
+def _aggregate_to_blocks(hourly: np.ndarray, block_size: int) -> np.ndarray:
+    """Average groups of consecutive columns (time axis) into blocks.
+
+    Parameters
+    ----------
+    hourly : np.ndarray
+        Array with time as the last axis. Shape (..., T_hourly).
+    block_size : int
+        Number of consecutive hours per block.
+
+    Returns
+    -------
+    np.ndarray
+        Averaged array with shape (..., T_hourly // block_size).
+    """
+    *leading, T = hourly.shape
+    n_blocks = T // block_size
+    # Reshape last axis into (n_blocks, block_size) then average
+    reshaped = hourly[..., : n_blocks * block_size].reshape(*leading, n_blocks, block_size)
+    return reshaped.mean(axis=-1)
+
+
 def build_damdata_from_rts(
     source_dir: str | Path,
     ts_dir: str | Path,
@@ -435,6 +457,7 @@ def build_damdata_from_rts(
     horizon_hours: int = 48,
     spp_forecasts_parquet: str | Path | None = None,
     spp_start_idx: int = 0,
+    day2_interval_hours: int = 1,
 ) -> DAMData:
     """
     High-level function:
@@ -649,6 +672,43 @@ def build_damdata_from_rts(
             Pmax_t[i, :] = Pmax[i]  # Static capacity for thermal/hydro
     # 6) Network: PTDF and Fmax
     PTDF, Fmax, bus_ids, line_ids = build_dc_ptdf(buses_df, lines_df)
+
+    # ---- Variable-duration period aggregation ----
+    period_duration = None
+    if day2_interval_hours > 1 and horizon_hours > 24:
+        day1_hours = 24
+        day2_hourly = horizon_hours - day1_hours
+        if day2_hourly % day2_interval_hours != 0:
+            raise ValueError(
+                f"Day-2 hours ({day2_hourly}) must be divisible by "
+                f"day2_interval_hours ({day2_interval_hours})"
+            )
+        day2_periods = day2_hourly // day2_interval_hours
+        T_new = day1_hours + day2_periods
+
+        # Aggregate load: average over block
+        d_day1 = d[:, :day1_hours]
+        d_day2 = _aggregate_to_blocks(d[:, day1_hours:], day2_interval_hours)
+        d = np.concatenate([d_day1, d_day2], axis=1)
+
+        # Aggregate Pmax_t: average over block
+        pmax_day1 = Pmax_t[:, :day1_hours]
+        pmax_day2 = _aggregate_to_blocks(Pmax_t[:, day1_hours:], day2_interval_hours)
+        Pmax_t = np.concatenate([pmax_day1, pmax_day2], axis=1)
+
+        # Aggregate time_index: use start timestamp of each block
+        time_day1 = time_index[:day1_hours]
+        time_day2 = [time_index[day1_hours + j * day2_interval_hours]
+                     for j in range(day2_periods)]
+        time_index = time_day1 + time_day2
+
+        # Build period_duration vector
+        period_duration = np.array(
+            [1.0] * day1_hours + [float(day2_interval_hours)] * day2_periods
+        )
+
+        print(f"  Variable intervals: {day1_hours} × 1h + {day2_periods} × {day2_interval_hours}h = {T_new} periods")
+
     # 7) Build DAMData
     dam = DAMData(
         gen_ids=gen_ids,
@@ -674,6 +734,7 @@ def build_damdata_from_rts(
         PTDF=PTDF,
         Fmax=Fmax,
         d=d,
+        period_duration=period_duration,
         gens_df=gens_df,
         buses_df=buses_df,
         lines_df=lines_df,

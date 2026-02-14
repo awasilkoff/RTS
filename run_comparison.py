@@ -71,6 +71,10 @@ def main():
                         help="DARUC: only charge commitment costs for additional units, scale dispatch by --dispatch-cost-scale")
     parser.add_argument("--dispatch-cost-scale", type=float, default=0.1,
                         help="Dispatch cost scale factor for incremental objective (default: 0.01)")
+    parser.add_argument("--day2-interval", type=int, default=1,
+                        help="Day-2 interval hours (default: 1 = hourly, 2 = 2-hour blocks)")
+    parser.add_argument("--day1-only-robust", action="store_true",
+                        help="Only enforce robust constraints for day 1 (first 24 periods)")
     parser.add_argument("--out-dir", type=str, default=None,
                         help="Output directory (auto-generated if not specified)")
     args = parser.parse_args()
@@ -135,6 +139,8 @@ def main():
         mip_gap=args.mip_gap,
         incremental_obj=args.incremental_obj,
         dispatch_cost_scale=args.dispatch_cost_scale,
+        day2_interval_hours=args.day2_interval,
+        day1_only_robust=args.day1_only_robust,
     )
 
     daruc_results = daruc_outputs["daruc_results"]
@@ -191,6 +197,8 @@ def main():
         provider_start_idx=args.provider_start,
         rho_lines_frac=args.rho_lines_frac,
         mip_gap=args.mip_gap,
+        day2_interval_hours=args.day2_interval,
+        day1_only_robust=args.day1_only_robust,
     )
 
     aruc_results = aruc_outputs["results"]

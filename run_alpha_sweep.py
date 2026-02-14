@@ -122,6 +122,8 @@ def run_alpha_point(
     provider_start: int,
     incremental_obj: bool = False,
     gurobi_numeric_mode: str = "balanced",
+    day2_interval_hours: int = 1,
+    day1_only_robust: bool = False,
 ) -> dict | None:
     """Run DARUC + ARUC with a given NPZ and return metrics row."""
     print(f"\n{'#' * 70}")
@@ -143,6 +145,8 @@ def run_alpha_point(
             provider_start_idx=provider_start,
             incremental_obj=incremental_obj,
             gurobi_numeric_mode=gurobi_numeric_mode,
+            day2_interval_hours=day2_interval_hours,
+            day1_only_robust=day1_only_robust,
         )
         data = daruc_out["data"]
         daruc_res = daruc_out["daruc_results"]
@@ -180,6 +184,8 @@ def run_alpha_point(
             uncertainty_provider_path=str(npz_path),
             provider_start_idx=provider_start,
             gurobi_numeric_mode=gurobi_numeric_mode,
+            day2_interval_hours=day2_interval_hours,
+            day1_only_robust=day1_only_robust,
         )
         aruc_res = aruc_out["results"]
         aruc_obj = aruc_res["obj"]
@@ -489,6 +495,17 @@ def main():
         help="Gurobi numeric tuning mode (default: balanced)",
     )
     parser.add_argument(
+        "--day2-interval",
+        type=int,
+        default=1,
+        help="Day-2 interval hours (default: 1 = hourly, 2 = 2-hour blocks)",
+    )
+    parser.add_argument(
+        "--day1-only-robust",
+        action="store_true",
+        help="Only enforce robust constraints for day 1 (first 24 periods)",
+    )
+    parser.add_argument(
         "--out-dir",
         type=str,
         default=None,
@@ -573,6 +590,8 @@ def main():
             provider_start=args.provider_start,
             incremental_obj=args.incremental_obj,
             gurobi_numeric_mode=args.gurobi_numeric_mode,
+            day2_interval_hours=args.day2_interval,
+            day1_only_robust=args.day1_only_robust,
         )
         if row is not None:
             rows.append(row)

@@ -80,6 +80,7 @@ def build_aruc_ldr_model(
     incremental_obj: bool = False,
     dispatch_cost_scale: float = 0.1,
     gurobi_numeric_mode: str = "balanced",
+    robust_mask: Optional[np.ndarray] = None,
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Adaptive robust UC with linear decision rules:
@@ -155,9 +156,24 @@ def build_aruc_ldr_model(
     d = data.d
     gen_to_bus = data.gen_to_bus
 
+    dt = data.dt  # period durations in hours, shape (T,)
+
     u_init = data.u_init
     init_up = data.init_up_time
     init_down = data.init_down_time
+
+    # Robust mask: which periods have full robust (SOC/Z) constraints
+    if robust_mask is None:
+        robust_mask = np.ones(T, dtype=bool)
+    else:
+        robust_mask = np.asarray(robust_mask, dtype=bool)
+        assert robust_mask.shape == (T,), (
+            f"robust_mask shape {robust_mask.shape} != ({T},)"
+        )
+    n_robust = int(robust_mask.sum())
+    n_nominal = T - n_robust
+    if n_nominal > 0:
+        print(f"  [ARUC] robust_mask: {n_robust} robust + {n_nominal} nominal periods")
 
     # Identify wind units if you've tagged them in data.gen_type
     is_wind = np.array([gt.upper() == "WIND" for gt in data.gen_type])
@@ -274,8 +290,9 @@ def build_aruc_ldr_model(
     #   p(i,t)(r) = p0[i,t] + sum_k Z[i,t,k] * r_k
     # Only z-eligible generators (thermal + wind) participate; solar/hydro
     # have zero uncertainty response, so we skip them entirely.
+    # Only created for robust periods (robust_mask[t] == True).
     Z = m.addVars(
-        [(i, t, k) for i in z_elig for t in range(T) for k in range(K)],
+        [(i, t, k) for i in z_elig for t in range(T) if robust_mask[t] for k in range(K)],
         vtype=GRB.CONTINUOUS, lb=-GRB.INFINITY, name="Z",
     )
 
@@ -293,26 +310,26 @@ def build_aruc_ldr_model(
         for i in range(I):
             for t in range(T):
                 if u_dam_arr[i, t] < 0.5:  # not committed by DAM
-                    obj.addTerms(C_NL[i], u[i, t])
+                    obj.addTerms(C_NL[i] * dt[t], u[i, t])
                     obj.addTerms(C_SU[i], v[i, t])
                     obj.addTerms(C_SD[i], w[i, t])
                 for b in range(B):
                     obj.addTerms(
-                        dispatch_cost_scale * block_cost[i, b],
+                        dispatch_cost_scale * block_cost[i, b] * dt[t],
                         p0_block[i, t, b],
                     )
     else:
         # Full cost objective (standard)
         for i in range(I):
             for t in range(T):
-                obj.addTerms(C_NL[i], u[i, t])
-                obj.addTerms(C_SU[i], v[i, t])
-                obj.addTerms(C_SD[i], w[i, t])
+                obj.addTerms(C_NL[i] * dt[t], u[i, t])     # no-load: $/hr × hours
+                obj.addTerms(C_SU[i], v[i, t])               # startup: one-time
+                obj.addTerms(C_SD[i], w[i, t])               # shutdown: one-time
                 for b in range(B):
-                    obj.addTerms(block_cost[i, b], p0_block[i, t, b])
+                    obj.addTerms(block_cost[i, b] * dt[t], p0_block[i, t, b])
 
     for t in range(T):
-        obj.addTerms(M_p, s_p[t])
+        obj.addTerms(M_p * dt[t], s_p[t])
 
     m.setObjective(obj, GRB.MINIMIZE)
 
@@ -324,16 +341,40 @@ def build_aruc_ldr_model(
     # where y_gen[i,t,:] = L_t @ Z_{i,t}
 
     z_gen = m.addVars(
-        [(i, t) for i in thermal_idx for t in range(T)],
+        [(i, t) for i in thermal_idx for t in range(T) if robust_mask[t]],
         lb=0.0, name="z_gen",
     )
     y_gen = m.addVars(
-        [(i, t, k) for i in thermal_idx for t in range(T) for k in range(K)],
+        [(i, t, k) for i in thermal_idx for t in range(T) if robust_mask[t] for k in range(K)],
         lb=-GRB.INFINITY, name="y_gen",
     )
 
     for i in range(I):
         for t in range(T):
+            # --- Non-robust (nominal) period: DAM-like constraints ---
+            if not robust_mask[t]:
+                m.addConstr(
+                    p0[i, t] <= Pmax_2d[i, t] * u[i, t],
+                    name=f"p0_max_nom_i{i}_t{t}",
+                )
+                m.addConstr(
+                    Pmin[i] * u[i, t] <= p0[i, t],
+                    name=f"p0_min_nom_i{i}_t{t}",
+                )
+                for b in range(B):
+                    m.addConstr(
+                        p0_block[i, t, b] <= block_cap[i, b] * u[i, t],
+                        name=f"p0_block_cap_i{i}_t{t}_b{b}",
+                    )
+                m.addConstr(
+                    p0[i, t]
+                    <= gp.quicksum(p0_block[i, t, b] for b in range(B)),
+                    name=f"p0_agg_nom_i{i}_t{t}",
+                )
+                continue
+
+            # --- Robust period: full uncertainty constraints ---
+
             # Get time-specific Cholesky factor and rho
             sqrt_Sigma_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
             rho_t = rho[t] if time_varying else rho
@@ -432,14 +473,16 @@ def build_aruc_ldr_model(
             )
 
     # Ramps on nominal dispatch (paper formulation uses nominal ramps)
+    # dt_ramp = (dt[t-1] + dt[t]) / 2  (transition time between period midpoints)
     for i in range(I):
         for t in range(1, T):
+            dt_ramp = (dt[t - 1] + dt[t]) / 2.0
             m.addConstr(
-                p0[i, t] - p0[i, t - 1] <= RU[i] * u[i, t - 1] + RU[i] * v[i, t],
+                p0[i, t] - p0[i, t - 1] <= RU[i] * dt_ramp * u[i, t - 1] + RU[i] * dt_ramp * v[i, t],
                 name=f"ramp_up_i{i}_t{t}",
             )
             m.addConstr(
-                p0[i, t - 1] - p0[i, t] <= RD[i] * u[i, t] + RD[i] * w[i, t],
+                p0[i, t - 1] - p0[i, t] <= RD[i] * dt_ramp * u[i, t] + RD[i] * dt_ramp * w[i, t],
                 name=f"ramp_down_i{i}_t{t}",
             )
 
@@ -458,35 +501,41 @@ def build_aruc_ldr_model(
             )
 
     # ------------------------------------------------------------------
-    # MUT / MDT Constraints
+    # MUT / MDT Constraints — look-forward, counting hours not periods
     # ------------------------------------------------------------------
     for i in range(I):
-        mut_val = int(MUT[i])
-        mdt_val = int(MDT[i])
+        mut_hrs = float(MUT[i])
+        mdt_hrs = float(MDT[i])
 
         # Minimum up time constraints
-        for t in range(T):
-            end_period = min(T, t + mut_val)
-            lhs = gp.quicksum(u[i, s] for s in range(t, end_period))
-            m.addConstr(lhs >= mut_val * v[i, t], name=f"mut_i{i}_t{t}")
+        if mut_hrs > 0:
+            for t in range(T):
+                cum = 0.0
+                must_on = []
+                for s in range(t, T):
+                    must_on.append(s)
+                    cum += dt[s]
+                    if cum >= mut_hrs:
+                        break
+                n = len(must_on)
+                if n > 0:
+                    lhs = gp.quicksum(u[i, s] for s in must_on)
+                    m.addConstr(lhs >= n * v[i, t], name=f"mut_i{i}_t{t}")
 
         # Minimum down time constraints
-        for t in range(T):
-            end_period = min(T, t + mdt_val)
-            lhs = gp.quicksum((1 - u[i, s]) for s in range(t, end_period))
-            m.addConstr(lhs >= mdt_val * w[i, t], name=f"mdt_i{i}_t{t}")
-
-        # # Initial conditions for MUT
-        # if u_init[i] > 0.5 and init_up[i] < mut_val:
-        #     remaining = int(mut_val - init_up[i])
-        #     for t in range(min(remaining, T)):
-        #         m.addConstr(u[i, t] == 1, name=f"init_mut_i{i}_t{t}")
-        #
-        # # Initial conditions for MDT
-        # if u_init[i] < 0.5 and init_down[i] < mdt_val:
-        #     remaining = int(mdt_val - init_down[i])
-        #     for t in range(min(remaining, T)):
-        #         m.addConstr(u[i, t] == 0, name=f"init_mdt_i{i}_t{t}")
+        if mdt_hrs > 0:
+            for t in range(T):
+                cum = 0.0
+                must_off = []
+                for s in range(t, T):
+                    must_off.append(s)
+                    cum += dt[s]
+                    if cum >= mdt_hrs:
+                        break
+                n = len(must_off)
+                if n > 0:
+                    lhs = gp.quicksum((1 - u[i, s]) for s in must_off)
+                    m.addConstr(lhs >= n * w[i, t], name=f"mdt_i{i}_t{t}")
 
     # ------------------------------------------------------------------
     # DARUC constraints (if DAM commitment is provided)
@@ -532,32 +581,54 @@ def build_aruc_ldr_model(
             name=f"bal_nom_t{t}",
         )
         # zero-net-response condition on Z (keeps balance for all r)
-        for k in range(K):
-            m.addConstr(
-                gp.quicksum(Z[i, t, k] for i in z_elig) == 0.0,
-                name=f"bal_Z_t{t}_k{k}",
-            )
+        # Only for robust periods (Z doesn't exist for nominal periods)
+        if robust_mask[t]:
+            for k in range(K):
+                m.addConstr(
+                    gp.quicksum(Z[i, t, k] for i in z_elig) == 0.0,
+                    name=f"bal_Z_t{t}_k{k}",
+                )
 
     # 2) Line flows robust (skip entirely in copper-plate mode)
-    z_line = m.addVars(L, T, lb=0.0, name="z_line")
-    y_line = m.addVars(L, T, K, lb=-GRB.INFINITY, name="y_line")
+    # Only create SOC auxiliaries for robust periods
+    z_line = m.addVars(
+        [(l, t) for l in range(L) for t in range(T) if robust_mask[t]],
+        lb=0.0, name="z_line",
+    )
+    y_line = m.addVars(
+        [(l, t, k) for l in range(L) for t in range(T) if robust_mask[t] for k in range(K)],
+        lb=-GRB.INFINITY, name="y_line",
+    )
 
     if not enforce_lines:
         print("  [ARUC] Line flow constraints DISABLED (copper-plate mode)")
     if enforce_lines:
         for l in range(L):
             for t in range(T):
-                # Get time-specific values
-                sqrt_Sigma_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
-                rho_lines_t = rho_lines[t] if time_varying else rho_lines
-
-                # 1) flow_nom_expr
+                # 1) flow_nom_expr (needed for both robust and nominal)
                 flow_nom = gp.LinExpr()
                 for n in range(N):
                     if abs(PTDF[l, n]) < 1e-10:
                         continue
                     gen_sum = gp.quicksum(p0[i, t] for i in gens_at_bus[n])
                     flow_nom += PTDF[l, n] * (gen_sum - float(d[n, t]))
+
+                if not robust_mask[t]:
+                    # Nominal line flow constraints (like DAM)
+                    m.addConstr(
+                        flow_nom <= Fmax[l],
+                        name=f"line_max_nom_l{l}_t{t}",
+                    )
+                    m.addConstr(
+                        flow_nom >= -Fmax[l],
+                        name=f"line_min_nom_l{l}_t{t}",
+                    )
+                    continue
+
+                # --- Robust period ---
+                # Get time-specific values
+                sqrt_Sigma_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
+                rho_lines_t = rho_lines[t] if time_varying else rho_lines
 
                 # 2) a_expr[k] = d(flow) / d r_k
                 a_expr = [gp.LinExpr() for _ in range(K)]
@@ -599,13 +670,22 @@ def build_aruc_ldr_model(
                     name=f"line_min_rob_l{l}_t{t}",
                 )
 
-    # 3) Wind availability
-    z_wind = m.addVars(n_wind, T, lb=0.0, name="z_wind")
-    # Auxiliary variables for SOC constraints
-    y_wind = m.addVars(n_wind, T, K, lb=-GRB.INFINITY, name="y_wind")
+    # 3) Wind availability — only for robust periods
+    z_wind = m.addVars(
+        [(k_wind, t) for k_wind in range(n_wind) for t in range(T) if robust_mask[t]],
+        lb=0.0, name="z_wind",
+    )
+    y_wind = m.addVars(
+        [(k_wind, t, k) for k_wind in range(n_wind) for t in range(T) if robust_mask[t] for k in range(K)],
+        lb=-GRB.INFINITY, name="y_wind",
+    )
 
     for k_wind, i in enumerate(wind_idx):
         for t in range(T):
+            if not robust_mask[t]:
+                # Nominal wind: p0 <= Pmax*u (already handled in dispatch section above)
+                continue
+
             # Get time-specific values
             sqrt_Sigma_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
             rho_t = rho[t] if time_varying else rho
@@ -638,7 +718,6 @@ def build_aruc_ldr_model(
                 )
 
             # SOC: z_wind[k_wind, t] >= || y_wind[k_wind,t,:] ||_2
-            # Use addConstr with cone constraint: (z, y) in quadratic cone
             m.addConstr(
                 z_wind[k_wind, t] * z_wind[k_wind, t]
                 >= gp.quicksum(

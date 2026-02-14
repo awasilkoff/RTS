@@ -28,6 +28,8 @@ import gurobipy as gp
 
 from models import DAMData
 from aruc_model import build_aruc_ldr_model, align_uncertainty_to_aruc
+from aruc_warm_start import warm_start_aruc_from_dam
+from dam_model import build_dam_model
 from io_rts import build_damdata_from_rts
 from uncertainty_set_provider import UncertaintySetProvider
 
@@ -532,6 +534,20 @@ def run_rts_aruc(
         gurobi_numeric_mode=gurobi_numeric_mode,
         robust_mask=robust_mask,
     )
+
+    # Warm start from a quick DAM solve (~5s) — provides binary commitment
+    # values that give Gurobi a feasible incumbent immediately, avoiding
+    # hours of branch-and-bound with a massive optimality gap.
+    print("  Solving quick DAM for warm start...")
+    dam_model, dam_vars = build_dam_model(data, M_p=m_penalty,
+                                          enforce_lines=enforce_lines)
+    dam_model.Params.OutputFlag = 0
+    dam_model.optimize()
+    if dam_model.Status in [gp.GRB.OPTIMAL, gp.GRB.SUBOPTIMAL]:
+        warm_start_aruc_from_dam(model, vars_dict, dam_vars, data)
+    else:
+        print("  DAM warm start failed, proceeding without warm start")
+
     print("  Model built. Starting optimization...")
 
     model.optimize()

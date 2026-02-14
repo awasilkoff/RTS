@@ -1,12 +1,15 @@
 """
 Warm-starting ARUC-LDR model from deterministic DAM solution.
 
-The key insight: The deterministic DAM solution provides good initial values for:
-- u[i,t], v[i,t], w[i,t]: commitment decisions (binary)
-- p0[i,t]: nominal dispatch (corresponds to DAM's p[i,t])
-- Z[i,t,k]: can be initialized to 0 (no response to uncertainty)
+Strategy: provide ONLY the binary commitment variables (u, v, w) as a MIP
+start.  Gurobi then fixes those binaries and solves the resulting continuous
+SOCP to find optimal p0, Z, and auxiliary variables — producing a feasible,
+high-quality incumbent in seconds rather than hours.
 
-This can significantly reduce solve time, especially for large instances.
+Previous approach (setting p0, Z=0, blocks, slack) was rejected by Gurobi
+because Z=0 makes the wind availability SOC constraints infeasible:
+  (p0 - Pbar) + rho * ||sqrt_Sigma[:, k]|| <= 0
+cannot hold when p0 = Pbar (from DAM) and rho > 0.
 """
 
 from __future__ import annotations
@@ -26,7 +29,11 @@ def warm_start_aruc_from_dam(
     data: DAMData,
 ) -> None:
     """
-    Warm start ARUC model using deterministic DAM solution.
+    Warm start ARUC model using DAM commitment decisions (binaries only).
+
+    Only sets u, v, w Start values.  Gurobi completes the partial MIP start
+    by solving for optimal continuous variables (p0, Z, auxiliaries) with the
+    binaries fixed — a continuous SOCP that solves in seconds.
 
     Parameters
     ----------
@@ -47,56 +54,24 @@ def warm_start_aruc_from_dam(
     dam_u = dam_vars["u"]
     dam_v = dam_vars["v"]
     dam_w = dam_vars["w"]
-    dam_p = dam_vars["p"]
 
     # Get ARUC variables
     aruc_u = aruc_vars["u"]
     aruc_v = aruc_vars["v"]
     aruc_w = aruc_vars["w"]
-    aruc_p0 = aruc_vars["p0"]
-    aruc_Z = aruc_vars["Z"]
 
-    # Count how many start values we set
     n_vars_set = 0
 
-    # Set commitment variables from DAM solution
+    # Only set binary commitment variables — let Gurobi solve for
+    # optimal continuous variables (p0, Z, blocks, slack, auxiliaries)
     for i in range(I):
         for t in range(T):
-            # Binary commitment decisions
             aruc_u[i, t].Start = dam_u[i, t].X
             aruc_v[i, t].Start = dam_v[i, t].X
             aruc_w[i, t].Start = dam_w[i, t].X
             n_vars_set += 3
 
-            # Nominal dispatch
-            aruc_p0[i, t].Start = dam_p[i, t].X
-            n_vars_set += 1
-
-    # Initialize Z to zero (no response to uncertainty in starting point)
-    for key in aruc_Z.keys():
-        aruc_Z[key].Start = 0.0
-        n_vars_set += 1
-
-    # Optionally set slack variables if they exist
-    if "s_p" in aruc_vars and "s_p" in dam_vars:
-        dam_s_p = dam_vars["s_p"]
-        aruc_s_p = aruc_vars["s_p"]
-        for t in range(T):
-            aruc_s_p[t].Start = dam_s_p[t].X
-            n_vars_set += 1
-
-    # Also set p0_block if it exists
-    if "p0_block" in aruc_vars and "p_block" in dam_vars:
-        dam_p_block = dam_vars["p_block"]
-        aruc_p0_block = aruc_vars["p0_block"]
-        B = data.n_blocks
-        for i in range(I):
-            for t in range(T):
-                for b in range(B):
-                    aruc_p0_block[i, t, b].Start = dam_p_block[i, t, b].X
-                    n_vars_set += 1
-
-    print(f"Warm start: set {n_vars_set} variable start values from DAM solution")
+    print(f"Warm start: set {n_vars_set} binary start values from DAM solution")
     aruc_model.update()
 
 

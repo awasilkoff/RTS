@@ -757,6 +757,12 @@ def build_aruc_ldr_model(
     m.Params.ScaleFlag = _nmode["ScaleFlag"]
     m.Params.MIPGap = mip_gap       # Default 0.5% — UC doesn't need 0.01% precision
 
+    # Heuristic tuning for MISOCP — default Gurobi heuristics produce
+    # terrible incumbents for this problem class (SOC + integer).
+    # Spend more effort finding good feasible solutions early.
+    m.Params.Heuristics = 0.2       # 20% of node time on heuristics (default 5%)
+    m.Params.MIPFocus = 1           # Focus on finding feasible solutions quickly
+
     vars_dict: Dict[str, object] = {
         "u": u,
         "v": v,

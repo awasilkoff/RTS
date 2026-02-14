@@ -56,6 +56,7 @@ from compare_aruc_vs_daruc import (
     compute_cost_breakdown,
     _round_commitment,
 )
+from test_daruc_quick import analyze_Z
 
 
 def _unit_hours(u_df: pd.DataFrame, times: list[str]) -> int:
@@ -111,6 +112,74 @@ def generate_npz_for_alpha(
 # ---------------------------------------------------------------------------
 
 
+def _save_alpha_artifacts(
+    alpha: float,
+    out_dir: Path,
+    daruc_out: dict,
+    aruc_out: dict,
+) -> None:
+    """Save per-alpha solve artifacts to labeled subdirectories."""
+    import json
+
+    alpha_dir = out_dir / f"alpha_{alpha:.4f}"
+    dam_dir = alpha_dir / "dam"
+    daruc_dir = alpha_dir / "daruc"
+    aruc_dir = alpha_dir / "aruc"
+    dam_dir.mkdir(parents=True, exist_ok=True)
+    daruc_dir.mkdir(parents=True, exist_ok=True)
+    aruc_dir.mkdir(parents=True, exist_ok=True)
+
+    data = daruc_out["data"]
+    daruc_res = daruc_out["daruc_results"]
+    dam_res = daruc_out["dam_outputs"]["results"]
+    aruc_res = aruc_out["results"]
+
+    # --- DAM ---
+    dam_res["u"].to_csv(dam_dir / "commitment_u.csv")
+    dam_res["p"].to_csv(dam_dir / "dispatch_p0.csv")
+    with open(dam_dir / "summary.json", "w") as f:
+        json.dump({"objective": dam_res["obj"]}, f, indent=2)
+
+    # --- DARUC ---
+    daruc_res["u"].to_csv(daruc_dir / "commitment_u.csv")
+    daruc_res["p0"].to_csv(daruc_dir / "dispatch_p0.csv")
+    daruc_res["Z"].to_csv(daruc_dir / "Z_coefficients.csv")
+    if daruc_out.get("deviation_summary") is not None:
+        daruc_out["deviation_summary"].to_csv(daruc_dir / "deviation_summary.csv", index=False)
+    np.save(daruc_dir / "Sigma.npy", daruc_out["Sigma"])
+    np.save(daruc_dir / "rho.npy", np.atleast_1d(daruc_out["rho"]))
+    try:
+        analyze_Z(daruc_res["Z"], data, daruc_dir, rho=daruc_out["rho"])
+    except Exception:
+        pass  # non-critical
+    with open(daruc_dir / "summary.json", "w") as f:
+        json.dump({
+            "daruc_objective": daruc_res["obj"],
+            "dam_objective": dam_res["obj"],
+            "alpha": alpha,
+            "time_varying": daruc_out.get("time_varying", False),
+        }, f, indent=2)
+
+    # --- ARUC ---
+    aruc_res["u"].to_csv(aruc_dir / "commitment_u.csv")
+    aruc_res["p0"].to_csv(aruc_dir / "dispatch_p0.csv")
+    aruc_res["Z"].to_csv(aruc_dir / "Z_coefficients.csv")
+    np.save(aruc_dir / "Sigma.npy", aruc_out["Sigma"])
+    np.save(aruc_dir / "rho.npy", np.atleast_1d(aruc_out["rho"]))
+    try:
+        analyze_Z(aruc_res["Z"], data, aruc_dir, rho=aruc_out["rho"])
+    except Exception:
+        pass  # non-critical
+    with open(aruc_dir / "summary.json", "w") as f:
+        json.dump({
+            "objective": aruc_res["obj"],
+            "alpha": alpha,
+            "time_varying": aruc_out.get("time_varying", False),
+        }, f, indent=2)
+
+    print(f"  Saved solve artifacts to {alpha_dir}/")
+
+
 def run_alpha_point(
     alpha: float,
     npz_path: Path,
@@ -124,6 +193,7 @@ def run_alpha_point(
     gurobi_numeric_mode: str = "balanced",
     day2_interval_hours: int = 1,
     day1_only_robust: bool = False,
+    out_dir: Path | None = None,
 ) -> dict | None:
     """Run DARUC + ARUC with a given NPZ and return metrics row."""
     print(f"\n{'#' * 70}")
@@ -200,6 +270,10 @@ def run_alpha_point(
         return None
 
     elapsed = time.time() - t0
+
+    # Save solve artifacts to disk
+    if out_dir is not None:
+        _save_alpha_artifacts(alpha, out_dir, daruc_out, aruc_out)
 
     # Mean rho from the NPZ (for reference)
     npz_data = np.load(npz_path)
@@ -608,6 +682,7 @@ def main():
             gurobi_numeric_mode=args.gurobi_numeric_mode,
             day2_interval_hours=args.day2_interval,
             day1_only_robust=args.day1_only_robust,
+            out_dir=out_dir,
         )
         if row is not None:
             rows.append(row)

@@ -477,7 +477,12 @@ def build_aruc_ldr_model(
 
     # Ramps on nominal dispatch (paper formulation uses nominal ramps)
     # dt_ramp = (dt[t-1] + dt[t]) / 2  (transition time between period midpoints)
+    # Skip non-thermal generators: wind/solar/hydro have RU=0 in RTS-GMLC
+    # data, which would lock dispatch to a constant. These generators have
+    # no physical ramp limits.
     for i in range(I):
+        if data.gen_type[i] != "THERMAL":
+            continue
         for t in range(1, T):
             dt_ramp = (dt[t - 1] + dt[t]) / 2.0
             m.addConstr(

@@ -134,6 +134,27 @@ def _load_feature_config(feature_set_dir: Path) -> dict:
         return json.load(f)
 
 
+def _filter_diverged_taus(tau_values, nll_values, *other_arrays, factor=2.0):
+    """Filter out tau values where NLL diverged (> factor * median).
+
+    Very small tau can produce near-singular covariance estimates with
+    pathologically large NLL. This filters those points from charts.
+
+    Returns filtered copies of all input arrays plus the boolean mask.
+    """
+    median_nll = np.median(nll_values)
+    keep = nll_values <= factor * median_nll
+    n_dropped = (~keep).sum()
+    if n_dropped > 0:
+        dropped_taus = tau_values[~keep]
+        print(f"  Divergence filter: dropped {n_dropped} tau(s) {dropped_taus.tolist()} "
+              f"(NLL > {factor}x median {median_nll:.1f})")
+    result = [tau_values[keep], nll_values[keep]]
+    for arr in other_arrays:
+        result.append(arr[keep])
+    return tuple(result)
+
+
 def _load_knn_sweep() -> pd.DataFrame:
     """Load k-NN sweep results."""
     csv_path = KNN_SWEEP_DIR / "knn_k_sweep_summary.csv"
@@ -709,6 +730,11 @@ def fig4_nll_vs_tau(
         nll_min = stats["val_nll_min"].values
         nll_max = stats["val_nll_max"].values
 
+        # Filter diverged taus (very small tau → near-singular covariance)
+        tau_values, nll_mean, nll_std, nll_min, nll_max = _filter_diverged_taus(
+            tau_values, nll_mean, nll_std, nll_min, nll_max
+        )
+
         fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, 2.5))
 
         # Mean line with markers
@@ -756,6 +782,12 @@ def fig4_nll_vs_tau(
         df_filtered = df[df["scaler_type"] == best_scaler].copy()
         tau_nll = df_filtered.groupby("tau")["val_nll_learned"].min().reset_index()
         tau_nll = tau_nll.sort_values("tau")
+
+        # Filter diverged taus
+        _tau_arr = tau_nll["tau"].values
+        _nll_arr = tau_nll["val_nll_learned"].values
+        _tau_arr, _nll_arr = _filter_diverged_taus(_tau_arr, _nll_arr)
+        tau_nll = pd.DataFrame({"tau": _tau_arr, "val_nll_learned": _nll_arr})
 
         fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, 2.5))
 
@@ -932,6 +964,11 @@ def fig3b_4b_hyperparameter_sweeps(
         tau_vals = df_filt["tau"].values
         nll_mean_tau = df_filt["val_nll_learned"].values
         nll_std_tau = np.zeros_like(nll_mean_tau)
+
+    # Filter diverged taus
+    tau_vals, nll_mean_tau, nll_std_tau = _filter_diverged_taus(
+        tau_vals, nll_mean_tau, nll_std_tau
+    )
 
     ax_tau.plot(
         tau_vals,
@@ -2096,6 +2133,11 @@ def fig11_tau_sweep_unconstrained(
     nll_knn = df_filtered["val_nll_euclidean_knn"].values
     nll_global = df_filtered["val_nll_global"].values
 
+    # Filter diverged taus
+    tau_values, nll_learned, nll_knn, nll_global = _filter_diverged_taus(
+        tau_values, nll_learned, nll_knn, nll_global
+    )
+
     fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, 2.5))
 
     # Learned omega curve
@@ -2249,6 +2291,14 @@ def table_nll_vs_tau(
         output_path = OUTPUT_DIR / "tables" / "tab_nll_vs_tau.tex"
 
     df = _load_sweep_results(feature_set_dir)
+
+    # Filter diverged configs
+    if "diverged" in df.columns:
+        df = df[~df["diverged"]].copy()
+    else:
+        # Fallback: apply median-based filter
+        median_nll = df["val_nll_learned"].median()
+        df = df[df["val_nll_learned"] <= 2.0 * median_nll].copy()
 
     # Get unique tau values
     tau_values = sorted(df["tau"].unique())

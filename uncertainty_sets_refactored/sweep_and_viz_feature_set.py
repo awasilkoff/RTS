@@ -374,13 +374,36 @@ def run_sweep(
             f"win%: {pct_better_kernel:.0f}/{pct_better_euclidean:.0f}/{pct_better_global:.0f}"
         )
 
-    # Find best configuration (sort by improvement vs kernel equal weights)
-    sweep_df = pd.DataFrame(rows).sort_values(
-        "nll_improvement_vs_kernel", ascending=False
-    )
+    # Build results DataFrame
+    sweep_df = pd.DataFrame(rows)
 
-    best_row_idx = 0  # Rank in sorted dataframe
-    best_row = sweep_df.iloc[0]
+    # Divergence filter: exclude configs where learned NLL > 2x global baseline.
+    # Very small tau can cause near-singular covariance estimates, producing
+    # pathologically large NLL (e.g. 3000+ vs ~13 for sane configs).
+    global_nll_ref = sweep_df["val_nll_global"].median()
+    divergence_threshold = 2.0 * global_nll_ref
+    diverged_mask = sweep_df["val_nll_learned"] > divergence_threshold
+    n_diverged = diverged_mask.sum()
+    if n_diverged > 0:
+        diverged_taus = sweep_df.loc[diverged_mask, "tau"].unique()
+        print(
+            f"\n  Divergence filter: excluding {n_diverged} config(s) "
+            f"with val_nll > {divergence_threshold:.1f} "
+            f"(2x global baseline {global_nll_ref:.1f}). "
+            f"Diverged taus: {sorted(diverged_taus)}"
+        )
+    sweep_df["diverged"] = diverged_mask
+
+    # Select best from non-diverged configs by lowest absolute validation NLL
+    sane_df = sweep_df[~diverged_mask].copy()
+    if len(sane_df) == 0:
+        print("  WARNING: all configs diverged! Falling back to full sweep_df.")
+        sane_df = sweep_df.copy()
+    sane_df = sane_df.sort_values("val_nll_learned", ascending=True)
+    best_row = sane_df.iloc[0]
+    # Re-sort full sweep_df by val_nll_learned for output
+    sweep_df = sweep_df.sort_values("val_nll_learned", ascending=True).reset_index(drop=True)
+    best_row_idx = 0  # Best non-diverged is first after ascending sort
 
     # Reconstruct best omega (strict regex to avoid matching omega_l2_reg)
     omega_cols = [c for c in sweep_df.columns if re.match(r"^omega_\d+_", c)]

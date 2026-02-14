@@ -1,0 +1,859 @@
+%% bare_jrnl.tex
+%% V1.4b
+%% 2015/08/26
+%% by Michael Shell
+%% see http://www.michaelshell.org/
+%% for current contact information.
+%%
+%% This is a skeleton file demonstrating the use of IEEEtran.cls
+%% (requires IEEEtran.cls version 1.8b or later) with an IEEE
+%% journal paper.
+%%
+%% Support sites:
+%% http://www.michaelshell.org/tex/ieeetran/
+%% http://www.ctan.org/pkg/ieeetran
+%% and
+%% http://www.ieee.org/
+
+%%*************************************************************************
+%% Legal Notice:
+%% This code is offered as-is without any warranty either expressed or
+%% implied; without even the implied warranty of MERCHANTABILITY or
+%% FITNESS FOR A PARTICULAR PURPOSE!
+%% User assumes all risk.
+%% In no event shall the IEEE or any contributor to this code be liable for
+%% any damages or losses, including, but not limited to, incidental,
+%% consequential, or any other damages, resulting from the use or misuse
+%% of any information contained here.
+%%
+%% All comments are the opinions of their respective authors and are not
+%% necessarily endorsed by the IEEE.
+%%
+%% This work is distributed under the LaTeX Project Public License (LPPL)
+%% ( http://www.latex-project.org/ ) version 1.3, and may be freely used,
+%% distributed and modified. A copy of the LPPL, version 1.3, is included
+%% in the base LaTeX documentation of all distributions of LaTeX released
+%% 2003/12/01 or later.
+%% Retain all contribution notices and credits.
+%% ** Modified files should be clearly indicated as such, including  **
+%% ** renaming them and changing author support contact information. **
+%%*************************************************************************
+
+
+% *** Authors should verify (and, if needed, correct) their LaTeX system  ***
+% *** with the testflow diagnostic prior to trusting their LaTeX platform ***
+% *** with production work. The IEEE's font choices and paper sizes can   ***
+% *** trigger bugs that do not appear when using other class files.       ***                          ***
+% The testflow support page is at:
+% http://www.michaelshell.org/tex/testflow/
+
+
+
+\documentclass[journal]{IEEEtran}
+%
+% If IEEEtran.cls has not been installed into the LaTeX system files,
+% manually specify the path to it like:
+% \documentclass[journal]{../sty/IEEEtran}
+
+
+
+
+
+% Some very useful LaTeX packages include:
+% (uncomment the ones you want to load)
+
+
+% *** MISC UTILITY PACKAGES ***
+%
+%\usepackage{ifpdf}
+% Heiko Oberdiek's ifpdf.sty is very useful if you need conditional
+% compilation based on whether the output is pdf or dvi.
+% usage:
+% \ifpdf
+%   % pdf code
+% \else
+%   % dvi code
+% \fi
+% The latest version of ifpdf.sty can be obtained from:
+% http://www.ctan.org/pkg/ifpdf
+% Also, note that IEEEtran.cls V1.7 and later provides a builtin
+% \ifCLASSINFOpdf conditional that works the same way.
+% When switching from latex to pdflatex and vice-versa, the compiler may
+% have to be run twice to clear warning/error messages.
+
+
+
+
+
+
+% *** CITATION PACKAGES ***
+%
+%\usepackage{cite}
+% cite.sty was written by Donald Arseneau
+% V1.6 and later of IEEEtran pre-defines the format of the cite.sty package
+% \cite{} output to follow that of the IEEE. Loading the cite package will
+% result in citation numbers being automatically sorted and properly
+% "compressed/ranged". e.g., [1], [9], [2], [7], [5], [6] without using
+% cite.sty will become [1], [2], [5]--[7], [9] using cite.sty. cite.sty's
+% \cite will automatically add leading space, if needed. Use cite.sty's
+% noadjust option (cite.sty V3.8 and later) if you want to turn this off
+% such as if a citation ever needs to be enclosed in parenthesis.
+% cite.sty is already installed on most LaTeX systems. Be sure and use
+% version 5.0 (2009-03-20) and later if using hyperref.sty.
+% The latest version can be obtained at:
+% http://www.ctan.org/pkg/cite
+% The documentation is contained in the cite.sty file itself.
+
+
+
+
+
+
+% *** GRAPHICS RELATED PACKAGES ***
+%
+\ifCLASSINFOpdf
+  % \usepackage[pdftex]{graphicx}
+  % declare the path(s) where your graphic files are
+  % \graphicspath{{../pdf/}{../jpeg/}}
+  % and their extensions so you won't have to specify these with
+  % every instance of \includegraphics
+  % \DeclareGraphicsExtensions{.pdf,.jpeg,.png}
+\else
+  % or other class option (dvipsone, dvipdf, if not using dvips). graphicx
+  % will default to the driver specified in the system graphics.cfg if no
+  % driver is specified.
+  % \usepackage[dvips]{graphicx}
+  % declare the path(s) where your graphic files are
+  % \graphicspath{{../eps/}}
+  % and their extensions so you won't have to specify these with
+  % every instance of \includegraphics
+  % \DeclareGraphicsExtensions{.eps}
+\fi
+% graphicx was written by David Carlisle and Sebastian Rahtz. It is
+% required if you want graphics, photos, etc. graphicx.sty is already
+% installed on most LaTeX systems. The latest version and documentation
+% can be obtained at:
+% http://www.ctan.org/pkg/graphicx
+% Another good source of documentation is "Using Imported Graphics in
+% LaTeX2e" by Keith Reckdahl which can be found at:
+% http://www.ctan.org/pkg/epslatex
+%
+% latex, and pdflatex in dvi mode, support graphics in encapsulated
+% postscript (.eps) format. pdflatex in pdf mode supports graphics
+% in .pdf, .jpeg, .png and .mps (metapost) formats. Users should ensure
+% that all non-photo figures use a vector format (.eps, .pdf, .mps) and
+% not a bitmapped formats (.jpeg, .png). The IEEE frowns on bitmapped formats
+% which can result in "jaggedy"/blurry rendering of lines and letters as
+% well as large increases in file sizes.
+%
+% You can find documentation about the pdfTeX application at:
+% http://www.tug.org/applications/pdftex
+
+
+
+
+
+% *** MATH PACKAGES ***
+%
+\usepackage{amsmath}
+% A popular package from the American Mathematical Society that provides
+% many useful and powerful commands for dealing with mathematics.
+%
+% Note that the amsmath package sets \interdisplaylinepenalty to 10000
+% thus preventing page breaks from occurring within multiline equations. Use:
+\interdisplaylinepenalty=2500
+% after loading amsmath to restore such page breaks as IEEEtran.cls normally
+% does. amsmath.sty is already installed on most LaTeX systems. The latest
+% version and documentation can be obtained at:
+% http://www.ctan.org/pkg/amsmath
+
+
+
+
+
+% *** SPECIALIZED LIST PACKAGES ***
+%
+%\usepackage{algorithmic}
+% algorithmic.sty was written by Peter Williams and Rogerio Brito.
+% This package provides an algorithmic environment fo describing algorithms.
+% You can use the algorithmic environment in-text or within a figure
+% environment to provide for a floating algorithm. Do NOT use the algorithm
+% floating environment provided by algorithm.sty (by the same authors) or
+% algorithm2e.sty (by Christophe Fiorio) as the IEEE does not use dedicated
+% algorithm float types and packages that provide these will not provide
+% correct IEEE style captions. The latest version and documentation of
+% algorithmic.sty can be obtained at:
+% http://www.ctan.org/pkg/algorithms
+% Also of interest may be the (relatively newer and more customizable)
+% algorithmicx.sty package by Szasz Janos:
+% http://www.ctan.org/pkg/algorithmicx
+
+
+
+
+% *** ALIGNMENT PACKAGES ***
+%
+%\usepackage{array}
+% Frank Mittelbach's and David Carlisle's array.sty patches and improves
+% the standard LaTeX2e array and tabular environments to provide better
+% appearance and additional user controls. As the default LaTeX2e table
+% generation code is lacking to the point of almost being broken with
+% respect to the quality of the end results, all users are strongly
+% advised to use an enhanced (at the very least that provided by array.sty)
+% set of table tools. array.sty is already installed on most systems. The
+% latest version and documentation can be obtained at:
+% http://www.ctan.org/pkg/array
+
+
+% IEEEtran contains the IEEEeqnarray family of commands that can be used to
+% generate multiline equations as well as matrices, tables, etc., of high
+% quality.
+
+
+
+
+% *** SUBFIGURE PACKAGES ***
+%\ifCLASSOPTIONcompsoc
+%  \usepackage[caption=false,font=normalsize,labelfont=sf,textfont=sf]{subfig}
+%\else
+%  \usepackage[caption=false,font=footnotesize]{subfig}
+%\fi
+% subfig.sty, written by Steven Douglas Cochran, is the modern replacement
+% for subfigure.sty, the latter of which is no longer maintained and is
+% incompatible with some LaTeX packages including fixltx2e. However,
+% subfig.sty requires and automatically loads Axel Sommerfeldt's caption.sty
+% which will override IEEEtran.cls' handling of captions and this will result
+% in non-IEEE style figure/table captions. To prevent this problem, be sure
+% and invoke subfig.sty's "caption=false" package option (available since
+% subfig.sty version 1.3, 2005/06/28) as this is will preserve IEEEtran.cls
+% handling of captions.
+% Note that the Computer Society format requires a larger sans serif font
+% than the serif footnote size font used in traditional IEEE formatting
+% and thus the need to invoke different subfig.sty package options depending
+% on whether compsoc mode has been enabled.
+%
+% The latest version and documentation of subfig.sty can be obtained at:
+% http://www.ctan.org/pkg/subfig
+
+
+
+
+% *** FLOAT PACKAGES ***
+%
+%\usepackage{fixltx2e}
+% fixltx2e, the successor to the earlier fix2col.sty, was written by
+% Frank Mittelbach and David Carlisle. This package corrects a few problems
+% in the LaTeX2e kernel, the most notable of which is that in current
+% LaTeX2e releases, the ordering of single and double column floats is not
+% guaranteed to be preserved. Thus, an unpatched LaTeX2e can allow a
+% single column figure to be placed prior to an earlier double column
+% figure.
+% Be aware that LaTeX2e kernels dated 2015 and later have fixltx2e.sty's
+% corrections already built into the system in which case a warning will
+% be issued if an attempt is made to load fixltx2e.sty as it is no longer
+% needed.
+% The latest version and documentation can be found at:
+% http://www.ctan.org/pkg/fixltx2e
+
+
+%\usepackage{stfloats}
+% stfloats.sty was written by Sigitas Tolusis. This package gives LaTeX2e
+% the ability to do double column floats at the bottom of the page as well
+% as the top. (e.g., "\begin{figure*}[!b]" is not normally possible in
+% LaTeX2e). It also provides a command:
+%\fnbelowfloat
+% to enable the placement of footnotes below bottom floats (the standard
+% LaTeX2e kernel puts them above bottom floats). This is an invasive package
+% which rewrites many portions of the LaTeX2e float routines. It may not work
+% with other packages that modify the LaTeX2e float routines. The latest
+% version and documentation can be obtained at:
+% http://www.ctan.org/pkg/stfloats
+% Do not use the stfloats baselinefloat ability as the IEEE does not allow
+% \baselineskip to stretch. Authors submitting work to the IEEE should note
+% that the IEEE rarely uses double column equations and that authors should try
+% to avoid such use. Do not be tempted to use the cuted.sty or midfloat.sty
+% packages (also by Sigitas Tolusis) as the IEEE does not format its papers in
+% such ways.
+% Do not attempt to use stfloats with fixltx2e as they are incompatible.
+% Instead, use Morten Hogholm'a dblfloatfix which combines the features
+% of both fixltx2e and stfloats:
+%
+% \usepackage{dblfloatfix}
+% The latest version can be found at:
+% http://www.ctan.org/pkg/dblfloatfix
+
+
+
+
+%\ifCLASSOPTIONcaptionsoff
+%  \usepackage[nomarkers]{endfloat}
+% \let\MYoriglatexcaption\caption
+% \renewcommand{\caption}[2][\relax]{\MYoriglatexcaption[#2]{#2}}
+%\fi
+% endfloat.sty was written by James Darrell McCauley, Jeff Goldberg and
+% Axel Sommerfeldt. This package may be useful when used in conjunction with
+% IEEEtran.cls'  captionsoff option. Some IEEE journals/societies require that
+% submissions have lists of figures/tables at the end of the paper and that
+% figures/tables without any captions are placed on a page by themselves at
+% the end of the document. If needed, the draftcls IEEEtran class option or
+% \CLASSINPUTbaselinestretch interface can be used to increase the line
+% spacing as well. Be sure and use the nomarkers option of endfloat to
+% prevent endfloat from "marking" where the figures would have been placed
+% in the text. The two hack lines of code above are a slight modification of
+% that suggested by in the endfloat docs (section 8.4.1) to ensure that
+% the full captions always appear in the list of figures/tables - even if
+% the user used the short optional argument of \caption[]{}.
+% IEEE papers do not typically make use of \caption[]'s optional argument,
+% so this should not be an issue. A similar trick can be used to disable
+% captions of packages such as subfig.sty that lack options to turn off
+% the subcaptions:
+% For subfig.sty:
+% \let\MYorigsubfloat\subfloat
+% \renewcommand{\subfloat}[2][\relax]{\MYorigsubfloat[]{#2}}
+% However, the above trick will not work if both optional arguments of
+% the \subfloat command are used. Furthermore, there needs to be a
+% description of each subfigure *somewhere* and endfloat does not add
+% subfigure captions to its list of figures. Thus, the best approach is to
+% avoid the use of subfigure captions (many IEEE journals avoid them anyway)
+% and instead reference/explain all the subfigures within the main caption.
+% The latest version of endfloat.sty and its documentation can obtained at:
+% http://www.ctan.org/pkg/endfloat
+%
+% The IEEEtran \ifCLASSOPTIONcaptionsoff conditional can also be used
+% later in the document, say, to conditionally put the References on a
+% page by themselves.
+
+
+
+
+% *** PDF, URL AND HYPERLINK PACKAGES ***
+%
+%\usepackage{url}
+% url.sty was written by Donald Arseneau. It provides better support for
+% handling and breaking URLs. url.sty is already installed on most LaTeX
+% systems. The latest version and documentation can be obtained at:
+% http://www.ctan.org/pkg/url
+% Basically, \url{my_url_here}.
+
+
+
+
+% *** Do not adjust lengths that control margins, column widths, etc. ***
+% *** Do not use packages that alter fonts (such as pslatex).         ***
+% There should be no need to do such things with IEEEtran.cls V1.6 and later.
+% (Unless specifically asked to do so by the journal or conference you plan
+% to submit to, of course. )
+
+
+% correct bad hyphenation here
+\hyphenation{op-tical net-works semi-conduc-tor}
+
+
+\begin{document}
+%
+% paper title
+% Titles are generally capitalized except for words such as a, an, and, as,
+% at, but, by, for, in, nor, of, on, or, the, to and up, which are usually
+% not capitalized unless they are the first or last word of the title.
+% Linebreaks \\ can be used within to get better formatting as desired.
+% Do not put math or special symbols in the title.
+\title{Bare Demo of IEEEtran.cls\\ for IEEE Journals}
+%
+%
+% author names and IEEE memberships
+% note positions of commas and nonbreaking spaces ( ~ ) LaTeX will not break
+% a structure at a ~ so this keeps an author's name from being broken across
+% two lines.
+% use \thanks{} to gain access to the first footnote area
+% a separate \thanks must be used for each paragraph as LaTeX2e's \thanks
+% was not built to handle multiple paragraphs
+%
+
+\author{Michael~Shell,~\IEEEmembership{Member,~IEEE,}
+        John~Doe,~\IEEEmembership{Fellow,~OSA,}
+        and~Jane~Doe,~\IEEEmembership{Life~Fellow,~IEEE}% <-this % stops a space
+\thanks{M. Shell was with the Department
+of Electrical and Computer Engineering, Georgia Institute of Technology, Atlanta,
+GA, 30332 USA e-mail: (see http://www.michaelshell.org/contact.html).}% <-this % stops a space
+\thanks{J. Doe and J. Doe are with Anonymous University.}% <-this % stops a space
+\thanks{Manuscript received April 19, 2005; revised August 26, 2015.}}
+
+% note the % following the last \IEEEmembership and also \thanks -
+% these prevent an unwanted space from occurring between the last author name
+% and the end of the author line. i.e., if you had this:
+%
+% \author{....lastname \thanks{...} \thanks{...} }
+%                     ^------------^------------^----Do not want these spaces!
+%
+% a space would be appended to the last name and could cause every name on that
+% line to be shifted left slightly. This is one of those "LaTeX things". For
+% instance, "\textbf{A} \textbf{B}" will typeset as "A B" not "AB". To get
+% "AB" then you have to do: "\textbf{A}\textbf{B}"
+% \thanks is no different in this regard, so shield the last } of each \thanks
+% that ends a line with a % and do not let a space in before the next \thanks.
+% Spaces after \IEEEmembership other than the last one are OK (and needed) as
+% you are supposed to have spaces between the names. For what it is worth,
+% this is a minor point as most people would not even notice if the said evil
+% space somehow managed to creep in.
+
+
+
+% The paper headers
+\markboth{Journal of \LaTeX\ Class Files,~Vol.~14, No.~8, August~2015}%
+{Shell \MakeLowercase{\textit{et al.}}: Bare Demo of IEEEtran.cls for IEEE Journals}
+% The only time the second header will appear is for the odd numbered pages
+% after the title page when using the twoside option.
+%
+% *** Note that you probably will NOT want to include the author's ***
+% *** name in the headers of peer review papers.                   ***
+% You can use \ifCLASSOPTIONpeerreview for conditional compilation here if
+% you desire.
+
+
+
+
+% If you want to put a publisher's ID mark on the page you can do it like
+% this:
+%\IEEEpubid{0000--0000/00\$00.00~\copyright~2015 IEEE}
+% Remember, if you use this you must call \IEEEpubidadjcol in the second
+% column for its text to clear the IEEEpubid mark.
+
+
+
+% use for special paper notices
+%\IEEEspecialpapernotice{(Invited Paper)}
+
+
+
+
+% make the title area
+\maketitle
+
+% As a general rule, do not put math, special symbols or citations
+% in the abstract or keywords.
+\begin{abstract}
+The abstract goes here.
+\end{abstract}
+
+% Note that keywords are not normally used for peerreview papers.
+\begin{IEEEkeywords}
+IEEE, IEEEtran, journal, \LaTeX, paper, template.
+\end{IEEEkeywords}
+
+
+
+
+
+
+% For peer review papers, you can put extra information on the cover
+% page as needed:
+% \ifCLASSOPTIONpeerreview
+% \begin{center} \bfseries EDICS Category: 3-BBND \end{center}
+% \fi
+%
+% For peerreview papers, this IEEEtran command inserts a page break and
+% creates the second title. It will be ignored for other modes.
+\IEEEpeerreviewmaketitle
+
+
+
+\section{Introduction}
+\IEEEPARstart{R}{eliability} processes are required in power system
+operations due to a
+fundamental market failure in the provision of reliability. To address
+this, system operators routinely commit generation resources outside of
+the energy market through reliability-driven commitment actions.
+While effective in preserving system feasibility, empirical evidence,
+and operational experience indicate that the heuristics used to trigger
+these commitments are often overly conservative, leading to systematic
+over-commitment and distortion of price signals in both the day-ahead
+and real-time markets.
+
+Motivated by this gap, this work proposes a robust optimization
+framework to identify the minimal set of generation commitment decisions
+that are strictly necessary prior to the next day-ahead market clearing
+to ensure system reliability. Rather than optimizing all commitment and
+dispatch decisions under uncertainty, the proposed methodology focuses
+exclusively on commitment decisions that cannot be deferred without
+risking infeasibility under adverse realizations of load and renewable
+generation.
+
+System reliability is enforced with respect to a worst-case forecast
+model of net demand, capturing uncertainty in both load and renewable
+production. Commitment decisions are selected so as to guarantee
+feasibility for all realizations within this uncertainty set, while
+minimizing the extent of out-of-market intervention. In this sense, the
+resulting commitments may be interpreted as the least-distortionary
+reliability actions, providing a principled defense of operator
+interventions while preserving market signals to the greatest extent
+possible.
+\subsection{Contributions}
+This paper makes the following contributions. First, we develop a
+notification-gated formulation for reliability unit commitment that
+explicitly models the interaction between physical generator lead times
+and the sequencing of market and operational decision processes. The
+proposed framework identifies the subset of commitment decisions that
+cannot be deferred to subsequent market stages and restricts out-of-
+market interventions to this non-deferrable decision set.
+
+Second, we introduce a minimal-intervention reliability objective that
+minimizes only startup actions and associated no-load costs induced by
+non-deferrable commitments. This objective decouples reliability
+enforcement from full economic re-optimization, thereby preserving
+market-based commitment and dispatch outcomes while ensuring worst-case
+feasibility under uncertainty.
+
+Third, we demonstrate that the proposed formulation generalizes
+naturally across operational horizons, including multi-day reliability
+assessment and day-ahead reliability unit commitment, enabling
+coordinated treatment of long-lead thermal resources and near-term
+reliability adjustments within a unified optimization framework.
+
+Fourth, we conduct a comprehensive numerical evaluation comparing the
+proposed approach against standard reliability unit commitment and
+integrated market-reliability formulations. Results show significant
+reductions in early commitment interventions and redispatch magnitude
+without compromising system reliability.
+
+\section{Current Practice}
+While all system operators have their own idiosyncracies,
+the North American RTOs have certain schematic similarities in their
+sequence of decision processes. For this work, we will focus on the
+pattern in use by Southwest Power Pool (SPP), but the outline applies
+to most of the other system operators with the notable exception of
+NYISO which integrates the DARUC and DAMKT clearing.
+
+For a given operating day, the operational planning sequnce begins
+with an advisory multi-day reliability-assessment. This decision
+process has a horizon of four to seven days.
+
+\subsection{DAMKT}
+\begin{align*}
+&\underset{ \mathbf {p}, \mathbf {u}, \mathbf {v}, \mathbf {w}, \mathbf {s}}{ \min } f = \sum _{i, t} \Bigg[ C_{i}^{NL}u_{i,t} + C_{i}^{SU} v_{i,t} + C_{i}^{SD} w_{i,t} \\
+&+ \sum _b \left(C_{i,b}^p \, p_{i,t,b} \right) \Bigg] + \sum _{t} \left(M^p s_t^{p} \right), \tag{18a} \\
+&\text{subject to: } \qquad \sum _{i} p_{i,t} + s_t^{p} = \sum_n{d_{n,t}}, \quad \forall t, \qquad \tag{18b} \\
+&-\bar{F}^l \leq \sum_n s_n^l (\sum_{i\in\mathcal{I}_n}p_{i,t} - d_{n,t}) \leq \bar{F}^l, \quad \forall l,t \tag{18c}\\
+&p_{i,t,b} \leq {\bar{P}}_{i,b} \, u_{i,t}, \, \, \forall i,t,b, \quad p_{i,t} = \sum _{b} p_{i,t,b}, \quad \forall i,t, \tag{18d} \\
+& p_{j,t} \leq \bar{p}^{forecast}_{j,t}, \quad \forall j,t\\
+&{\underline{P}}_i \, u_{i,t} \leq p_{i,t} \leq {\bar{P}}_i \, u_{i,t}, \quad \forall i,t, \tag{18e} \\
+&p_{i,t} - p_{i,t-1} \leq R_i^U( u_{i,t-1} + v_{i,t}), \quad \forall i, t, \tag{18f} \\
+&p_{i,t-1} - p_{i,t} \leq R_i^D( u_{i,t} + w_{i,t}), \quad \forall i, t, \tag{18g} \\
+&u_{i,t} - u_{i,t-1} = v_{i,t} - w_{i,t}, \quad \forall i, t, \tag{18h} \\
+&\sum _{t^{\prime } = t - {MUT}_i + 1}^t v_{i,t^{\prime }} \leq u_{i,t}, \quad \forall i, t = [MUT_i, T], \tag{18i} \\
+&\sum _{t^{\prime } = t - {MDT}_i + 1}^t w_{i,t^{\prime }} \leq 1 - u_{i,t}, \quad \forall i, t = [MDT_i, T], \tag{18j} \\
+&\sum _{t^{\prime } = 1}^{UT_i} u_{i,t^{\prime }} = UT_i, \quad \sum _{t^{\prime } = 1}^{DT_i} u_{i,t^{\prime }} = 0, \quad \forall i, \tag{18k}\\
+&\mathbf {p}, \mathbf {s}, \geq 0 \\
+&\mathbf {u'},\mathbf {u},\mathbf {v}, \mathbf {w} \in \{0,1\}
+\end{align*}
+\subsection{DARUC}
+\begin{align*}
+&\underset{ \mathbf {p}, \mathbf {u}, \mathbf {v}, \mathbf {w}, \mathbf {s}}{ \min } f = \sum _{i, t} \Bigg[ C_{i}^{NL}u_{i,t} + C_{i}^{SU} v_{i,t} + C_{i}^{SD} w_{i,t} \Bigg]  \\
+&+ \sum _{t} \left(M^p s_t^{p} \right), \tag{18a} \\
+&\text{subject to: } \qquad \sum _{i} p_{i,t} + s_t^{p} = \sum_n{d_{n,t}}, \quad \forall t, \qquad \tag{18b} \\
+&-\bar{F}^l \leq \sum_n s_n^l (\sum_{i\in\mathcal{I}_n}p_{i,t} - d_{n,t}) \leq \bar{F}^l, \quad \forall l,t \tag{18c}\\
+&p_{i,t,b} \leq {\bar{P}}_{i,b} \, u_{i,t}, \, \, \forall i,t,b, \quad p_{i,t} = \sum _{b} p_{i,t,b}, \quad \forall i,t, \tag{18d} \\
+& p_{j,t} \leq \bar{p}^{forecast}_{j,t}, \quad \forall j,t\\
+&{\underline{P}}_i \, u_{i,t} \leq p_{i,t} \leq {\bar{P}}_i \, u_{i,t}, \quad \forall i,t, \tag{18e} \\
+&p_{i,t} - p_{i,t-1} \leq R_i^U( u_{i,t-1} + v_{i,t}), \quad \forall i, t, \tag{18f} \\
+&p_{i,t-1} - p_{i,t} \leq R_i^D( u_{i,t} + w_{i,t}), \quad \forall i, t, \tag{18g} \\
+&u_{i,t} - u_{i,t-1} = v_{i,t} - w_{i,t}, \quad \forall i, t, \tag{18h} \\
+&\sum _{t^{\prime } = t - {MUT}_i + 1}^t v_{i,t^{\prime }} \leq u_{i,t}, \quad \forall i, t = [MUT_i, T], \tag{18i} \\
+&\sum _{t^{\prime } = t - {MDT}_i + 1}^t w_{i,t^{\prime }} \leq 1 - u_{i,t}, \quad \forall i, t = [MDT_i, T], \tag{18j} \\
+&\sum _{t^{\prime } = 1}^{UT_i} u_{i,t^{\prime }} = UT_i, \quad \sum _{t^{\prime } = 1}^{DT_i} u_{i,t^{\prime }} = 0, \quad \forall i, \tag{18k}\\
+&\mathbf {p}, \mathbf {s}, \geq 0 \\
+&\mathbf {u'},\mathbf {u},\mathbf {v}, \mathbf {w} \in \{0,1\}
+\end{align*}
+\section{Least-Distortional RUC}
+\subsection{Description of Timeline}
+For this work, we focus on the timeline present in SPP's
+operations which are characteristic of most North American
+system operator practices.
+For notational clarity, we refer the Operating Day (OD) as
+the day for which the operation plan is being generated.
+The principle scheduling process, the Day-Ahead Market (DAMKT)
+finishes solving around noon of OD-1. Decisions of that process
+are communicated at 2 pm OD-1. The DA-RUC process follows this
+at 5 pm. The DARUC would consider a decision horizon of the
+OD and OD+1.
+
+For the multi-day reliability
+
+\subsection{Define Gating Set}
+The core idea of this section is that the notification (lead) time of a
+generating unit determines which commitment decisions must be finalized
+at the current decision stage and which can be deferred to subsequent
+market or operational processes. Commitment decisions should be made
+binding only when deferral would violate physical feasibility.
+
+Let decision process $k$ represent the current reliability or market
+commitment stage (e.g., MDRA, DA-RUC, ID-RUC), and let $t^{\text{next}}$
+denote the first operating period whose commitment decisions can be
+modified by the next available process. Let $t\in\mathcal{T}^k=1,\dots,T$
+index the physical operating periods in the look-ahead horizon
+considered at stage $k$.
+
+For a generating resource $i$ with startup notification (lead) time
+$L_i^{SU}$, a startup decision affecting operating period
+$t$ must be issued at the current stage if it cannot be deferred to the next process. This condition is expressed by the following gating set:
+\begin{equation}
+    \mathcal{T}_{i}^{\text{start}} :=
+    \{ t \in \mathcal{T}^k \;|\; t - L_i^{SU} < t^{\text{next}}\} .
+\end{equation}
+
+Periods belonging to $\mathcal{T}_{i}^{\text{start}}$ correspond to
+startup decisions that must be initiated prior to the next commitment
+process in order to preserve feasibility. Startup decisions outside this
+set may be deferred and are therefore excluded from the current
+reliability optimization.
+
+Should we address the continuation of commitments?
+
+Using these gating sets, we can formulate the reliability
+optimizations to only include as costs those decisions which must
+be taken in this decision process.We gate only startup decisions, since
+these represent the discrete, non-deferrable interventions taken outside
+the market. No-load costs are included only insofar as they are incurred
+as a consequence of these gated startups over the period in which the
+commitment cannot be revisited by subsequent market processes.
+
+\begin{align}
+\min_{\hat{\mathbf{u}},\hat{\mathbf{v}}}\quad
+&\sum_{i\in\mathcal{I}}\sum_{t\in\mathcal{T}_i^{\text{start}}}
+\left( C_i^{SU}\hat v_{i,t} + C_i^{NL}\hat u_{i,t}\right) \label{eq:gate_obj}\\
+\text{s.t.}\quad
+&\text{DAMKT feasibility constraints } \nonumber\\
+&u_{i,t} = u^m_{i,t} + u'_{i,t},\quad
+v_{i,t} = v^m_{i,t} +  v'_{i,t}, \quad \forall i,t \nonumber\\
+&u'_{i,t} \le 1-u^m_{i,t},\quad v'_{i,t}\le 1-v^m_{i,t}, \quad \forall i,t \nonumber\\
+& u'_{i,t},v'_{i,t} \in \{0,1\}, \quad \forall i,t. \nonumber
+\end{align}
+\begin{align}
+\min_{\hat{\mathbf{u}},\hat{\mathbf{v}}}\quad
+&\sum_{i\in\mathcal{I}}\sum_{t\in\mathcal{T}_i^{\text{start}}}
+\left(
+C_i^{SU}\hat v_{i,t}
++
+\sum_{\tau=t}^{\min\{t+H_i-1,\,T\}} C_i^{NL}\hat v_{i,t}
+\right) \label{eq:gate_obj_window}
+\end{align}
+
+% An example of a floating figure using the graphicx package.
+% Note that \label must occur AFTER (or within) \caption.
+% For figures, \caption should occur after the \includegraphics.
+% Note that IEEEtran v1.7 and later has special internal code that
+% is designed to preserve the operation of \label within \caption
+% even when the captionsoff option is in effect. However, because
+% of issues like this, it may be the safest practice to put all your
+% \label just after \caption rather than within \caption{}.
+%
+% Reminder: the "draftcls" or "draftclsnofoot", not "draft", class
+% option should be used if it is desired that the figures are to be
+% displayed while in draft mode.
+%
+%\begin{figure}[!t]
+%\centering
+%\includegraphics[width=2.5in]{myfigure}
+% where an .eps filename suffix will be assumed under latex,
+% and a .pdf suffix will be assumed for pdflatex; or what has been declared
+% via \DeclareGraphicsExtensions.
+%\caption{Simulation results for the network.}
+%\label{fig_sim}
+%\end{figure}
+
+% Note that the IEEE typically puts floats only at the top, even when this
+% results in a large percentage of a column being occupied by floats.
+
+
+% An example of a double column floating figure using two subfigures.
+% (The subfig.sty package must be loaded for this to work.)
+% The subfigure \label commands are set within each subfloat command,
+% and the \label for the overall figure must come after \caption.
+% \hfil is used as a separator to get equal spacing.
+% Watch out that the combined width of all the subfigures on a
+% line do not exceed the text width or a line break will occur.
+%
+%\begin{figure*}[!t]
+%\centering
+%\subfloat[Case I]{\includegraphics[width=2.5in]{box}%
+%\label{fig_first_case}}
+%\hfil
+%\subfloat[Case II]{\includegraphics[width=2.5in]{box}%
+%\label{fig_second_case}}
+%\caption{Simulation results for the network.}
+%\label{fig_sim}
+%\end{figure*}
+%
+% Note that often IEEE papers with subfigures do not employ subfigure
+% captions (using the optional argument to \subfloat[]), but instead will
+% reference/describe all of them (a), (b), etc., within the main caption.
+% Be aware that for subfig.sty to generate the (a), (b), etc., subfigure
+% labels, the optional argument to \subfloat must be present. If a
+% subcaption is not desired, just leave its contents blank,
+% e.g., \subfloat[].
+
+
+% An example of a floating table. Note that, for IEEE style tables, the
+% \caption command should come BEFORE the table and, given that table
+% captions serve much like titles, are usually capitalized except for words
+% such as a, an, and, as, at, but, by, for, in, nor, of, on, or, the, to
+% and up, which are usually not capitalized unless they are the first or
+% last word of the caption. Table text will default to \footnotesize as
+% the IEEE normally uses this smaller font for tables.
+% The \label must come after \caption as always.
+%
+%\begin{table}[!t]
+%% increase table row spacing, adjust to taste
+%\renewcommand{\arraystretch}{1.3}
+% if using array.sty, it might be a good idea to tweak the value of
+% \extrarowheight as needed to properly center the text within the cells
+%\caption{An Example of a Table}
+%\label{table_example}
+%\centering
+%% Some packages, such as MDW tools, offer better commands for making tables
+%% than the plain LaTeX2e tabular which is used here.
+%\begin{tabular}{|c||c|}
+%\hline
+%One & Two\\
+%\hline
+%Three & Four\\
+%\hline
+%\end{tabular}
+%\end{table}
+
+
+% Note that the IEEE does not put floats in the very first column
+% - or typically anywhere on the first page for that matter. Also,
+% in-text middle ("here") positioning is typically not used, but it
+% is allowed and encouraged for Computer Society conferences (but
+% not Computer Society journals). Most IEEE journals/conferences use
+% top floats exclusively.
+% Note that, LaTeX2e, unlike IEEE journals/conferences, places
+% footnotes above bottom floats. This can be corrected via the
+% \fnbelowfloat command of the stfloats package.
+
+
+
+
+\section{Conclusion}
+The conclusion goes here.
+
+
+
+
+
+% if have a single appendix:
+%\appendix[Proof of the Zonklar Equations]
+% or
+%\appendix  % for no appendix heading
+% do not use \section anymore after \appendix, only \section*
+% is possibly needed
+
+% use appendices with more than one appendix
+% then use \section to start each appendix
+% you must declare a \section before using any
+% \subsection or using \label (\appendices by itself
+% starts a section numbered zero.)
+%
+
+
+\appendices
+\section{Proof of the First Zonklar Equation}
+Appendix one text goes here.
+
+% you can choose not to have a title for an appendix
+% if you want by leaving the argument blank
+\section{}
+Appendix two text goes here.
+
+
+% use section* for acknowledgment
+\section*{Acknowledgment}
+
+
+The authors would like to thank...
+
+
+% Can use something like this to put references on a page
+% by themselves when using endfloat and the captionsoff option.
+\ifCLASSOPTIONcaptionsoff
+  \newpage
+\fi
+
+
+
+% trigger a \newpage just before the given reference
+% number - used to balance the columns on the last page
+% adjust value as needed - may need to be readjusted if
+% the document is modified later
+%\IEEEtriggeratref{8}
+% The "triggered" command can be changed if desired:
+%\IEEEtriggercmd{\enlargethispage{-5in}}
+
+% references section
+
+% can use a bibliography generated by BibTeX as a .bbl file
+% BibTeX documentation can be easily obtained at:
+% http://mirror.ctan.org/biblio/bibtex/contrib/doc/
+% The IEEEtran BibTeX style support page is at:
+% http://www.michaelshell.org/tex/ieeetran/bibtex/
+\bibliographystyle{IEEEtran}
+% argument is your BibTeX string definitions and bibliography database(s)
+\bibliography{IEEEabrv,../bib/paper}
+%
+% <OR> manually copy in the resultant .bbl file
+% set second argument of \begin to the number of references
+% (used to reserve space for the reference number labels box)
+\begin{thebibliography}{1}
+
+\bibitem{IEEEhowto:kopka}
+H.~Kopka and P.~W. Daly, \emph{A Guide to \LaTeX}, 3rd~ed.\hskip 1em plus
+  0.5em minus 0.4em\relax Harlow, England: Addison-Wesley, 1999.
+
+\end{thebibliography}
+
+% biography section
+%
+% If you have an EPS/PDF photo (graphicx package needed) extra braces are
+% needed around the contents of the optional argument to biography to prevent
+% the LaTeX parser from getting confused when it sees the complicated
+% \includegraphics command within an optional argument. (You could create
+% your own custom macro containing the \includegraphics command to make things
+% simpler here.)
+%\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{mshell}}]{Michael Shell}
+% or if you just want to reserve a space for a photo:
+
+\begin{IEEEbiography}{Michael Shell}
+Biography text here.
+\end{IEEEbiography}
+
+% if you will not have a photo at all:
+\begin{IEEEbiographynophoto}{John Doe}
+Biography text here.
+\end{IEEEbiographynophoto}
+
+% insert where needed to balance the two columns on the last page with
+% biographies
+%\newpage
+
+\begin{IEEEbiographynophoto}{Jane Doe}
+Biography text here.
+\end{IEEEbiographynophoto}
+
+% You can push biographies down or up by placing
+% a \vfill before or after them. The appropriate
+% use of \vfill depends on what kind of text is
+% on the last page and whether or not the columns
+% are being equalized.
+
+%\vfill
+
+% Can be used to pull up biographies so that the bottom of the last one
+% is flush with the other column.
+%\enlargethispage{-5in}
+
+
+
+% that's all folks
+\end{document}
+
+

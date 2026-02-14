@@ -583,7 +583,9 @@ def run_multi_seed_validation(
 
     print(f"\n{'=' * 80}")
     print(f"MULTI-SEED VALIDATION ({n_seeds} seeds x {len(taus)} taus)")
-    print(f"  constraint={omega_constraint}, l2_reg={omega_l2_reg}, scaler={scaler_type}")
+    print(
+        f"  constraint={omega_constraint}, l2_reg={omega_l2_reg}, scaler={scaler_type}"
+    )
     print(f"{'=' * 80}")
 
     rows = []
@@ -596,7 +598,9 @@ def run_multi_seed_validation(
             rng = np.random.RandomState(seed)
             omega0 = np.abs(rng.randn(d)) + 0.5
 
-            cfg = KernelCovConfig(tau=float(tau), ridge=float(ridge), zero_mean=use_zero_mean)
+            cfg = KernelCovConfig(
+                tau=float(tau), ridge=float(ridge), zero_mean=use_zero_mean
+            )
             fit_cfg = FitConfig(
                 max_iters=max_iters,
                 step_size=float(step_size),
@@ -610,8 +614,13 @@ def run_multi_seed_validation(
             )
 
             omega_hat, hist = fit_omega(
-                X, Y, omega0=omega0, train_idx=train_idx,
-                cfg=cfg, fit_cfg=fit_cfg, return_history=True,
+                X,
+                Y,
+                omega0=omega0,
+                train_idx=train_idx,
+                cfg=cfg,
+                fit_cfg=fit_cfg,
+                return_history=True,
             )
 
             dfh = pd.DataFrame(hist)
@@ -619,13 +628,22 @@ def run_multi_seed_validation(
             n_iters = len(dfh)
 
             pred_cfg = CovPredictConfig(
-                tau=float(tau), ridge=float(ridge),
-                enforce_nonneg_omega=True, dtype="float32", device="cpu",
+                tau=float(tau),
+                ridge=float(ridge),
+                enforce_nonneg_omega=True,
+                dtype="float32",
+                device="cpu",
                 zero_mean=use_zero_mean,
             )
             Mu_val, Sigma_val = predict_mu_sigma_topk_cross(
-                X_val, X_train, Y_train, omega=omega_hat, cfg=pred_cfg, k=k,
-                exclude_self_if_same=False, return_type="numpy",
+                X_val,
+                X_train,
+                Y_train,
+                omega=omega_hat,
+                cfg=pred_cfg,
+                k=k,
+                exclude_self_if_same=False,
+                return_type="numpy",
             )
             val_nll = _mean_gaussian_nll(Y_val, Mu_val, Sigma_val)
 
@@ -654,15 +672,22 @@ def run_multi_seed_validation(
     omega_cols = [c for c in results_df.columns if re.match(r"^omega_\d+$", c)]
     stats_agg = (
         results_df.groupby("tau")
-        .agg({
-            "val_nll": ["mean", "std", "min", "max"],
-            "train_nll": ["mean", "std"],
-        })
+        .agg(
+            {
+                "val_nll": ["mean", "std", "min", "max"],
+                "train_nll": ["mean", "std"],
+            }
+        )
         .reset_index()
     )
     stats_agg.columns = [
-        "tau", "val_nll_mean", "val_nll_std", "val_nll_min", "val_nll_max",
-        "train_nll_mean", "train_nll_std",
+        "tau",
+        "val_nll_mean",
+        "val_nll_std",
+        "val_nll_min",
+        "val_nll_max",
+        "train_nll_mean",
+        "train_nll_std",
     ]
     for col in omega_cols:
         omega_agg = results_df.groupby("tau")[col].agg(["mean", "std"]).reset_index()
@@ -676,9 +701,11 @@ def run_multi_seed_validation(
     best_mean = stats_df.loc[best_tau_idx, "val_nll_mean"]
     best_std = stats_df.loc[best_tau_idx, "val_nll_std"]
     print(f"\nBest tau (by mean): {best_tau} (NLL = {best_mean:.4f} ± {best_std:.4f})")
-    print(f"Best overall: tau={results_df.loc[results_df['val_nll'].idxmin(), 'tau']}, "
-          f"seed={results_df.loc[results_df['val_nll'].idxmin(), 'seed']}, "
-          f"NLL={best_nll:.4f}")
+    print(
+        f"Best overall: tau={results_df.loc[results_df['val_nll'].idxmin(), 'tau']}, "
+        f"seed={results_df.loc[results_df['val_nll'].idxmin(), 'seed']}, "
+        f"NLL={best_nll:.4f}"
+    )
 
     return results_df, stats_df, best_omega
 
@@ -696,6 +723,7 @@ def plot_nll_vs_tau(
     """
     import matplotlib.pyplot as plt
     from plot_config import setup_plotting
+
     setup_plotting()
 
     # Filter to best scaler if specified, otherwise use all
@@ -871,16 +899,16 @@ def main():
         nargs="+",
         type=float,
         default=[
+            0.01,
+            0.05,
             0.1,
             0.25,
             0.5,
-            0.75,
             1.0,
             2.5,
             5.0,
             7.5,
             10.0,
-            15.0,
             20.0,
         ],
         help="Tau values to sweep (finer at low tau where performance is better)",
@@ -904,8 +932,8 @@ def main():
     parser.add_argument(
         "--k",
         type=int,
-        default=64,
-        help="Number of neighbors for k-NN (default 64, tuned via sweep_knn_k_values.py)",
+        default=16,
+        help="Number of neighbors for k-NN (default 16, tuned via sweep_knn_k_values.py)",
     )
     parser.add_argument(
         "--output-suffix",
@@ -1009,7 +1037,8 @@ def main():
         }
         ms_results, ms_stats, ms_best_omega = run_multi_seed_validation(
             feature_set=feature_set,
-            forecasts_parquet=DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet",
+            forecasts_parquet=DATA_DIR
+            / "forecasts_filtered_rts3_constellation_v1.parquet",
             actuals_parquet=data_parquet,
             best_config=best_config,
             taus=tuple(args.taus),

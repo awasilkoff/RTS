@@ -111,9 +111,12 @@ Regenerate v2 parquets: `cd uncertainty_sets_refactored && python mapping.py`
 
 ```bash
 python run_comparison.py --hours 6 --start-month 7 --start-day 15 --rho 2.0
+python run_comparison.py --hours 48 --day2-interval 2 --day1-only-robust --rho 2.0
 ```
 
 Outputs (in `comparison_outputs/<run_tag>/`): commitment heatmaps, dispatch bars, Z coefficient heatmaps, wind curtailment figures, and text summary.
+
+CLI args for variable intervals: `--day2-interval 2` (2-hour blocks for day 2), `--day1-only-robust` (no Z/SOC for day 2).
 
 ### Price of Robustness Sweep (rho)
 
@@ -129,11 +132,18 @@ Outputs (in `price_of_robustness/`): `sweep_results.csv`, cost vs rho figure, cu
 
 ```bash
 python run_alpha_sweep.py --hours 12 --start-month 7 --start-day 15
+python run_alpha_sweep.py --hours 48 --day2-interval 2 --day1-only-robust --start-month 7 --start-day 15
 ```
 
 Output dir is auto-named from params (e.g. `alpha_sweep/lines_rlf0.25_12h_m07d15_a0.80_0.90_0.95_0.99/`), overridable with `--out-dir`.
 
-Outputs: `sweep_results.csv`, cost vs alpha figure, curtailment vs alpha figure.
+CLI args for variable intervals: `--day2-interval 2`, `--day1-only-robust`.
+
+**Resume support:** If interrupted, re-run with the same args — completed alphas are read from `sweep_results.csv` and skipped. Results are flushed to CSV after every alpha point.
+
+**Per-alpha artifacts:** After each solve, full outputs are saved to `alpha_X.XXXX/{dam,daruc,aruc}/` subdirectories (commitment, dispatch, Z coefficients, Sigma, rho, deviation summary, Z analysis, summary JSON).
+
+Outputs: `sweep_results.csv`, per-alpha artifact dirs, cost vs alpha figure, curtailment vs alpha figure.
 
 ### IEEE Paper Figures
 

@@ -522,10 +522,10 @@ def main():
         help="Conformal alpha values to sweep (default: 0.80 0.90 0.95 0.99)",
     )
     parser.add_argument(
-        "--hours", type=int, default=12, help="Horizon hours (default: 12)"
+        "--hours", type=int, default=48, help="Horizon hours (default: 48)"
     )
     parser.add_argument(
-        "--start-month", type=int, default=7, help="Start month (default: 7)"
+        "--start-month", type=int, default=2, help="Start month (default: 2)"
     )
     parser.add_argument(
         "--start-day", type=int, default=15, help="Start day (default: 15)"
@@ -546,7 +546,7 @@ def main():
         help="Fraction of rho for line constraints (default: 1.0)",
     )
     parser.add_argument(
-        "--mip-gap", type=float, default=0.01, help="MIP gap (default: 0.01)"
+        "--mip-gap", type=float, default=0.005, help="MIP gap (default: 0.005)"
     )
     parser.add_argument(
         "--no-enforce-lines",
@@ -564,14 +564,14 @@ def main():
     parser.add_argument(
         "--gurobi-numeric-mode",
         type=str,
-        default="balanced",
+        default="robust",
         choices=["fast", "balanced", "robust"],
-        help="Gurobi numeric tuning mode (default: balanced)",
+        help="Gurobi numeric tuning mode (default: robust)",
     )
     parser.add_argument(
         "--day2-interval",
         type=int,
-        default=1,
+        default=2,
         help="Day-2 interval hours (default: 1 = hourly, 2 = 2-hour blocks)",
     )
     parser.add_argument(

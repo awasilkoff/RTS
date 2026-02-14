@@ -1,469 +1,49 @@
-%% bare_jrnl.tex
-%% V1.4b
-%% 2015/08/26
-%% by Michael Shell
-%% see http://www.michaelshell.org/
-%% for current contact information.
-%%
-%% This is a skeleton file demonstrating the use of IEEEtran.cls
-%% (requires IEEEtran.cls version 1.8b or later) with an IEEE
-%% journal paper.
-%%
-%% Support sites:
-%% http://www.michaelshell.org/tex/ieeetran/
-%% http://www.ctan.org/pkg/ieeetran
-%% and
-%% http://www.ieee.org/
-
-%%*************************************************************************
-%% Legal Notice:
-%% This code is offered as-is without any warranty either expressed or
-%% implied; without even the implied warranty of MERCHANTABILITY or
-%% FITNESS FOR A PARTICULAR PURPOSE!
-%% User assumes all risk.
-%% In no event shall the IEEE or any contributor to this code be liable for
-%% any damages or losses, including, but not limited to, incidental,
-%% consequential, or any other damages, resulting from the use or misuse
-%% of any information contained here.
-%%
-%% All comments are the opinions of their respective authors and are not
-%% necessarily endorsed by the IEEE.
-%%
-%% This work is distributed under the LaTeX Project Public License (LPPL)
-%% ( http://www.latex-project.org/ ) version 1.3, and may be freely used,
-%% distributed and modified. A copy of the LPPL, version 1.3, is included
-%% in the base LaTeX documentation of all distributions of LaTeX released
-%% 2003/12/01 or later.
-%% Retain all contribution notices and credits.
-%% ** Modified files should be clearly indicated as such, including  **
-%% ** renaming them and changing author support contact information. **
-%%*************************************************************************
-
-
-% *** Authors should verify (and, if needed, correct) their LaTeX system  ***
-% *** with the testflow diagnostic prior to trusting their LaTeX platform ***
-% *** with production work. The IEEE's font choices and paper sizes can   ***
-% *** trigger bugs that do not appear when using other class files.       ***                          ***
-% The testflow support page is at:
-% http://www.michaelshell.org/tex/testflow/
-
-
-
 \documentclass[journal]{IEEEtran}
-%
-% If IEEEtran.cls has not been installed into the LaTeX system files,
-% manually specify the path to it like:
-% \documentclass[journal]{../sty/IEEEtran}
 
-
-
-
-
-% Some very useful LaTeX packages include:
-% (uncomment the ones you want to load)
-
-
-% *** MISC UTILITY PACKAGES ***
-%
-%\usepackage{ifpdf}
-% Heiko Oberdiek's ifpdf.sty is very useful if you need conditional
-% compilation based on whether the output is pdf or dvi.
-% usage:
-% \ifpdf
-%   % pdf code
-% \else
-%   % dvi code
-% \fi
-% The latest version of ifpdf.sty can be obtained from:
-% http://www.ctan.org/pkg/ifpdf
-% Also, note that IEEEtran.cls V1.7 and later provides a builtin
-% \ifCLASSINFOpdf conditional that works the same way.
-% When switching from latex to pdflatex and vice-versa, the compiler may
-% have to be run twice to clear warning/error messages.
-
-
-
-
-
-
-% *** CITATION PACKAGES ***
-%
-%\usepackage{cite}
-% cite.sty was written by Donald Arseneau
-% V1.6 and later of IEEEtran pre-defines the format of the cite.sty package
-% \cite{} output to follow that of the IEEE. Loading the cite package will
-% result in citation numbers being automatically sorted and properly
-% "compressed/ranged". e.g., [1], [9], [2], [7], [5], [6] without using
-% cite.sty will become [1], [2], [5]--[7], [9] using cite.sty. cite.sty's
-% \cite will automatically add leading space, if needed. Use cite.sty's
-% noadjust option (cite.sty V3.8 and later) if you want to turn this off
-% such as if a citation ever needs to be enclosed in parenthesis.
-% cite.sty is already installed on most LaTeX systems. Be sure and use
-% version 5.0 (2009-03-20) and later if using hyperref.sty.
-% The latest version can be obtained at:
-% http://www.ctan.org/pkg/cite
-% The documentation is contained in the cite.sty file itself.
-
-
-
-
-
-
-% *** GRAPHICS RELATED PACKAGES ***
-%
-\ifCLASSINFOpdf
-  % \usepackage[pdftex]{graphicx}
-  % declare the path(s) where your graphic files are
-  % \graphicspath{{../pdf/}{../jpeg/}}
-  % and their extensions so you won't have to specify these with
-  % every instance of \includegraphics
-  % \DeclareGraphicsExtensions{.pdf,.jpeg,.png}
-\else
-  % or other class option (dvipsone, dvipdf, if not using dvips). graphicx
-  % will default to the driver specified in the system graphics.cfg if no
-  % driver is specified.
-  % \usepackage[dvips]{graphicx}
-  % declare the path(s) where your graphic files are
-  % \graphicspath{{../eps/}}
-  % and their extensions so you won't have to specify these with
-  % every instance of \includegraphics
-  % \DeclareGraphicsExtensions{.eps}
-\fi
-% graphicx was written by David Carlisle and Sebastian Rahtz. It is
-% required if you want graphics, photos, etc. graphicx.sty is already
-% installed on most LaTeX systems. The latest version and documentation
-% can be obtained at:
-% http://www.ctan.org/pkg/graphicx
-% Another good source of documentation is "Using Imported Graphics in
-% LaTeX2e" by Keith Reckdahl which can be found at:
-% http://www.ctan.org/pkg/epslatex
-%
-% latex, and pdflatex in dvi mode, support graphics in encapsulated
-% postscript (.eps) format. pdflatex in pdf mode supports graphics
-% in .pdf, .jpeg, .png and .mps (metapost) formats. Users should ensure
-% that all non-photo figures use a vector format (.eps, .pdf, .mps) and
-% not a bitmapped formats (.jpeg, .png). The IEEE frowns on bitmapped formats
-% which can result in "jaggedy"/blurry rendering of lines and letters as
-% well as large increases in file sizes.
-%
-% You can find documentation about the pdfTeX application at:
-% http://www.tug.org/applications/pdftex
-
-
-
-
-
-% *** MATH PACKAGES ***
-%
 \usepackage{amsmath}
-% A popular package from the American Mathematical Society that provides
-% many useful and powerful commands for dealing with mathematics.
-%
-% Note that the amsmath package sets \interdisplaylinepenalty to 10000
-% thus preventing page breaks from occurring within multiline equations. Use:
+\usepackage{amssymb}
 \interdisplaylinepenalty=2500
-% after loading amsmath to restore such page breaks as IEEEtran.cls normally
-% does. amsmath.sty is already installed on most LaTeX systems. The latest
-% version and documentation can be obtained at:
-% http://www.ctan.org/pkg/amsmath
 
-
-
-
-
-% *** SPECIALIZED LIST PACKAGES ***
-%
-%\usepackage{algorithmic}
-% algorithmic.sty was written by Peter Williams and Rogerio Brito.
-% This package provides an algorithmic environment fo describing algorithms.
-% You can use the algorithmic environment in-text or within a figure
-% environment to provide for a floating algorithm. Do NOT use the algorithm
-% floating environment provided by algorithm.sty (by the same authors) or
-% algorithm2e.sty (by Christophe Fiorio) as the IEEE does not use dedicated
-% algorithm float types and packages that provide these will not provide
-% correct IEEE style captions. The latest version and documentation of
-% algorithmic.sty can be obtained at:
-% http://www.ctan.org/pkg/algorithms
-% Also of interest may be the (relatively newer and more customizable)
-% algorithmicx.sty package by Szasz Janos:
-% http://www.ctan.org/pkg/algorithmicx
-
-
-
-
-% *** ALIGNMENT PACKAGES ***
-%
-%\usepackage{array}
-% Frank Mittelbach's and David Carlisle's array.sty patches and improves
-% the standard LaTeX2e array and tabular environments to provide better
-% appearance and additional user controls. As the default LaTeX2e table
-% generation code is lacking to the point of almost being broken with
-% respect to the quality of the end results, all users are strongly
-% advised to use an enhanced (at the very least that provided by array.sty)
-% set of table tools. array.sty is already installed on most systems. The
-% latest version and documentation can be obtained at:
-% http://www.ctan.org/pkg/array
-
-
-% IEEEtran contains the IEEEeqnarray family of commands that can be used to
-% generate multiline equations as well as matrices, tables, etc., of high
-% quality.
-
-
-
-
-% *** SUBFIGURE PACKAGES ***
-%\ifCLASSOPTIONcompsoc
-%  \usepackage[caption=false,font=normalsize,labelfont=sf,textfont=sf]{subfig}
-%\else
-%  \usepackage[caption=false,font=footnotesize]{subfig}
-%\fi
-% subfig.sty, written by Steven Douglas Cochran, is the modern replacement
-% for subfigure.sty, the latter of which is no longer maintained and is
-% incompatible with some LaTeX packages including fixltx2e. However,
-% subfig.sty requires and automatically loads Axel Sommerfeldt's caption.sty
-% which will override IEEEtran.cls' handling of captions and this will result
-% in non-IEEE style figure/table captions. To prevent this problem, be sure
-% and invoke subfig.sty's "caption=false" package option (available since
-% subfig.sty version 1.3, 2005/06/28) as this is will preserve IEEEtran.cls
-% handling of captions.
-% Note that the Computer Society format requires a larger sans serif font
-% than the serif footnote size font used in traditional IEEE formatting
-% and thus the need to invoke different subfig.sty package options depending
-% on whether compsoc mode has been enabled.
-%
-% The latest version and documentation of subfig.sty can be obtained at:
-% http://www.ctan.org/pkg/subfig
-
-
-
-
-% *** FLOAT PACKAGES ***
-%
-%\usepackage{fixltx2e}
-% fixltx2e, the successor to the earlier fix2col.sty, was written by
-% Frank Mittelbach and David Carlisle. This package corrects a few problems
-% in the LaTeX2e kernel, the most notable of which is that in current
-% LaTeX2e releases, the ordering of single and double column floats is not
-% guaranteed to be preserved. Thus, an unpatched LaTeX2e can allow a
-% single column figure to be placed prior to an earlier double column
-% figure.
-% Be aware that LaTeX2e kernels dated 2015 and later have fixltx2e.sty's
-% corrections already built into the system in which case a warning will
-% be issued if an attempt is made to load fixltx2e.sty as it is no longer
-% needed.
-% The latest version and documentation can be found at:
-% http://www.ctan.org/pkg/fixltx2e
-
-
-%\usepackage{stfloats}
-% stfloats.sty was written by Sigitas Tolusis. This package gives LaTeX2e
-% the ability to do double column floats at the bottom of the page as well
-% as the top. (e.g., "\begin{figure*}[!b]" is not normally possible in
-% LaTeX2e). It also provides a command:
-%\fnbelowfloat
-% to enable the placement of footnotes below bottom floats (the standard
-% LaTeX2e kernel puts them above bottom floats). This is an invasive package
-% which rewrites many portions of the LaTeX2e float routines. It may not work
-% with other packages that modify the LaTeX2e float routines. The latest
-% version and documentation can be obtained at:
-% http://www.ctan.org/pkg/stfloats
-% Do not use the stfloats baselinefloat ability as the IEEE does not allow
-% \baselineskip to stretch. Authors submitting work to the IEEE should note
-% that the IEEE rarely uses double column equations and that authors should try
-% to avoid such use. Do not be tempted to use the cuted.sty or midfloat.sty
-% packages (also by Sigitas Tolusis) as the IEEE does not format its papers in
-% such ways.
-% Do not attempt to use stfloats with fixltx2e as they are incompatible.
-% Instead, use Morten Hogholm'a dblfloatfix which combines the features
-% of both fixltx2e and stfloats:
-%
-% \usepackage{dblfloatfix}
-% The latest version can be found at:
-% http://www.ctan.org/pkg/dblfloatfix
-
-
-
-
-%\ifCLASSOPTIONcaptionsoff
-%  \usepackage[nomarkers]{endfloat}
-% \let\MYoriglatexcaption\caption
-% \renewcommand{\caption}[2][\relax]{\MYoriglatexcaption[#2]{#2}}
-%\fi
-% endfloat.sty was written by James Darrell McCauley, Jeff Goldberg and
-% Axel Sommerfeldt. This package may be useful when used in conjunction with
-% IEEEtran.cls'  captionsoff option. Some IEEE journals/societies require that
-% submissions have lists of figures/tables at the end of the paper and that
-% figures/tables without any captions are placed on a page by themselves at
-% the end of the document. If needed, the draftcls IEEEtran class option or
-% \CLASSINPUTbaselinestretch interface can be used to increase the line
-% spacing as well. Be sure and use the nomarkers option of endfloat to
-% prevent endfloat from "marking" where the figures would have been placed
-% in the text. The two hack lines of code above are a slight modification of
-% that suggested by in the endfloat docs (section 8.4.1) to ensure that
-% the full captions always appear in the list of figures/tables - even if
-% the user used the short optional argument of \caption[]{}.
-% IEEE papers do not typically make use of \caption[]'s optional argument,
-% so this should not be an issue. A similar trick can be used to disable
-% captions of packages such as subfig.sty that lack options to turn off
-% the subcaptions:
-% For subfig.sty:
-% \let\MYorigsubfloat\subfloat
-% \renewcommand{\subfloat}[2][\relax]{\MYorigsubfloat[]{#2}}
-% However, the above trick will not work if both optional arguments of
-% the \subfloat command are used. Furthermore, there needs to be a
-% description of each subfigure *somewhere* and endfloat does not add
-% subfigure captions to its list of figures. Thus, the best approach is to
-% avoid the use of subfigure captions (many IEEE journals avoid them anyway)
-% and instead reference/explain all the subfigures within the main caption.
-% The latest version of endfloat.sty and its documentation can obtained at:
-% http://www.ctan.org/pkg/endfloat
-%
-% The IEEEtran \ifCLASSOPTIONcaptionsoff conditional can also be used
-% later in the document, say, to conditionally put the References on a
-% page by themselves.
-
-
-
-
-% *** PDF, URL AND HYPERLINK PACKAGES ***
-%
-%\usepackage{url}
-% url.sty was written by Donald Arseneau. It provides better support for
-% handling and breaking URLs. url.sty is already installed on most LaTeX
-% systems. The latest version and documentation can be obtained at:
-% http://www.ctan.org/pkg/url
-% Basically, \url{my_url_here}.
-
-
-
-
-% *** Do not adjust lengths that control margins, column widths, etc. ***
-% *** Do not use packages that alter fonts (such as pslatex).         ***
-% There should be no need to do such things with IEEEtran.cls V1.6 and later.
-% (Unless specifically asked to do so by the journal or conference you plan
-% to submit to, of course. )
-
-
-% correct bad hyphenation here
 \hyphenation{op-tical net-works semi-conduc-tor}
 
-
 \begin{document}
-%
-% paper title
-% Titles are generally capitalized except for words such as a, an, and, as,
-% at, but, by, for, in, nor, of, on, or, the, to and up, which are usually
-% not capitalized unless they are the first or last word of the title.
-% Linebreaks \\ can be used within to get better formatting as desired.
-% Do not put math or special symbols in the title.
-\title{Bare Demo of IEEEtran.cls\\ for IEEE Journals}
-%
-%
-% author names and IEEE memberships
-% note positions of commas and nonbreaking spaces ( ~ ) LaTeX will not break
-% a structure at a ~ so this keeps an author's name from being broken across
-% two lines.
-% use \thanks{} to gain access to the first footnote area
-% a separate \thanks must be used for each paragraph as LaTeX2e's \thanks
-% was not built to handle multiple paragraphs
-%
 
-\author{Michael~Shell,~\IEEEmembership{Member,~IEEE,}
-        John~Doe,~\IEEEmembership{Fellow,~OSA,}
-        and~Jane~Doe,~\IEEEmembership{Life~Fellow,~IEEE}% <-this % stops a space
-\thanks{M. Shell was with the Department
-of Electrical and Computer Engineering, Georgia Institute of Technology, Atlanta,
-GA, 30332 USA e-mail: (see http://www.michaelshell.org/contact.html).}% <-this % stops a space
-\thanks{J. Doe and J. Doe are with Anonymous University.}% <-this % stops a space
-\thanks{Manuscript received April 19, 2005; revised August 26, 2015.}}
+\title{Notification-Gated Reliability Unit Commitment:\\ Least-Distortionary Out-of-Market Interventions}
 
-% note the % following the last \IEEEmembership and also \thanks -
-% these prevent an unwanted space from occurring between the last author name
-% and the end of the author line. i.e., if you had this:
-%
-% \author{....lastname \thanks{...} \thanks{...} }
-%                     ^------------^------------^----Do not want these spaces!
-%
-% a space would be appended to the last name and could cause every name on that
-% line to be shifted left slightly. This is one of those "LaTeX things". For
-% instance, "\textbf{A} \textbf{B}" will typeset as "A B" not "AB". To get
-% "AB" then you have to do: "\textbf{A}\textbf{B}"
-% \thanks is no different in this regard, so shield the last } of each \thanks
-% that ends a line with a % and do not let a space in before the next \thanks.
-% Spaces after \IEEEmembership other than the last one are OK (and needed) as
-% you are supposed to have spaces between the names. For what it is worth,
-% this is a minor point as most people would not even notice if the said evil
-% space somehow managed to creep in.
+\author{Author~One,~\IEEEmembership{Member,~IEEE,}
+        Author~Two,
+        and~Author~Three,~\IEEEmembership{Senior~Member,~IEEE}%
+\thanks{Affiliations and funding acknowledgments.}%
+\thanks{Manuscript received XXXX; revised XXXX.}}
 
+\markboth{IEEE Transactions on Power Systems}%
+{Authors: Notification-Gated Reliability Unit Commitment}
 
-
-% The paper headers
-\markboth{Journal of \LaTeX\ Class Files,~Vol.~14, No.~8, August~2015}%
-{Shell \MakeLowercase{\textit{et al.}}: Bare Demo of IEEEtran.cls for IEEE Journals}
-% The only time the second header will appear is for the odd numbered pages
-% after the title page when using the twoside option.
-%
-% *** Note that you probably will NOT want to include the author's ***
-% *** name in the headers of peer review papers.                   ***
-% You can use \ifCLASSOPTIONpeerreview for conditional compilation here if
-% you desire.
-
-
-
-
-% If you want to put a publisher's ID mark on the page you can do it like
-% this:
-%\IEEEpubid{0000--0000/00\$00.00~\copyright~2015 IEEE}
-% Remember, if you use this you must call \IEEEpubidadjcol in the second
-% column for its text to clear the IEEEpubid mark.
-
-
-
-% use for special paper notices
-%\IEEEspecialpapernotice{(Invited Paper)}
-
-
-
-
-% make the title area
 \maketitle
 
-% As a general rule, do not put math, special symbols or citations
-% in the abstract or keywords.
 \begin{abstract}
 The abstract goes here.
 \end{abstract}
 
-% Note that keywords are not normally used for peerreview papers.
 \begin{IEEEkeywords}
-IEEE, IEEEtran, journal, \LaTeX, paper, template.
+Reliability unit commitment, robust optimization, market design,
+notification time, linear decision rules.
 \end{IEEEkeywords}
 
-
-
-
-
-
-% For peer review papers, you can put extra information on the cover
-% page as needed:
-% \ifCLASSOPTIONpeerreview
-% \begin{center} \bfseries EDICS Category: 3-BBND \end{center}
-% \fi
-%
-% For peerreview papers, this IEEEtran command inserts a page break and
-% creates the second title. It will be ignored for other modes.
 \IEEEpeerreviewmaketitle
 
 
-
+%% ===================================================================
+%%  SECTION 1 — INTRODUCTION
+%% ===================================================================
 \section{Introduction}
+
 \IEEEPARstart{R}{eliability} processes are required in power system
 operations due to a
 fundamental market failure in the provision of reliability. To address
 this, system operators routinely commit generation resources outside of
 the energy market through reliability-driven commitment actions.
-While effective in preserving system feasibility, empirical evidence,
+While effective in preserving system feasibility, empirical evidence
 and operational experience indicate that the heuristics used to trigger
 these commitments are often overly conservative, leading to systematic
 over-commitment and distortion of price signals in both the day-ahead
@@ -487,14 +67,18 @@ resulting commitments may be interpreted as the least-distortionary
 reliability actions, providing a principled defense of operator
 interventions while preserving market signals to the greatest extent
 possible.
+
 \subsection{Contributions}
-This paper makes the following contributions. First, we develop a
-notification-gated formulation for reliability unit commitment that
-explicitly models the interaction between physical generator lead times
-and the sequencing of market and operational decision processes. The
-proposed framework identifies the subset of commitment decisions that
-cannot be deferred to subsequent market stages and restricts out-of-
-market interventions to this non-deferrable decision set.
+
+This paper makes the following contributions.
+
+First, we develop a notification-gated formulation for reliability unit
+commitment that explicitly models the interaction between physical
+generator lead times and the sequencing of market and operational
+decision processes. The proposed framework identifies the subset of
+commitment decisions that cannot be deferred to subsequent market stages
+and restricts out-of-market interventions to this non-deferrable
+decision set.
 
 Second, we introduce a minimal-intervention reliability objective that
 minimizes only startup actions and associated no-load costs induced by
@@ -515,345 +99,824 @@ integrated market-reliability formulations. Results show significant
 reductions in early commitment interventions and redispatch magnitude
 without compromising system reliability.
 
-\section{Current Practice}
-While all system operators have their own idiosyncracies,
-the North American RTOs have certain schematic similarities in their
-sequence of decision processes. For this work, we will focus on the
+
+%% ===================================================================
+%%  SECTION 2 — LITERATURE REVIEW
+%% ===================================================================
+\section{Literature Review}
+
+% TODO: Three threads to cover:
+%
+% (a) RUC in practice — ISO/RTO operational descriptions, FERC reports,
+%     SPP/MISO/CAISO market manuals documenting DARUC processes.
+%     Emphasize that RUC is widespread but formulations are proprietary
+%     and the academic literature rarely models the sequential
+%     decision structure faithfully.
+%
+% (b) Robust and stochastic UC — Bertsimas, Litvinov, Jiang et al.
+%     Position this paper relative to the robust UC literature:
+%     we are not proposing a new uncertainty model (that is paper 2),
+%     but a new *decision scope* within which robustness is enforced.
+%
+% (c) Market design and out-of-market actions — uplift, price formation,
+%     convex hull pricing literature. Brief treatment: motivation for
+%     why minimizing interventions matters, even if we don't compute
+%     LMPs in the case study.
+%
+% The gap: no existing formulation explicitly models notification
+% times to restrict the reliability optimization to non-deferrable
+% decisions.
+
+
+%% ===================================================================
+%%  SECTION 3 — THE RELIABILITY COMMITMENT PROBLEM
+%% ===================================================================
+\section{The Reliability Commitment Problem}
+
+\subsection{Operational Timeline}
+
+While all system operators have their own idiosyncrasies,
+the North American RTOs share a common schematic structure in their
+sequence of decision processes. For this work, we focus on the
 pattern in use by Southwest Power Pool (SPP), but the outline applies
-to most of the other system operators with the notable exception of
-NYISO which integrates the DARUC and DAMKT clearing.
+to most other system operators with the notable exception of
+NYISO, which integrates the DARUC and DAMKT clearing.
 
-For a given operating day, the operational planning sequnce begins
-with an advisory multi-day reliability-assessment. This decision
-process has a horizon of four to seven days.
-
-\subsection{DAMKT}
-\begin{align*}
-&\underset{ \mathbf {p}, \mathbf {u}, \mathbf {v}, \mathbf {w}, \mathbf {s}}{ \min } f = \sum _{i, t} \Bigg[ C_{i}^{NL}u_{i,t} + C_{i}^{SU} v_{i,t} + C_{i}^{SD} w_{i,t} \\
-&+ \sum _b \left(C_{i,b}^p \, p_{i,t,b} \right) \Bigg] + \sum _{t} \left(M^p s_t^{p} \right), \tag{18a} \\
-&\text{subject to: } \qquad \sum _{i} p_{i,t} + s_t^{p} = \sum_n{d_{n,t}}, \quad \forall t, \qquad \tag{18b} \\
-&-\bar{F}^l \leq \sum_n s_n^l (\sum_{i\in\mathcal{I}_n}p_{i,t} - d_{n,t}) \leq \bar{F}^l, \quad \forall l,t \tag{18c}\\
-&p_{i,t,b} \leq {\bar{P}}_{i,b} \, u_{i,t}, \, \, \forall i,t,b, \quad p_{i,t} = \sum _{b} p_{i,t,b}, \quad \forall i,t, \tag{18d} \\
-& p_{j,t} \leq \bar{p}^{forecast}_{j,t}, \quad \forall j,t\\
-&{\underline{P}}_i \, u_{i,t} \leq p_{i,t} \leq {\bar{P}}_i \, u_{i,t}, \quad \forall i,t, \tag{18e} \\
-&p_{i,t} - p_{i,t-1} \leq R_i^U( u_{i,t-1} + v_{i,t}), \quad \forall i, t, \tag{18f} \\
-&p_{i,t-1} - p_{i,t} \leq R_i^D( u_{i,t} + w_{i,t}), \quad \forall i, t, \tag{18g} \\
-&u_{i,t} - u_{i,t-1} = v_{i,t} - w_{i,t}, \quad \forall i, t, \tag{18h} \\
-&\sum _{t^{\prime } = t - {MUT}_i + 1}^t v_{i,t^{\prime }} \leq u_{i,t}, \quad \forall i, t = [MUT_i, T], \tag{18i} \\
-&\sum _{t^{\prime } = t - {MDT}_i + 1}^t w_{i,t^{\prime }} \leq 1 - u_{i,t}, \quad \forall i, t = [MDT_i, T], \tag{18j} \\
-&\sum _{t^{\prime } = 1}^{UT_i} u_{i,t^{\prime }} = UT_i, \quad \sum _{t^{\prime } = 1}^{DT_i} u_{i,t^{\prime }} = 0, \quad \forall i, \tag{18k}\\
-&\mathbf {p}, \mathbf {s}, \geq 0 \\
-&\mathbf {u'},\mathbf {u},\mathbf {v}, \mathbf {w} \in \{0,1\}
-\end{align*}
-\subsection{DARUC}
-\begin{align*}
-&\underset{ \mathbf {p}, \mathbf {u}, \mathbf {v}, \mathbf {w}, \mathbf {s}}{ \min } f = \sum _{i, t} \Bigg[ C_{i}^{NL}u_{i,t} + C_{i}^{SU} v_{i,t} + C_{i}^{SD} w_{i,t} \Bigg]  \\
-&+ \sum _{t} \left(M^p s_t^{p} \right), \tag{18a} \\
-&\text{subject to: } \qquad \sum _{i} p_{i,t} + s_t^{p} = \sum_n{d_{n,t}}, \quad \forall t, \qquad \tag{18b} \\
-&-\bar{F}^l \leq \sum_n s_n^l (\sum_{i\in\mathcal{I}_n}p_{i,t} - d_{n,t}) \leq \bar{F}^l, \quad \forall l,t \tag{18c}\\
-&p_{i,t,b} \leq {\bar{P}}_{i,b} \, u_{i,t}, \, \, \forall i,t,b, \quad p_{i,t} = \sum _{b} p_{i,t,b}, \quad \forall i,t, \tag{18d} \\
-& p_{j,t} \leq \bar{p}^{forecast}_{j,t}, \quad \forall j,t\\
-&{\underline{P}}_i \, u_{i,t} \leq p_{i,t} \leq {\bar{P}}_i \, u_{i,t}, \quad \forall i,t, \tag{18e} \\
-&p_{i,t} - p_{i,t-1} \leq R_i^U( u_{i,t-1} + v_{i,t}), \quad \forall i, t, \tag{18f} \\
-&p_{i,t-1} - p_{i,t} \leq R_i^D( u_{i,t} + w_{i,t}), \quad \forall i, t, \tag{18g} \\
-&u_{i,t} - u_{i,t-1} = v_{i,t} - w_{i,t}, \quad \forall i, t, \tag{18h} \\
-&\sum _{t^{\prime } = t - {MUT}_i + 1}^t v_{i,t^{\prime }} \leq u_{i,t}, \quad \forall i, t = [MUT_i, T], \tag{18i} \\
-&\sum _{t^{\prime } = t - {MDT}_i + 1}^t w_{i,t^{\prime }} \leq 1 - u_{i,t}, \quad \forall i, t = [MDT_i, T], \tag{18j} \\
-&\sum _{t^{\prime } = 1}^{UT_i} u_{i,t^{\prime }} = UT_i, \quad \sum _{t^{\prime } = 1}^{DT_i} u_{i,t^{\prime }} = 0, \quad \forall i, \tag{18k}\\
-&\mathbf {p}, \mathbf {s}, \geq 0 \\
-&\mathbf {u'},\mathbf {u},\mathbf {v}, \mathbf {w} \in \{0,1\}
-\end{align*}
-\section{Least-Distortional RUC}
-\subsection{Description of Timeline}
-For this work, we focus on the timeline present in SPP's
-operations which are characteristic of most North American
-system operator practices.
-For notational clarity, we refer the Operating Day (OD) as
+For notational clarity, we refer to the Operating Day (OD) as
 the day for which the operation plan is being generated.
-The principle scheduling process, the Day-Ahead Market (DAMKT)
-finishes solving around noon of OD-1. Decisions of that process
-are communicated at 2 pm OD-1. The DA-RUC process follows this
-at 5 pm. The DARUC would consider a decision horizon of the
-OD and OD+1.
+The principal scheduling process, the Day-Ahead Market (DAMKT),
+finishes solving around noon of OD$-$1. Decisions of that process
+are communicated at 2 pm OD$-$1. The DA-RUC process follows this
+at 5 pm. The DARUC considers a decision horizon covering
+OD and OD$+$1.
 
-For the multi-day reliability
+% TODO: Complete the multi-day reliability assessment (MDRA) description.
+% MDRA is advisory, 4-7 day horizon, commits long-lead resources.
+% Then: DAMKT → DARUC → ID-RUC intraday.
+% A timeline figure would be valuable here.
 
-\subsection{Define Gating Set}
-The core idea of this section is that the notification (lead) time of a
-generating unit determines which commitment decisions must be finalized
-at the current decision stage and which can be deferred to subsequent
-market or operational processes. Commitment decisions should be made
-binding only when deferral would violate physical feasibility.
+\subsection{Unit Commitment Formulation}
+
+% State the canonical UC formulation ONCE. Both DAMKT and standard
+% DARUC share these constraints; they differ only in objective.
+
+The following formulation captures the core unit commitment
+constraints common to both the day-ahead market and reliability
+processes. Let $\mathcal{I}$ index generating resources,
+$\mathcal{T} = \{1,\dots,T\}$ index operating periods,
+$\mathcal{N}$ index buses, and $\mathcal{L}$ index transmission
+lines.
+
+\begin{subequations}\label{eq:uc_base}
+\begin{align}
+%--- power balance ---
+&\sum_{i} p_{i,t} + s_t^{p} = \sum_n d_{n,t},
+  \quad \forall t, \label{eq:uc_bal} \\
+%--- transmission ---
+&-\bar{F}^l \leq \sum_n S_n^l
+  \Big(\sum_{i\in\mathcal{I}_n} p_{i,t} - d_{n,t}\Big)
+  \leq \bar{F}^l,
+  \quad \forall l,t, \label{eq:uc_flow} \\
+%--- block dispatch ---
+&p_{i,t,b} \leq \bar{P}_{i,b}\, u_{i,t},
+  \;\; \forall i,t,b, \quad
+  p_{i,t} = \textstyle\sum_b p_{i,t,b},
+  \;\; \forall i,t, \label{eq:uc_block} \\
+%--- renewable limit ---
+&p_{j,t} \leq \bar{p}^{\text{fcst}}_{j,t},
+  \quad \forall j \in \mathcal{I}^{\text{ren}},\; t, \label{eq:uc_ren} \\
+%--- capacity ---
+&\underline{P}_i\, u_{i,t} \leq p_{i,t}
+  \leq \bar{P}_i\, u_{i,t},
+  \quad \forall i,t, \label{eq:uc_cap} \\
+%--- ramp up ---
+&p_{i,t} - p_{i,t-1} \leq R_i^U (u_{i,t-1} + v_{i,t}),
+  \quad \forall i,t, \label{eq:uc_ru} \\
+%--- ramp down ---
+&p_{i,t-1} - p_{i,t} \leq R_i^D (u_{i,t} + w_{i,t}),
+  \quad \forall i,t, \label{eq:uc_rd} \\
+%--- logic ---
+&u_{i,t} - u_{i,t-1} = v_{i,t} - w_{i,t},
+  \quad \forall i,t, \label{eq:uc_logic} \\
+%--- MUT ---
+&\sum_{t'=t-\text{MUT}_i+1}^{t} v_{i,t'} \leq u_{i,t},
+  \quad \forall i,\; t \geq \text{MUT}_i, \label{eq:uc_mut} \\
+%--- MDT ---
+&\sum_{t'=t-\text{MDT}_i+1}^{t} w_{i,t'} \leq 1 - u_{i,t},
+  \quad \forall i,\; t \geq \text{MDT}_i, \label{eq:uc_mdt} \\
+%--- initial conditions ---
+&\sum_{t'=1}^{UT_i} u_{i,t'} = UT_i, \quad
+  \sum_{t'=1}^{DT_i} u_{i,t'} = 0,
+  \quad \forall i, \label{eq:uc_init} \\
+%--- domains ---
+&\mathbf{p},\, \mathbf{s} \geq 0, \quad
+  \mathbf{u},\, \mathbf{v},\, \mathbf{w} \in \{0,1\}.
+  \label{eq:uc_domain}
+\end{align}
+\end{subequations}
+
+We denote this shared constraint set as $\mathcal{X}^{\text{UC}}$.
+
+\subsection{Day-Ahead Market (DAMKT)}
+
+The DAMKT minimizes total production cost including energy,
+no-load, startup, and shutdown costs over all generators and periods:
+\begin{align}\label{eq:damkt_obj}
+\min_{\mathbf{p},\mathbf{u},\mathbf{v},\mathbf{w},\mathbf{s}}
+\quad &\sum_{i,t} \Big[
+  C_i^{NL} u_{i,t} + C_i^{SU} v_{i,t} + C_i^{SD} w_{i,t}
+  + \sum_b C_{i,b}^p\, p_{i,t,b}
+\Big] \nonumber\\
+&+ \sum_t M^p s_t^p \\
+\text{s.t.} \quad
+& \eqref{eq:uc_base}. \nonumber
+\end{align}
+
+\subsection{Standard Day-Ahead RUC (DARUC)}
+
+The standard DARUC uses the same constraint set
+$\mathcal{X}^{\text{UC}}$ but removes energy costs from the
+objective, retaining only commitment-related costs:
+\begin{align}\label{eq:daruc_obj}
+\min_{\mathbf{p},\mathbf{u},\mathbf{v},\mathbf{w},\mathbf{s}}
+\quad &\sum_{i,t} \Big[
+  C_i^{NL} u_{i,t} + C_i^{SU} v_{i,t} + C_i^{SD} w_{i,t}
+\Big]
++ \sum_t M^p s_t^p \\
+\text{s.t.} \quad
+& \eqref{eq:uc_base}. \nonumber
+\end{align}
+
+% TODO: Note that in practice, the DARUC may also fix u^m from the
+% DAMKT solution and only allow additional commitments. This varies
+% by ISO. SPP's practice is [describe].
+
+\subsection{Why Standard DARUC Over-Commits}\label{sec:overcommit}
+
+% TODO: This is the diagnostic argument that sets up Section 4.
+% Key points:
+%
+% (1) Standard DARUC optimizes u_{i,t} for ALL i and ALL t in the
+%     horizon. But most of these decisions will be revisited by the
+%     next market clearing (DAMKT for OD+1, or ID-RUC intraday).
+%     The DARUC is solving a problem that is mostly not its to solve.
+%
+% (2) Because the DARUC sees the full horizon and minimizes total
+%     commitment cost, it may commit units early to avoid more
+%     expensive startups later — even when those later decisions
+%     can be deferred to a subsequent process that will have better
+%     information.
+%
+% (3) The result: commitment decisions that are technically feasible
+%     but premature. Units are started hours or days before they are
+%     needed, displacing market-cleared resources and distorting
+%     price signals.
+%
+% (4) The core issue is not that the DARUC commits the wrong units,
+%     but that it commits units whose startup decisions could have
+%     waited. The formulation lacks a notion of *deferrability*.
+
+
+%% ===================================================================
+%%  SECTION 4 — NOTIFICATION-GATED RUC (THE CONTRIBUTION)
+%% ===================================================================
+\section{Notification-Gated Reliability Commitment}
+
+The proposed formulation is solved in two phases.
+Phase~1 determines the minimum-cost set of non-deferrable reliability
+commitments against the mean forecast.
+Phase~2 verifies that these commitments are sufficient to guarantee
+dispatch feasibility under worst-case uncertainty.
+When Phase~2 identifies a robustness shortfall, the two phases are
+iterated via column-and-constraint generation until robust feasibility
+is attained (Section~\ref{sec:augment}).
+
+\subsection{Gating Sets}\label{sec:gating}
+
+The notification (lead) time of a generating unit determines which
+commitment decisions must be finalized at the current decision stage
+and which can be deferred to subsequent market or operational
+processes.
+Commitment decisions should be made binding only when deferral would
+violate physical feasibility.
 
 Let decision process $k$ represent the current reliability or market
-commitment stage (e.g., MDRA, DA-RUC, ID-RUC), and let $t^{\text{next}}$
-denote the first operating period whose commitment decisions can be
-modified by the next available process. Let $t\in\mathcal{T}^k=1,\dots,T$
-index the physical operating periods in the look-ahead horizon
-considered at stage $k$.
+commitment stage (e.g., MDRA, DA-RUC, ID-RUC), and let
+$t^{\text{next}}$ denote the first operating period whose commitment
+decisions can be modified by the next available process.
+Let $t \in \mathcal{T}^k = \{1,\dots,T\}$ index the physical
+operating periods in the look-ahead horizon considered at stage~$k$.
 
-For a generating resource $i$ with startup notification (lead) time
-$L_i^{SU}$, a startup decision affecting operating period
-$t$ must be issued at the current stage if it cannot be deferred to the next process. This condition is expressed by the following gating set:
-\begin{equation}
-    \mathcal{T}_{i}^{\text{start}} :=
-    \{ t \in \mathcal{T}^k \;|\; t - L_i^{SU} < t^{\text{next}}\} .
+For generating resource~$i$ with startup notification time
+$L_i^{SU}$, a startup decision affecting operating period~$t$ must
+be issued at the current stage if it cannot be deferred to the next
+process.
+This condition defines the \emph{gating set}:
+\begin{equation}\label{eq:gating_set}
+    \mathcal{T}_{i}^{\text{gate}} \;:=\;
+    \bigl\{\, t \in \mathcal{T}^k \;\big|\;
+            t - L_i^{SU} < t^{\text{next}} \bigr\}.
 \end{equation}
 
-Periods belonging to $\mathcal{T}_{i}^{\text{start}}$ correspond to
-startup decisions that must be initiated prior to the next commitment
-process in order to preserve feasibility. Startup decisions outside this
-set may be deferred and are therefore excluded from the current
-reliability optimization.
+Periods in $\mathcal{T}_{i}^{\text{gate}}$ correspond to startup
+decisions that must be initiated before the next commitment process
+in order to preserve feasibility.
+Startup decisions outside this set may be deferred and are excluded
+from the current reliability optimization.
 
-Should we address the continuation of commitments?
+Because $t - L_i^{SU}$ is increasing in~$t$, the gating set is a
+contiguous block of early periods: if period~$t$ is gated, then every
+earlier period $t' < t$ is also gated.
+Generators with longer notification times have larger gating sets,
+reflecting the greater advance notice required to start them.
 
-Using these gating sets, we can formulate the reliability
-optimizations to only include as costs those decisions which must
-be taken in this decision process.We gate only startup decisions, since
-these represent the discrete, non-deferrable interventions taken outside
-the market. No-load costs are included only insofar as they are incurred
-as a consequence of these gated startups over the period in which the
-commitment cannot be revisited by subsequent market processes.
+The gating set restricts \emph{startup} decisions ($v_{i,t}$), not
+commitment status ($u_{i,t}$).
+A unit already committed by the market does not require a new startup
+decision and is therefore not subject to gating.
 
+\subsection{Market-Reliability Decomposition}\label{sec:decomp}
+
+Let $(\mathbf{u}^m, \mathbf{v}^m, \mathbf{w}^m)$ denote the
+commitment schedule from the preceding DAMKT solution.
+The reliability process operates on the \emph{total} commitment
+variables $(u_{i,t}, v_{i,t}, w_{i,t})$, which are constrained to
+preserve all market-decided commitments:
+\begin{equation}\label{eq:nodecommit}
+    u_{i,t} \;\geq\; u_{i,t}^m, \qquad \forall\, i,t.
+\end{equation}
+The startup and shutdown variables $v_{i,t}$ and $w_{i,t}$ are
+determined by the logic constraint~\eqref{eq:uc_logic} applied to the
+total commitment~$u_{i,t}$ and are not independently decomposed.
+
+The \emph{incremental commitment} is defined as
+\begin{equation}\label{eq:uprime}
+    u'_{i,t} \;:=\; u_{i,t} - u_{i,t}^m \;\in\; \{0,1\},
+    \qquad \forall\, i,t,
+\end{equation}
+where $u'_{i,t} = 1$ indicates a reliability intervention: a unit
+brought online beyond the market solution.
+
+A reliability startup at period~$t$ may \emph{absorb} a market
+startup at a later period: if the market planned to start unit~$i$ at
+period~$t{+}2$, but the reliability process starts it at~$t$, the
+unit is already online at~$t{+}2$ and the market startup is
+superseded.
+This interaction is handled automatically by the logic
+constraint~\eqref{eq:uc_logic} operating on total~$u$.
+
+\subsection{Phase~1: Deterministic Gated LD-RUC}\label{sec:phase1}
+
+Phase~1 identifies the minimum-cost reliability commitments that
+ensure feasibility under the mean renewable forecast~$\boldsymbol{\mu}$.
+The formulation uses the full constraint set
+$\mathcal{X}^{\text{UC}}$ over the entire planning horizon; only the
+\emph{objective} is restricted to the gating window.
+
+\begin{subequations}\label{eq:phase1}
 \begin{align}
-\min_{\hat{\mathbf{u}},\hat{\mathbf{v}}}\quad
-&\sum_{i\in\mathcal{I}}\sum_{t\in\mathcal{T}_i^{\text{start}}}
-\left( C_i^{SU}\hat v_{i,t} + C_i^{NL}\hat u_{i,t}\right) \label{eq:gate_obj}\\
+\min_{\substack{
+  \mathbf{u},\mathbf{v},\mathbf{w},\\
+  \mathbf{p},\mathbf{s}}} \quad
+& \sum_{i \in \mathcal{I}}
+  \sum_{t \in \mathcal{T}_i^{\text{gate}}}
+  \!\Big[\,
+    C_i^{SU}\, v_{i,t}
+    \;+\; C_i^{NL}\, u'_{i,t}
+  \Big]
+  \;+\; M \!\sum_{t} s_t^p
+  \label{eq:phase1_obj} \\[4pt]
 \text{s.t.}\quad
-&\text{DAMKT feasibility constraints } \nonumber\\
-&u_{i,t} = u^m_{i,t} + u'_{i,t},\quad
-v_{i,t} = v^m_{i,t} +  v'_{i,t}, \quad \forall i,t \nonumber\\
-&u'_{i,t} \le 1-u^m_{i,t},\quad v'_{i,t}\le 1-v^m_{i,t}, \quad \forall i,t \nonumber\\
-& u'_{i,t},v'_{i,t} \in \{0,1\}, \quad \forall i,t. \nonumber
+& \eqref{eq:uc_base}
+  \quad\text{with } \bar{p}_{j,t}^{\text{fcst}} = \mu_{j,t},
+  \label{eq:phase1_uc} \\
+& u_{i,t} \geq u_{i,t}^m,
+  \quad \forall\, i,t,
+  \label{eq:phase1_lock} \\
+& u'_{i,t} = u_{i,t} - u_{i,t}^m,
+  \quad \forall\, i,t.
+  \label{eq:phase1_uprime}
 \end{align}
+\end{subequations}
+
+The objective~\eqref{eq:phase1_obj} penalizes startup costs
+$C_i^{SU} v_{i,t}$ and incremental no-load costs
+$C_i^{NL} u'_{i,t}$ only within the gating window
+$\mathcal{T}_i^{\text{gate}}$.
+Startup terms corresponding to the DAMKT solution
+($v_{i,t} = v_{i,t}^m$) contribute a constant under the
+no-decommitment constraint~\eqref{eq:phase1_lock} and do not
+influence the optimization.
+Commitment variables outside the gating window are free but carry no
+objective cost; the optimizer adds non-gated commitments only when
+forced by minimum-up-time propagation or system feasibility.
+
+\emph{Windowed no-load variant.}
+A gated startup at period~$t$ commits unit~$i$ for at least
+$\text{MUT}_i$ periods, some of which may fall beyond the gating
+window.
+A refined objective attributes no-load cost over the irrevocable
+commitment window rather than period-by-period:
+\begin{equation}\label{eq:obj_window}
+\sum_{i \in \mathcal{I}}
+\sum_{t \in \mathcal{T}_i^{\text{gate}}}
+\!\left[
+  C_i^{SU}\, v_{i,t}
+  \;+\;
+  \sum_{\tau=t}^{\min\{t+\text{MUT}_i-1,\,T\}}
+    \!\! C_i^{NL}\, v'_{i,t}
+\right]
++ M \!\sum_t s_t^p,
+\end{equation}
+where $v'_{i,t} := v_{i,t}\,(1 - v_{i,t}^m)$ isolates reliability
+startups from market startups.
+
+\emph{Output.}
+Phase~1 produces a candidate commitment schedule
+$\hat{\mathbf{u}} = \mathbf{u}^m + \hat{\mathbf{u}}'$, along with
+the associated startup and shutdown indicators
+$(\hat{\mathbf{v}},\hat{\mathbf{w}})$.
+
+\subsection{Phase~2: Robust Feasibility Verification}
+\label{sec:phase2}
+
+Phase~2 takes the commitment decisions from Phase~1 as fixed and
+checks whether a feasible dispatch policy exists for all uncertainty
+realizations.
+Because all binary variables are fixed, Phase~2 is a continuous
+optimization problem.
+
+\subsubsection{Uncertainty model}
+Let $\mathbf{r} \in \mathbb{R}^K$ represent deviations of renewable
+generation from the mean forecast, where $K$ is the number of
+uncertain renewable sources.
+The uncertainty set is an ellipsoid parameterized by a positive
+definite covariance matrix
+$\boldsymbol{\Sigma} \in \mathbb{R}^{K \times K}$ and a scalar
+budget~$\rho > 0$:
+\begin{equation}\label{eq:uset}
+    \mathcal{U} \;:=\;
+    \bigl\{\, \mathbf{r} \in \mathbb{R}^K \;\big|\;
+    \mathbf{r}^\top \boldsymbol{\Sigma}^{-1} \mathbf{r}
+    \leq \rho^2 \bigr\}.
+\end{equation}
+The construction of $\boldsymbol{\Sigma}$ and calibration of~$\rho$
+via conformal prediction are detailed in~[paper~2]; here we treat
+$(\boldsymbol{\Sigma}, \rho)$ as given inputs.
+
+\subsubsection{Linear decision rules}
+Dispatch is modeled as an affine function of the uncertainty
+realization:
+\begin{equation}\label{eq:ldr}
+    p_{i,t}(\mathbf{r})
+    \;=\; p_{i,t}^0
+    \;+\; \mathbf{z}_{i,t}^\top \mathbf{r},
+    \qquad \forall\, i,t,
+\end{equation}
+where $p_{i,t}^0$ is the nominal dispatch and
+$\mathbf{z}_{i,t} \in \mathbb{R}^K$ are the linear decision rule
+(LDR) coefficients governing the response of generator~$i$ at
+period~$t$ to the uncertainty realization.
+
+\subsubsection{Robust counterpart}
+Each operational constraint must hold for every
+$\mathbf{r} \in \mathcal{U}$.
+For a generic upper-bound constraint
+$\mathbf{z}_{i,t}^\top \mathbf{r} \leq b_{i,t}$, the worst-case
+over $\mathcal{U}$ yields the second-order cone (SOC) condition
+\begin{equation}\label{eq:soc_generic}
+    \rho\,
+    \bigl\lVert
+      \boldsymbol{\Sigma}^{1/2} \mathbf{z}_{i,t}
+    \bigr\rVert_2
+    \;\leq\; b_{i,t}.
+\end{equation}
+
+Applying this to each constraint in $\mathcal{X}^{\text{UC}}$ with
+commitment fixed at $\hat{\mathbf{u}}$ gives the Phase~2 formulation:
+\begin{subequations}\label{eq:phase2}
 \begin{align}
-\min_{\hat{\mathbf{u}},\hat{\mathbf{v}}}\quad
-&\sum_{i\in\mathcal{I}}\sum_{t\in\mathcal{T}_i^{\text{start}}}
-\left(
-C_i^{SU}\hat v_{i,t}
-+
-\sum_{\tau=t}^{\min\{t+H_i-1,\,T\}} C_i^{NL}\hat v_{i,t}
-\right) \label{eq:gate_obj_window}
+\min_{\mathbf{p}^0,\,\mathbf{Z},\,\mathbf{s}} \quad
+& \sum_t s_t
+  \label{eq:phase2_obj} \\[3pt]
+\text{s.t.}\quad
+%--- nominal power balance ---
+& \sum_{i} p_{i,t}^0 + s_t = \sum_n d_{n,t},
+  \quad \forall\, t,
+  \label{eq:phase2_bal_nom} \\
+%--- recourse balance ---
+& \sum_{i} z_{i,t,k} = 0,
+  \quad \forall\, k,t,
+  \label{eq:phase2_bal_rec} \\
+%--- capacity upper (SOC) ---
+& p_{i,t}^0
+  + \rho \lVert \boldsymbol{\Sigma}^{1/2} \mathbf{z}_{i,t} \rVert_2
+  \leq \bar{P}_i\, \hat{u}_{i,t},
+  \quad \forall\, i,t,
+  \label{eq:phase2_cap_up} \\
+%--- capacity lower (SOC) ---
+& \underline{P}_i\, \hat{u}_{i,t}
+  \leq p_{i,t}^0
+  - \rho \lVert \boldsymbol{\Sigma}^{1/2} \mathbf{z}_{i,t} \rVert_2,
+  \quad \forall\, i,t,
+  \label{eq:phase2_cap_lo} \\
+%--- ramp up (SOC) ---
+& (p_{i,t}^0 - p_{i,t-1}^0)
+  + \rho \lVert \boldsymbol{\Sigma}^{1/2}
+    (\mathbf{z}_{i,t} - \mathbf{z}_{i,t-1}) \rVert_2
+  \nonumber\\
+& \qquad\qquad
+  \leq R_i^U (\hat{u}_{i,t-1} + \hat{v}_{i,t}),
+  \quad \forall\, i,t,
+  \label{eq:phase2_ramp_up} \\
+%--- ramp down (SOC) ---
+& (p_{i,t-1}^0 - p_{i,t}^0)
+  + \rho \lVert \boldsymbol{\Sigma}^{1/2}
+    (\mathbf{z}_{i,t-1} - \mathbf{z}_{i,t}) \rVert_2
+  \nonumber\\
+& \qquad\qquad
+  \leq R_i^D (\hat{u}_{i,t} + \hat{w}_{i,t}),
+  \quad \forall\, i,t,
+  \label{eq:phase2_ramp_dn} \\
+%--- transmission (SOC) ---
+& \Big|\sum_n S_n^l
+  \Big(\sum_{i \in \mathcal{I}_n} p_{i,t}^0 - d_{n,t}\Big)\Big|
+  + \rho \Big\lVert \boldsymbol{\Sigma}^{1/2}
+    \sum_{i \in \mathcal{I}_n} S_n^l\, \mathbf{z}_{i,t}
+  \Big\rVert_2
+  \nonumber\\
+& \qquad\qquad
+  \leq \bar{F}^l,
+  \quad \forall\, l,t,
+  \label{eq:phase2_flow} \\
+%--- renewable limit (SOC) ---
+& p_{j,t}^0
+  + \rho \lVert \boldsymbol{\Sigma}^{1/2}
+    (\mathbf{z}_{j,t} - \mathbf{e}_{j,t}) \rVert_2
+  \leq \mu_{j,t},
+  \nonumber\\
+& \qquad\qquad
+  \forall\, j \in \mathcal{I}^{\text{ren}},\; t,
+  \label{eq:phase2_ren} \\
+%--- domains ---
+& \mathbf{p}^0 \geq 0,\; \mathbf{s} \geq 0.
+  \label{eq:phase2_domain}
 \end{align}
+\end{subequations}
 
-% An example of a floating figure using the graphicx package.
-% Note that \label must occur AFTER (or within) \caption.
-% For figures, \caption should occur after the \includegraphics.
-% Note that IEEEtran v1.7 and later has special internal code that
-% is designed to preserve the operation of \label within \caption
-% even when the captionsoff option is in effect. However, because
-% of issues like this, it may be the safest practice to put all your
-% \label just after \caption rather than within \caption{}.
-%
-% Reminder: the "draftcls" or "draftclsnofoot", not "draft", class
-% option should be used if it is desired that the figures are to be
-% displayed while in draft mode.
-%
-%\begin{figure}[!t]
-%\centering
-%\includegraphics[width=2.5in]{myfigure}
-% where an .eps filename suffix will be assumed under latex,
-% and a .pdf suffix will be assumed for pdflatex; or what has been declared
-% via \DeclareGraphicsExtensions.
-%\caption{Simulation results for the network.}
-%\label{fig_sim}
-%\end{figure}
+Here $\mathbf{e}_{j,t} \in \mathbb{R}^K$ is the unit vector
+selecting the uncertainty dimension corresponding to renewable
+source~$j$ at period~$t$, so that the available renewable output
+under realization~$\mathbf{r}$ is $\mu_{j,t} + \mathbf{e}_{j,t}^\top
+\mathbf{r}$.
+Constraint~\eqref{eq:phase2_bal_rec} ensures that the aggregate
+dispatch response to any realization sums to zero: when renewable
+output deviates, the remaining fleet absorbs the imbalance.
 
-% Note that the IEEE typically puts floats only at the top, even when this
-% results in a large percentage of a column being occupied by floats.
+Formulation~\eqref{eq:phase2} is a second-order cone program (SOCP)
+with no integer variables.
+If the optimal slack satisfies $\sum_t s_t^* = 0$, the Phase~1
+commitments are \emph{robust-sufficient}: a feasible dispatch policy
+exists for every $\mathbf{r} \in \mathcal{U}$.
+If $\sum_t s_t^* > 0$, the commitments are insufficient and the
+\emph{robustness gap} $\sum_t s_t^*$ quantifies the worst-case
+shortfall in megawatt-hours.
 
 
-% An example of a double column floating figure using two subfigures.
-% (The subfig.sty package must be loaded for this to work.)
-% The subfigure \label commands are set within each subfloat command,
-% and the \label for the overall figure must come after \caption.
-% \hfil is used as a separator to get equal spacing.
-% Watch out that the combined width of all the subfigures on a
-% line do not exceed the text width or a line break will occur.
-%
-%\begin{figure*}[!t]
-%\centering
-%\subfloat[Case I]{\includegraphics[width=2.5in]{box}%
-%\label{fig_first_case}}
-%\hfil
-%\subfloat[Case II]{\includegraphics[width=2.5in]{box}%
-%\label{fig_second_case}}
-%\caption{Simulation results for the network.}
-%\label{fig_sim}
-%\end{figure*}
-%
-% Note that often IEEE papers with subfigures do not employ subfigure
-% captions (using the optional argument to \subfloat[]), but instead will
-% reference/describe all of them (a), (b), etc., within the main caption.
-% Be aware that for subfig.sty to generate the (a), (b), etc., subfigure
-% labels, the optional argument to \subfloat must be present. If a
-% subcaption is not desired, just leave its contents blank,
-% e.g., \subfloat[].
+\subsection{Augmentation via Column-and-Constraint Generation}
+\label{sec:augment}
+
+When Phase~2 reports a positive robustness gap, the Phase~1
+commitments are insufficient under worst-case uncertainty.
+We close this gap by iterating between the two phases using
+column-and-constraint generation (CCG).
+
+Phase~2 not only evaluates the gap but also identifies a
+\emph{worst-case scenario}: the realization
+$\mathbf{r}^* \in \mathcal{U}$ at which the dispatch constraints are
+most stressed.
+This scenario is added to Phase~1 as an additional set of
+deterministic constraints, requiring that the commitment schedule be
+feasible under both the mean forecast and the worst-case
+realization~$\mathbf{r}^*$.
+Phase~1 is then re-solved, and the updated commitments are passed
+back to Phase~2 for verification.
+
+Formally, at CCG iteration~$\ell$, Phase~1 is augmented with the
+scenario set $\mathcal{R}^{(\ell)} = \{\mathbf{r}^{*(1)}, \dots,
+\mathbf{r}^{*(\ell)}\}$ collected from prior Phase~2 solves:
+\begin{equation}\label{eq:ccg_aug}
+  \eqref{eq:phase1} \;\;\text{with additional constraints:}\;\;
+  \mathcal{X}^{\text{UC}}(\mathbf{r}^{*(m)}) \;\;\forall\,
+  \mathbf{r}^{*(m)} \in \mathcal{R}^{(\ell)},
+\end{equation}
+where $\mathcal{X}^{\text{UC}}(\mathbf{r})$ denotes the
+deterministic UC constraints evaluated at the renewable forecast
+$\boldsymbol{\mu} + \mathbf{r}$.
+Phase~1 remains a mixed-integer linear program at each iteration
+(no SOC constraints); only the number of scenario copies of
+$\mathcal{X}^{\text{UC}}$ grows.
+
+\begin{proposition}\label{prop:ccg}
+The CCG procedure converges in a finite number of iterations to the
+optimal solution of the monolithic robust gated LD-RUC.
+\end{proposition}
+
+This follows from the standard finite-convergence result for
+two-stage robust optimization with a compact uncertainty set
+and finite recourse~[cite Zeng \& Zhao 2013].
+
+In practice, we expect the number of CCG iterations to be small.
+When the system has sufficient reserve headroom, Phase~2 may certify
+robust feasibility on the first pass, requiring no augmentation at
+all.
+The robustness gap and iteration count are reported in the case study
+as measures of how far the deterministic gated solution lies from
+robust sufficiency.
+
+\subsection{Summary}\label{sec:formulation_summary}
+
+The complete LD-RUC procedure is:
+\begin{enumerate}
+  \item Solve Phase~1~\eqref{eq:phase1}: deterministic gated LD-RUC
+    (MIP) with mean forecast.
+    Obtain candidate commitments $\hat{\mathbf{u}}$.
+  \item Solve Phase~2~\eqref{eq:phase2}: robust feasibility
+    verification (SOCP) with fixed $\hat{\mathbf{u}}$.
+  \item If $\sum_t s_t^* = 0$: terminate.
+    The commitments are robust-sufficient.
+  \item If $\sum_t s_t^* > 0$: extract worst-case
+    $\mathbf{r}^*$, augment Phase~1
+    via~\eqref{eq:ccg_aug}, and return to Step~1.
+\end{enumerate}
+
+The separation of commitment (integer, Phase~1) from dispatch
+verification (continuous, Phase~2) offers both computational and
+structural advantages.
+Phase~1 is a standard-sized MIP with the same constraint structure as
+a conventional DARUC; the gating set modifies only the objective.
+Phase~2 is a SOCP that scales with the number of generators and
+periods but involves no combinatorial decisions.
 
 
-% An example of a floating table. Note that, for IEEE style tables, the
-% \caption command should come BEFORE the table and, given that table
-% captions serve much like titles, are usually capitalized except for words
-% such as a, an, and, as, at, but, by, for, in, nor, of, on, or, the, to
-% and up, which are usually not capitalized unless they are the first or
-% last word of the caption. Table text will default to \footnotesize as
-% the IEEE normally uses this smaller font for tables.
-% The \label must come after \caption as always.
-%
-%\begin{table}[!t]
-%% increase table row spacing, adjust to taste
-%\renewcommand{\arraystretch}{1.3}
-% if using array.sty, it might be a good idea to tweak the value of
-% \extrarowheight as needed to properly center the text within the cells
-%\caption{An Example of a Table}
-%\label{table_example}
-%\centering
-%% Some packages, such as MDW tools, offer better commands for making tables
-%% than the plain LaTeX2e tabular which is used here.
-%\begin{tabular}{|c||c|}
-%\hline
-%One & Two\\
-%\hline
-%Three & Four\\
-%\hline
-%\end{tabular}
-%\end{table}
+%% ===================================================================
+%%  SECTION 5 — GENERALIZATION ACROSS DECISION STAGES
+%% ===================================================================
+\section{Generalization Across Decision Stages}\label{sec:general}
+
+The gating set~\eqref{eq:gating_set} is parameterized by the
+decision stage~$k$ (through $t^{\text{next}}$) and the generator
+notification times~$L_i^{SU}$.
+By varying these parameters, the LD-RUC framework instantiates
+naturally across the operational planning sequence.
+
+\subsection{Multi-Day Reliability Assessment (MDRA)}
+
+The MDRA is an advisory process run several days before the operating
+day, with a horizon of four to seven days.
+At this stage, $t^{\text{next}}$ corresponds to the first period of
+OD$-$1 (the day before the operating day), when the DAMKT will
+clear.
+Only generators with very long notification times --- those whose
+startup lead time exceeds the interval between the MDRA and the
+DAMKT --- have non-empty gating sets.
+In practice, this restricts the MDRA's binding decisions to large
+coal, nuclear, and combined-cycle units requiring multi-day advance
+notice.
+
+\subsection{Day-Ahead RUC (DA-RUC)}
+
+The DA-RUC runs after the DAMKT clears for the operating day.
+Here $t^{\text{next}}$ is the first period of OD$+$1 (the next
+operating day), since the next DAMKT will cover that horizon.
+Generators with notification times shorter than 24~hours have gating
+sets that cover only the operating day itself; those with longer lead
+times may also gate periods on OD$+$1.
+This is the primary application of the LD-RUC framework developed in
+Section~\ref{sec:phase1}.
+
+\subsection{Intra-Day RUC (ID-RUC)}
+
+Intra-day reliability processes run on a rolling basis during the
+operating day.
+At each invocation, $t^{\text{next}}$ is the earliest period that can
+still be modified by the next intra-day run (typically the current
+period plus the process cycle time).
+The gating sets shrink as the operating day progresses and more
+decisions become irrevocable, leaving only fast-start resources with
+non-empty gating windows.
+
+\subsection{Relationship to Standard DARUC}
+
+The standard DARUC formulation~\eqref{eq:daruc_obj} can be viewed as
+the limiting case of the gating framework in which
+$\mathcal{T}_i^{\text{gate}} = \mathcal{T}$ for all~$i$ --- that is,
+every commitment decision is treated as non-deferrable.
+This occurs when $t^{\text{next}} \to \infty$ (no subsequent process
+exists) or equivalently when $L_i^{SU} \to \infty$ for all
+generators.
+
+Conversely, the pure market outcome (no reliability intervention)
+corresponds to $\mathcal{T}_i^{\text{gate}} = \varnothing$ for
+all~$i$, which occurs when $L_i^{SU} = 0$ (all units can be started
+instantaneously) or $t^{\text{next}} = 1$ (the next process can
+modify every period).
+The gating framework thus spans a continuum between no intervention
+and full re-optimization, with the physical notification times
+determining the appropriate point on this spectrum.
 
 
-% Note that the IEEE does not put floats in the very first column
-% - or typically anywhere on the first page for that matter. Also,
-% in-text middle ("here") positioning is typically not used, but it
-% is allowed and encouraged for Computer Society conferences (but
-% not Computer Society journals). Most IEEE journals/conferences use
-% top floats exclusively.
-% Note that, LaTeX2e, unlike IEEE journals/conferences, places
-% footnotes above bottom floats. This can be corrected via the
-% \fnbelowfloat command of the stfloats package.
+%% ===================================================================
+%%  SECTION 6 — CASE STUDY
+%% ===================================================================
+\section{Case Study}\label{sec:casestudy}
+
+\subsection{Setup}
+
+The proposed LD-RUC formulation is evaluated on the RTS-GMLC test
+case, a three-area system with 73~generating units (thermal, wind,
+solar, and hydro) and 120~transmission lines.
+Wind forecast data are drawn from the Southwest Power Pool (SPP)
+constellation forecast dataset, scaled to the RTS-GMLC wind fleet
+capacities.
+The ellipsoidal uncertainty set parameters
+$(\boldsymbol{\Sigma}, \rho)$ are constructed using the learned
+covariance and conformal prediction methodology developed
+in~[paper~2].
+
+Notification times $L_i^{SU}$ are assigned to the generator fleet
+based on fuel type and capacity:
+% TODO: Table of notification time assignments.
+% Coal/nuclear: 24-48 hours
+% Combined cycle: 8-12 hours
+% Combustion turbine: 1-4 hours
+% Wind/solar/hydro: 0 hours (no startup lead time)
+
+The DA-RUC decision stage is used as the primary test case, with
+$t^{\text{next}}$ set to the first period of OD$+$1 (period~25 for a
+48-hour horizon starting at OD hour~1).
+All experiments are solved using Gurobi~11 on [hardware description].
+
+\subsection{Standard DARUC vs.\ LD-RUC}\label{sec:results_daruc}
+
+% TODO: Primary comparison results.
+% Expected structure:
+% - Table: number of reliability commitments (startups) by fuel type
+%   for standard DARUC vs LD-RUC
+% - Figure: commitment heatmap showing which generators are committed
+%   differently between the two approaches
+% - Key finding: long-lead units (coal, CC) have identical commitments
+%   since they are gated in both formulations; short-lead units (CT)
+%   differ significantly
+% - Total commitment cost comparison
+% - Feasibility verification: confirm no load shedding (s = 0)
+%   in both cases
+
+\subsection{Robust Verification Results}\label{sec:results_robust}
+
+% TODO: Phase 2 results.
+% - For each test scenario: does Phase 2 pass on the first try?
+% - Report pass/fail rate across scenarios
+% - When Phase 2 fails: report robustness gap (sum of s_t)
+% - Number of CCG iterations required to achieve robust feasibility
+% - Key question to answer: how often are deterministic gated
+%   commitments already robust-sufficient?
+% - Compare final (post-CCG) commitment schedule against Phase 1
+%   result: how many additional units were needed?
+
+\subsection{Comparison with Integrated Robust UC}
+\label{sec:results_aruc}
+
+% TODO: Compare LD-RUC against the integrated ARUC from paper 2.
+% - ARUC jointly optimizes all commitment and dispatch decisions
+%   under uncertainty (no gating, no decomposition)
+% - Metrics: total cost, commitment count, wind curtailment,
+%   computation time
+% - Key point: LD-RUC produces fewer out-of-market interventions
+%   than ARUC by construction, at the potential cost of higher
+%   total system cost
+% - The cost gap between LD-RUC and ARUC represents the price of
+%   minimal intervention: how much more expensive is the
+%   least-distortionary solution?
+
+\subsection{Sensitivity to Notification Times}
+\label{sec:results_sensitivity}
+
+% TODO: This section demonstrates the gating set's value directly.
+% - Sweep L_i^SU for the fleet (or sweep t^next)
+% - For each setting: report number of gated decisions, number of
+%   reliability commitments, total cost
+% - Figure: commitments and cost vs notification time or t^next
+% - Limiting cases as validation:
+%   L_i -> 0: no gated decisions, zero reliability cost
+%   L_i -> infinity: all decisions gated, recovers standard DARUC
+% - Intermediate values: demonstrate smooth transition and
+%   quantify the marginal value of each hour of notification time
 
 
+%% ===================================================================
+%%  SECTION 7 — CONCLUSION
+%% ===================================================================
+\section{Conclusion}\label{sec:conclusion}
+
+This paper introduced a notification-gated formulation for
+reliability unit commitment that restricts out-of-market interventions
+to the minimal set of commitment decisions that cannot be deferred to
+subsequent market or operational processes.
+The gating set, derived from physical generator notification times and
+the timing of sequential decision stages, provides a principled
+criterion for distinguishing non-deferrable reliability actions from
+decisions that can be left to the market.
+
+The proposed two-phase solution approach separates the commitment
+decision (a deterministic MIP over the gating window) from robust
+feasibility verification (a continuous SOCP with fixed commitments).
+This decomposition offers computational advantages and provides
+diagnostic information: the robustness gap quantifies the worst-case
+shortfall of the deterministic solution, and the number of CCG
+iterations measures the additional commitment cost attributable to
+uncertainty.
+
+The gating framework generalizes across operational horizons.
+Multi-day reliability assessment, day-ahead RUC, and intra-day RUC
+are all instances of the same formulation with different
+parameterizations of the gating set.
+Standard DARUC is recovered as a limiting case in which all decisions
+are treated as non-deferrable.
+
+% TODO: Summarize numerical findings once case study is complete.
+% Expected: significant reduction in reliability commitments,
+% Phase 2 passes in most scenarios, small robustness gap when
+% it does not, modest CCG iterations.
+
+Future work includes analysis of market efficiency impacts (LMP
+changes and uplift costs resulting from reduced reliability
+interventions), extension to chance-constrained and distributionally
+robust uncertainty models, and application to multi-settlement market
+structures where the interaction between reliability processes and
+real-time pricing is most consequential.
 
 
-\section{Conclusion}
-The conclusion goes here.
-
-
-
-
-
-% if have a single appendix:
-%\appendix[Proof of the Zonklar Equations]
-% or
-%\appendix  % for no appendix heading
-% do not use \section anymore after \appendix, only \section*
-% is possibly needed
-
-% use appendices with more than one appendix
-% then use \section to start each appendix
-% you must declare a \section before using any
-% \subsection or using \label (\appendices by itself
-% starts a section numbered zero.)
-%
-
+%% ===================================================================
+%%  BACK MATTER
+%% ===================================================================
 
 \appendices
-\section{Proof of the First Zonklar Equation}
-Appendix one text goes here.
+\section{Nomenclature}\label{app:nomenclature}
 
-% you can choose not to have a title for an appendix
-% if you want by leaving the argument blank
-\section{}
-Appendix two text goes here.
+\begin{table}[h]
+\renewcommand{\arraystretch}{1.15}
+\centering
+\begin{tabular}{ll}
+\hline
+\textbf{Symbol} & \textbf{Description} \\
+\hline
+\multicolumn{2}{l}{\emph{Sets and indices}} \\
+$\mathcal{I}$, $i$ & Generating resources \\
+$\mathcal{I}^{\text{ren}}$, $j$ & Renewable generators \\
+$\mathcal{I}_n$ & Generators at bus $n$ \\
+$\mathcal{N}$, $n$ & Buses \\
+$\mathcal{L}$, $l$ & Transmission lines \\
+$\mathcal{T}$, $t$ & Operating periods \\
+$\mathcal{T}_i^{\text{gate}}$ & Gating set for generator $i$ \\
+$\mathcal{U}$ & Uncertainty set \\
+$K$, $k$ & Uncertainty dimensions \\
+$b$ & Dispatch blocks \\
+\hline
+\multicolumn{2}{l}{\emph{Parameters}} \\
+$C_i^{NL},C_i^{SU},C_i^{SD}$ & No-load, startup, shutdown cost \\
+$C_{i,b}^p$ & Block energy cost \\
+$\bar{P}_i$, $\underline{P}_i$ & Max/min capacity \\
+$\bar{P}_{i,b}$ & Block capacity \\
+$R_i^U$, $R_i^D$ & Ramp-up/down rate \\
+$\text{MUT}_i$, $\text{MDT}_i$ & Min up/down time \\
+$L_i^{SU}$ & Startup notification time \\
+$d_{n,t}$ & Nodal demand \\
+$\bar{F}^l$ & Line flow limit \\
+$S_n^l$ & PTDF entry \\
+$\mu_{j,t}$ & Mean renewable forecast \\
+$\boldsymbol{\Sigma}$ & Uncertainty covariance matrix \\
+$\rho$ & Uncertainty budget \\
+$M$ & Slack penalty \\
+$u_{i,t}^m$, $v_{i,t}^m$ & DAMKT commitment/startup \\
+$t^{\text{next}}$ & First period modifiable by next process \\
+\hline
+\multicolumn{2}{l}{\emph{Variables}} \\
+$u_{i,t}$ & Commitment status (binary) \\
+$v_{i,t}$, $w_{i,t}$ & Startup/shutdown (binary) \\
+$u'_{i,t}$ & Incremental commitment \\
+$p_{i,t}$ & Dispatch (MW) \\
+$p_{i,t}^0$ & Nominal dispatch (Phase~2) \\
+$\mathbf{z}_{i,t}$ & LDR coefficients (Phase~2) \\
+$s_t^p$, $s_t$ & Power balance slack \\
+\hline
+\end{tabular}
+\end{table}
 
-
-% use section* for acknowledgment
 \section*{Acknowledgment}
+The authors would like to thank\ldots
 
+%\bibliographystyle{IEEEtran}
+%\bibliography{IEEEabrv,../bib/paper}
 
-The authors would like to thank...
-
-
-% Can use something like this to put references on a page
-% by themselves when using endfloat and the captionsoff option.
-\ifCLASSOPTIONcaptionsoff
-  \newpage
-\fi
-
-
-
-% trigger a \newpage just before the given reference
-% number - used to balance the columns on the last page
-% adjust value as needed - may need to be readjusted if
-% the document is modified later
-%\IEEEtriggeratref{8}
-% The "triggered" command can be changed if desired:
-%\IEEEtriggercmd{\enlargethispage{-5in}}
-
-% references section
-
-% can use a bibliography generated by BibTeX as a .bbl file
-% BibTeX documentation can be easily obtained at:
-% http://mirror.ctan.org/biblio/bibtex/contrib/doc/
-% The IEEEtran BibTeX style support page is at:
-% http://www.michaelshell.org/tex/ieeetran/bibtex/
-\bibliographystyle{IEEEtran}
-% argument is your BibTeX string definitions and bibliography database(s)
-\bibliography{IEEEabrv,../bib/paper}
-%
-% <OR> manually copy in the resultant .bbl file
-% set second argument of \begin to the number of references
-% (used to reserve space for the reference number labels box)
-\begin{thebibliography}{1}
-
-\bibitem{IEEEhowto:kopka}
-H.~Kopka and P.~W. Daly, \emph{A Guide to \LaTeX}, 3rd~ed.\hskip 1em plus
-  0.5em minus 0.4em\relax Harlow, England: Addison-Wesley, 1999.
-
-\end{thebibliography}
-
-% biography section
-%
-% If you have an EPS/PDF photo (graphicx package needed) extra braces are
-% needed around the contents of the optional argument to biography to prevent
-% the LaTeX parser from getting confused when it sees the complicated
-% \includegraphics command within an optional argument. (You could create
-% your own custom macro containing the \includegraphics command to make things
-% simpler here.)
-%\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{mshell}}]{Michael Shell}
-% or if you just want to reserve a space for a photo:
-
-\begin{IEEEbiography}{Michael Shell}
-Biography text here.
-\end{IEEEbiography}
-
-% if you will not have a photo at all:
-\begin{IEEEbiographynophoto}{John Doe}
-Biography text here.
-\end{IEEEbiographynophoto}
-
-% insert where needed to balance the two columns on the last page with
-% biographies
-%\newpage
-
-\begin{IEEEbiographynophoto}{Jane Doe}
-Biography text here.
-\end{IEEEbiographynophoto}
-
-% You can push biographies down or up by placing
-% a \vfill before or after them. The appropriate
-% use of \vfill depends on what kind of text is
-% on the last page and whether or not the columns
-% are being equalized.
-
-%\vfill
-
-% Can be used to pull up biographies so that the bottom of the last one
-% is flush with the other column.
-%\enlargethispage{-5in}
-
-
-
-% that's all folks
 \end{document}
-
-

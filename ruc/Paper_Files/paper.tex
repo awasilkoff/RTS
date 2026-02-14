@@ -135,25 +135,39 @@ without compromising system reliability.
 
 \subsection{Operational Timeline}
 
-While all system operators have their own idiosyncrasies,
-the North American RTOs share a common schematic structure in their
-sequence of decision processes. For this work, we focus on the
-pattern in use by Southwest Power Pool (SPP), but the outline applies
-to most other system operators with the notable exception of
-NYISO, which integrates the DARUC and DAMKT clearing.
+North American RTOs share a common sequential structure in their
+commitment and dispatch processes, though specific timing and
+nomenclature vary across operators.
+For notational clarity, we refer to the \emph{Operating Day}~(OD)
+as the day for which the operation plan is being generated.
+The following sequence is representative of the general pattern;
+specific timing parameters are given in
+Section~\ref{sec:casestudy}.
 
-For notational clarity, we refer to the Operating Day (OD) as
-the day for which the operation plan is being generated.
-The principal scheduling process, the Day-Ahead Market (DAMKT),
-finishes solving around noon of OD$-$1. Decisions of that process
-are communicated at 2 pm OD$-$1. The DA-RUC process follows this
-at 5 pm. The DARUC considers a decision horizon covering
-OD and OD$+$1.
+The earliest commitment decisions are made through a
+\emph{multi-day reliability assessment}~(MDRA), an advisory process
+run several days before OD with a look-ahead horizon of four to
+seven days.
+The MDRA identifies long-lead resources --- typically large thermal
+units requiring multi-day advance notice --- that must be committed
+to ensure system adequacy.
 
-% TODO: Complete the multi-day reliability assessment (MDRA) description.
-% MDRA is advisory, 4-7 day horizon, commits long-lead resources.
-% Then: DAMKT → DARUC → ID-RUC intraday.
-% A timeline figure would be valuable here.
+The principal scheduling process is the \emph{Day-Ahead
+Market}~(DAMKT), which clears on OD$-$1 and produces a binding
+commitment and dispatch schedule for~OD.
+Following the DAMKT, the \emph{Day-Ahead Reliability Unit
+Commitment}~(DARUC) reviews the market solution and commits
+additional resources as needed to ensure reliability over a horizon
+covering OD and, in many implementations, OD$+$1.
+
+During the operating day itself, \emph{Intra-Day RUC}~(ID-RUC)
+processes run on a rolling basis, making near-term commitment
+adjustments as updated forecasts become available.
+
+The complete sequence --- MDRA, DAMKT, DARUC, ID-RUC --- forms a
+nested hierarchy in which each successive process operates over a
+shorter horizon with more current information, and may revise or
+supplement the decisions of its predecessor.
 
 \subsection{Unit Commitment Formulation}
 
@@ -247,34 +261,52 @@ objective, retaining only commitment-related costs:
 & \eqref{eq:uc_base}. \nonumber
 \end{align}
 
-% TODO: Note that in practice, the DARUC may also fix u^m from the
-% DAMKT solution and only allow additional commitments. This varies
-% by ISO. SPP's practice is [describe].
+In practice, the DARUC typically inherits the DAMKT commitment
+schedule as a lower bound, permitting additional commitments but
+prohibiting de-commitment of market-cleared resources.
+The specific implementation varies across operators; some fix the
+market schedule entirely, while others allow limited modifications.
+This no-decommitment convention is formalized in
+Section~\ref{sec:decomp}.
 
 \subsection{Why Standard DARUC Over-Commits}\label{sec:overcommit}
 
-% TODO: This is the diagnostic argument that sets up Section 4.
-% Key points:
-%
-% (1) Standard DARUC optimizes u_{i,t} for ALL i and ALL t in the
-%     horizon. But most of these decisions will be revisited by the
-%     next market clearing (DAMKT for OD+1, or ID-RUC intraday).
-%     The DARUC is solving a problem that is mostly not its to solve.
-%
-% (2) Because the DARUC sees the full horizon and minimizes total
-%     commitment cost, it may commit units early to avoid more
-%     expensive startups later — even when those later decisions
-%     can be deferred to a subsequent process that will have better
-%     information.
-%
-% (3) The result: commitment decisions that are technically feasible
-%     but premature. Units are started hours or days before they are
-%     needed, displacing market-cleared resources and distorting
-%     price signals.
-%
-% (4) The core issue is not that the DARUC commits the wrong units,
-%     but that it commits units whose startup decisions could have
-%     waited. The formulation lacks a notion of *deferrability*.
+The standard DARUC formulation optimizes commitment decisions
+$u_{i,t}$ for every generator~$i$ across every period~$t$ in the
+planning horizon.
+However, the vast majority of these decisions will be revisited ---
+and potentially revised --- by subsequent processes: the next DAMKT
+clearing for periods beyond~OD, and intra-day RUC for near-term
+adjustments.
+The DARUC thus solves an optimization problem whose scope extends
+well beyond the decisions that are genuinely its to make.
+
+This scope mismatch creates a systematic bias toward early
+commitment.
+Because the DARUC minimizes total commitment cost over the full
+horizon, it may find it optimal to start a unit in an early period
+to avoid a more expensive startup in a later period --- even when
+the later decision falls within the purview of a subsequent process
+that will have access to updated forecasts.
+The DARUC has no mechanism to recognize that such deferred decisions
+carry no immediate cost: from its perspective, the entire horizon
+is a single optimization to be solved jointly.
+
+The result is commitment decisions that are feasible but premature.
+Units are started hours or days before they are operationally
+required, displacing resources that were optimally scheduled by the
+market and distorting the price signals that the market was designed
+to produce.
+
+The fundamental issue is not that the DARUC commits the wrong units
+in an absolute sense, but that it commits units whose startup
+decisions could have been deferred without jeopardizing reliability.
+The formulation lacks a notion of \emph{deferrability}: it treats
+every commitment decision as equally urgent, regardless of whether
+the physical lead time of the generator demands an immediate
+decision or permits deferral to a later stage.
+Section~\ref{sec:gating} introduces the gating set to formalize
+this distinction.
 
 
 %% ===================================================================

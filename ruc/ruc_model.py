@@ -749,9 +749,9 @@ def build_phase2_model(
                 name=f"pmax_rob_i{i}_t{t}",
             )
 
-            # Robust Pmin
+            # Robust Pmin (Gurobi expr must be on LHS to avoid numpy __le__)
             m.addConstr(
-                Pmin[i] * u_it <= p0[i, t] - rho_t * z_gen[i, t],
+                p0[i, t] - rho_t * z_gen[i, t] >= float(Pmin[i]) * u_it,
                 name=f"pmin_rob_i{i}_t{t}",
             )
 

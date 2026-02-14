@@ -695,14 +695,22 @@ def main():
         default="focused_2d",
         help="Covariance feature set to use",
     )
+    parser.add_argument(
+        "--data-version",
+        type=str,
+        choices=["v1", "v2"],
+        default="v1",
+        help="Data version (v1=original, v2=scaled SUBMODEL-filtered)",
+    )
 
     args = parser.parse_args()
 
     # Build paths (use RTS4 data by default)
     data_dir = args.data_dir
+    version = args.data_version
     paths = CachedPaths(
-        actuals_parquet=data_dir / "actuals_filtered_rts4_constellation_v1.parquet",
-        forecasts_parquet=data_dir / "forecasts_filtered_rts4_constellation_v1.parquet",
+        actuals_parquet=data_dir / f"actuals_filtered_rts4_constellation_{version}.parquet",
+        forecasts_parquet=data_dir / f"forecasts_filtered_rts4_constellation_{version}.parquet",
         output_dir=args.output_dir,
     )
 

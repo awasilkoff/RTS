@@ -22,7 +22,30 @@
 \maketitle
 
 \begin{abstract}
-The abstract goes here.
+System operators routinely commit generation resources outside of the
+energy market to ensure reliability, but existing reliability unit
+commitment (RUC) formulations optimize over the full planning horizon
+without distinguishing decisions that must be made immediately from
+those that can be deferred to subsequent market processes.
+This scope mismatch leads to systematic over-commitment, displacing
+market-scheduled resources and distorting price signals.
+We propose a notification-gated RUC formulation that uses physical
+generator startup lead times to identify the minimal set of
+non-deferrable commitment decisions at each operational stage.
+The formulation is solved in two phases: a deterministic
+mixed-integer program that minimizes reliability intervention costs
+over the gating window, followed by a second-order cone program that
+verifies worst-case dispatch feasibility under ellipsoidal
+uncertainty.
+When robust verification fails, column-and-constraint generation
+iterates between the phases to close the gap.
+The gating framework generalizes across operational horizons ---
+multi-day assessment, day-ahead RUC, and intra-day RUC are all
+instances with different parameterizations --- and recovers standard
+DARUC as a limiting case.
+Numerical experiments on the RTS-GMLC test case demonstrate
+significant reductions in out-of-market commitments while maintaining
+system reliability under worst-case uncertainty.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -105,27 +128,126 @@ without compromising system reliability.
 %% ===================================================================
 \section{Literature Review}
 
-% TODO: Three threads to cover:
-%
-% (a) RUC in practice — ISO/RTO operational descriptions, FERC reports,
-%     SPP/MISO/CAISO market manuals documenting DARUC processes.
-%     Emphasize that RUC is widespread but formulations are proprietary
-%     and the academic literature rarely models the sequential
-%     decision structure faithfully.
-%
-% (b) Robust and stochastic UC — Bertsimas, Litvinov, Jiang et al.
-%     Position this paper relative to the robust UC literature:
-%     we are not proposing a new uncertainty model (that is paper 2),
-%     but a new *decision scope* within which robustness is enforced.
-%
-% (c) Market design and out-of-market actions — uplift, price formation,
-%     convex hull pricing literature. Brief treatment: motivation for
-%     why minimizing interventions matters, even if we don't compute
-%     LMPs in the case study.
-%
-% The gap: no existing formulation explicitly models notification
-% times to restrict the reliability optimization to non-deferrable
-% decisions.
+\subsection{Reliability Commitment in Practice}
+
+Every North American RTO operates a reliability unit commitment
+process following the day-ahead market clearing.
+The Southwest Power Pool (SPP) runs a DARUC with a 48-hour
+look-ahead that may commit additional resources beyond the
+day-ahead market solution~[cite SPP market protocols].
+The Midcontinent ISO (MISO) executes a similar reliability
+assessment commitment (RAC) process to ensure resource adequacy
+over the next operating day~[cite MISO BPM-002].
+CAISO's residual unit commitment (RUC) procures capacity to
+close any gap between day-ahead scheduled supply and the
+operator's demand forecast~[cite CAISO BPM].
+PJM, NYISO, and ERCOT employ analogous processes under varying
+nomenclature~[cite PJM manual 11; NYISO OATT; ERCOT protocols].
+
+Despite the ubiquity of these processes, their mathematical
+formulations are largely proprietary and vary considerably across
+operators.
+FERC Order~2222 and subsequent technical conferences have drawn
+attention to the market impact of reliability commitments, noting
+that out-of-market actions can suppress energy prices and
+create uplift charges~[cite FERC].
+The academic literature has given comparatively little attention
+to the formulation of the reliability commitment problem itself,
+typically treating it as a standard unit commitment solved
+after the market clears.
+The sequential nature of the decision process --- and in
+particular the question of \emph{which} decisions must be made
+at each stage --- has received almost no formal treatment.
+
+\subsection{Robust and Stochastic Unit Commitment}
+
+The robust optimization approach to unit commitment was
+pioneered by Bertsimas et~al.~[cite Bertsimas 2012], who
+introduced a polyhedral uncertainty set for net load and solved
+the two-stage problem via Benders decomposition.
+Subsequent work by Jiang et~al.~[cite Jiang 2012] developed
+column-and-constraint generation methods that avoid the need for
+dual-based decomposition and demonstrated improved computational
+performance.
+Zhao and Guan~[cite Zhao Guan 2013] extended the framework to
+multi-stage settings and established finite convergence results
+for the CCG procedure.
+
+Stochastic unit commitment provides an alternative treatment of
+uncertainty through scenario-based formulations.
+Papavasiliou et~al.~[cite Papavasiliou 2011] demonstrated the
+value of stochastic optimization for wind integration, and
+Zheng et~al.~[cite Zheng 2015] developed decomposition methods
+for large-scale stochastic UC problems.
+Distributionally robust approaches, which optimize over
+ambiguity sets of probability distributions, have been explored
+by Xiong et~al.~[cite Xiong 2017] and others.
+
+Linear decision rules (LDR) provide a tractable approximation of
+the recourse policy in robust and adaptive optimization.
+Ben-Tal et~al.~[cite Ben-Tal 2004] established the affine
+adjustable robust counterpart framework, and Lorca and
+Sun~[cite Lorca Sun 2016] applied LDR to unit commitment with
+ellipsoidal uncertainty sets, obtaining second-order cone
+reformulations.
+The present work builds on the LDR-based robust UC framework
+developed in~[paper~2], which introduces learned covariance
+estimation and conformal prediction for uncertainty set
+calibration.
+
+A common feature of the existing robust UC literature is that
+the formulation scope encompasses \emph{all} commitment decisions
+over the planning horizon.
+The contribution of this paper is orthogonal to the choice of
+uncertainty model: rather than proposing a new uncertainty
+representation, we introduce a \emph{decision scope} restriction
+that limits the reliability optimization to non-deferrable
+commitments, regardless of whether the underlying model is
+deterministic, robust, or stochastic.
+
+\subsection{Market Efficiency and Out-of-Market Actions}
+
+Out-of-market reliability actions have well-documented effects on
+market efficiency.
+Reliability commitments that deviate from the market solution
+create make-whole payments (uplift) to committed generators,
+representing costs that are not reflected in locational marginal
+prices~[cite Hogan 2003; O'Neill 2005].
+The convex hull pricing literature~[cite Gribik 2007;
+Schiro 2016] has established that pricing in the presence of
+non-convexities (including commitment decisions) cannot
+simultaneously achieve revenue adequacy and cost recovery without
+some form of side payment.
+
+Reducing the number of out-of-market commitments directly
+reduces the magnitude of uplift and improves the extent to which
+energy prices reflect the true marginal cost of supply.
+Andrianesis et~al.~[cite Andrianesis 2020] quantify the
+relationship between commitment interventions and uplift in
+ISO-NE, finding that reliability commitments account for a
+substantial fraction of total uplift payments.
+Ela et~al.~[cite Ela 2011] analyze the operational and market
+impacts of wind integration on commitment processes, noting that
+conservative commitment practices designed to hedge against
+renewable forecast errors contribute to over-commitment and
+price distortion.
+
+\subsection{Research Gap}
+
+The existing literature treats the reliability commitment problem
+as a monolithic optimization over the full planning horizon:
+once the market clears, the reliability process re-optimizes all
+remaining commitment decisions under its chosen uncertainty model.
+No existing formulation distinguishes between commitment decisions
+that must be finalized at the current stage and those that can be
+deferred to subsequent processes.
+
+This paper addresses this gap by introducing the gating set, which
+uses physical generator notification times to partition the
+decision space into deferrable and non-deferrable components.
+The result is a principled restriction of the reliability
+optimization scope that preserves market outcomes to the greatest
+extent permitted by physical constraints.
 
 
 %% ===================================================================

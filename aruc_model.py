@@ -81,6 +81,7 @@ def build_aruc_ldr_model(
     dispatch_cost_scale: float = 0.1,
     gurobi_numeric_mode: str = "balanced",
     robust_mask: Optional[np.ndarray] = None,
+    fix_wind_z: bool = False,
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Adaptive robust UC with linear decision rules:
@@ -300,6 +301,26 @@ def build_aruc_ldr_model(
     )
 
     # ------------------------------------------------------------------
+    # Fix wind Z diagonal: Z[wind_k, t, k_wind] = 1, off-diagonal = 0
+    # Forces wind to fully track its own realization, eliminating
+    # curtailment and forcing thermal units to provide all hedging.
+    # ------------------------------------------------------------------
+    if fix_wind_z:
+        print(f"  [ARUC] fix_wind_z=True: fixing Z[wind_k,t,k]=1 (diagonal), "
+              f"Z[wind_k,t,j!=k]=0 (off-diagonal)")
+        for k_wind, i in enumerate(wind_idx):
+            for t in range(T):
+                if not robust_mask[t]:
+                    continue
+                for k in range(K):
+                    if k == k_wind:
+                        Z[i, t, k].lb = 1.0
+                        Z[i, t, k].ub = 1.0
+                    else:
+                        Z[i, t, k].lb = 0.0
+                        Z[i, t, k].ub = 0.0
+
+    # ------------------------------------------------------------------
     # Objective
     # ------------------------------------------------------------------
     obj = gp.LinExpr()
@@ -430,11 +451,13 @@ def build_aruc_ldr_model(
 
             # --- Thermal generators: full robust constraints ---
 
-            # Define y_gen[i,t,k] = (L @ Z_{i,t})_k = sum_j L[k,j] * Z[i,t,j]
+            # Define y_gen[i,t,k] = (L^T @ Z_{i,t})_k = sum_j L[j,k] * Z[i,t,j]
+            # where L = chol(Sigma) (lower triangular, Sigma = LL^T).
+            # We need L^T (not L) so that ||y|| = ||L^T z|| = sqrt(z^T Sigma z).
             for k_idx in range(K):
                 expr = gp.LinExpr()
                 for j_idx in range(K):
-                    coef = float(sqrt_Sigma_t[k_idx, j_idx])
+                    coef = float(sqrt_Sigma_t[j_idx, k_idx])  # L^T[k,j] = L[j,k]
                     if abs(coef) < 1e-12:
                         continue
                     expr += coef * Z[i, t, j_idx]
@@ -648,11 +671,12 @@ def build_aruc_ldr_model(
                     for k in range(K):
                         a_expr[k] += PTDF[l, n] * Z[i, t, k]
 
-                # 3) Define auxiliary variables: y_line[l,t,k] = (sqrt_Sigma @ a_expr)[k]
+                # 3) Define auxiliary variables: y_line[l,t,k] = (L^T @ a_expr)[k]
+                #    L^T[k,j] = L[j,k] where L = chol(Sigma).
                 for i_k in range(K):
                     expr = gp.LinExpr()
                     for j_k in range(K):
-                        coef = sqrt_Sigma_t[i_k, j_k]
+                        coef = sqrt_Sigma_t[j_k, i_k]  # L^T[i_k, j_k] = L[j_k, i_k]
                         if abs(coef) < 1e-10:
                             continue
                         expr += coef * a_expr[j_k]
@@ -678,66 +702,83 @@ def build_aruc_ldr_model(
                 )
 
     # 3) Wind availability — only for robust periods
-    z_wind = m.addVars(
-        [(k_wind, t) for k_wind in range(n_wind) for t in range(T) if robust_mask[t]],
-        lb=0.0, name="z_wind",
-    )
-    y_wind = m.addVars(
-        [(k_wind, t, k) for k_wind in range(n_wind) for t in range(T) if robust_mask[t] for k in range(K)],
-        lb=-GRB.INFINITY, name="y_wind",
-    )
-
-    for k_wind, i in enumerate(wind_idx):
-        for t in range(T):
-            if not robust_mask[t]:
-                # Nominal wind: p0 <= Pmax*u (already handled in dispatch section above)
-                continue
-
-            # Get time-specific values
-            sqrt_Sigma_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
-            rho_t = rho[t] if time_varying else rho
-
-            # Deterministic forecast for this wind unit (Pbar)
-            Pbar_it = Pmax_2d[i, t]  # interpret Pmax_2d for wind as forecast
-
-            # alpha = p0(i,t) - Pbar(i,t)
-            alpha_expr = p0[i, t] - Pbar_it
-
-            # a_expr[j] = Z[i,t,j] - 1{j == k_wind}
-            a_expr = []
-            for k in range(K):
-                expr = gp.LinExpr()
-                expr += Z[i, t, k]
-                if k == k_wind:
-                    expr += -1.0
-                a_expr.append(expr)
-
-            # Define auxiliary variables: y_wind[k_wind,t,q] = (sqrt_Sigma @ a_expr)[q]
-            for q in range(K):
-                expr = gp.LinExpr()
-                for j in range(K):
-                    coef = float(sqrt_Sigma_t[q, j])
-                    if abs(coef) < 1e-12:
-                        continue
-                    expr += coef * a_expr[j]
+    #    When fix_wind_z=True, Z[wind_k,t,k]=1 and Z[wind_k,t,j!=k]=0 are
+    #    already fixed, so (Z - e_k) = 0 and the SOC is trivially satisfied.
+    #    We add a simple p0 <= Pbar constraint instead and skip the SOC.
+    if fix_wind_z:
+        z_wind = {}
+        y_wind = {}
+        for k_wind, i in enumerate(wind_idx):
+            for t in range(T):
+                if not robust_mask[t]:
+                    continue
+                # With Z fixed: p0 + 1*r_k <= Pbar + r_k  =>  p0 <= Pbar
                 m.addConstr(
-                    y_wind[k_wind, t, q] == expr, name=f"y_wind_def_w{k_wind}_t{t}_k{q}"
+                    p0[i, t] <= Pmax_2d[i, t],
+                    name=f"wind_max_fixed_i{i}_t{t}",
+                )
+    else:
+        z_wind = m.addVars(
+            [(k_wind, t) for k_wind in range(n_wind) for t in range(T) if robust_mask[t]],
+            lb=0.0, name="z_wind",
+        )
+        y_wind = m.addVars(
+            [(k_wind, t, k) for k_wind in range(n_wind) for t in range(T) if robust_mask[t] for k in range(K)],
+            lb=-GRB.INFINITY, name="y_wind",
+        )
+
+        for k_wind, i in enumerate(wind_idx):
+            for t in range(T):
+                if not robust_mask[t]:
+                    # Nominal wind: p0 <= Pmax*u (already handled in dispatch section above)
+                    continue
+
+                # Get time-specific values
+                sqrt_Sigma_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
+                rho_t = rho[t] if time_varying else rho
+
+                # Deterministic forecast for this wind unit (Pbar)
+                Pbar_it = Pmax_2d[i, t]  # interpret Pmax_2d for wind as forecast
+
+                # alpha = p0(i,t) - Pbar(i,t)
+                alpha_expr = p0[i, t] - Pbar_it
+
+                # a_expr[j] = Z[i,t,j] - 1{j == k_wind}
+                a_expr = []
+                for k in range(K):
+                    expr = gp.LinExpr()
+                    expr += Z[i, t, k]
+                    if k == k_wind:
+                        expr += -1.0
+                    a_expr.append(expr)
+
+                # Define auxiliary variables: y_wind[k_wind,t,q] = (L^T @ a_expr)[q]
+                #    L^T[q,j] = L[j,q] where L = chol(Sigma).
+                for q in range(K):
+                    expr = gp.LinExpr()
+                    for j in range(K):
+                        coef = float(sqrt_Sigma_t[j, q])  # L^T[q,j] = L[j,q]
+                        if abs(coef) < 1e-12:
+                            continue
+                        expr += coef * a_expr[j]
+                    m.addConstr(
+                        y_wind[k_wind, t, q] == expr, name=f"y_wind_def_w{k_wind}_t{t}_k{q}"
+                    )
+
+                # SOC: z_wind[k_wind, t] >= || y_wind[k_wind,t,:] ||_2
+                m.addConstr(
+                    z_wind[k_wind, t] * z_wind[k_wind, t]
+                    >= gp.quicksum(
+                        y_wind[k_wind, t, k] * y_wind[k_wind, t, k] for k in range(K)
+                    ),
+                    name=f"soc_wind_i{i}_t{t}",
                 )
 
-            # SOC: z_wind[k_wind, t] >= || y_wind[k_wind,t,:] ||_2
-            m.addConstr(
-                z_wind[k_wind, t] * z_wind[k_wind, t]
-                >= gp.quicksum(
-                    y_wind[k_wind, t, k] * y_wind[k_wind, t, k] for k in range(K)
-                ),
-                name=f"soc_wind_i{i}_t{t}",
-            )
-
-            # Robust inequality: alpha + rho * z_wind <= 0
-            m.addConstr(
-                alpha_expr + rho_t * z_wind[k_wind, t] <= 0.0,
-                name=f"wind_max_rob_i{i}_t{t}",
-            )
+                # Robust inequality: alpha + rho * z_wind <= 0
+                m.addConstr(
+                    alpha_expr + rho_t * z_wind[k_wind, t] <= 0.0,
+                    name=f"wind_max_rob_i{i}_t{t}",
+                )
 
     # Gurobi params — numeric tuning for MISOCP with wide coefficient range
     _NUMERIC_MODES = {

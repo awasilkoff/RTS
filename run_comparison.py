@@ -75,6 +75,8 @@ def main():
                         help="Day-2 interval hours (default: 1 = hourly, 2 = 2-hour blocks)")
     parser.add_argument("--day1-only-robust", action="store_true",
                         help="Only enforce robust constraints for day 1 (first 24 periods)")
+    parser.add_argument("--fix-wind-z", action="store_true",
+                        help="Fix wind Z diagonal to 1 (wind fully tracks own realization, no curtailment)")
     parser.add_argument("--out-dir", type=str, default=None,
                         help="Output directory (auto-generated if not specified)")
     args = parser.parse_args()
@@ -117,6 +119,8 @@ def main():
     print(f"  MIP gap:  {args.mip_gap:.4f} ({args.mip_gap*100:.2f}%)")
     if args.incremental_obj:
         print(f"  DARUC obj: incremental (dispatch scale={args.dispatch_cost_scale})")
+    if args.fix_wind_z:
+        print(f"  Wind Z:   FIXED (diagonal=1, no curtailment)")
     print(f"  Network:  {'with line limits' if args.enforce_lines else 'copperplate'}")
     print(f"  Output:   {out_dir}")
     print("=" * 70)
@@ -141,6 +145,7 @@ def main():
         dispatch_cost_scale=args.dispatch_cost_scale,
         day2_interval_hours=args.day2_interval,
         day1_only_robust=args.day1_only_robust,
+        fix_wind_z=args.fix_wind_z,
     )
 
     daruc_results = daruc_outputs["daruc_results"]
@@ -199,6 +204,7 @@ def main():
         mip_gap=args.mip_gap,
         day2_interval_hours=args.day2_interval,
         day1_only_robust=args.day1_only_robust,
+        fix_wind_z=args.fix_wind_z,
     )
 
     aruc_results = aruc_outputs["results"]

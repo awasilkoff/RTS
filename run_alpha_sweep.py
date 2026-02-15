@@ -193,6 +193,7 @@ def run_alpha_point(
     gurobi_numeric_mode: str = "balanced",
     day2_interval_hours: int = 1,
     day1_only_robust: bool = False,
+    fix_wind_z: bool = False,
     out_dir: Path | None = None,
 ) -> dict | None:
     """Run DARUC + ARUC with a given NPZ and return metrics row."""
@@ -217,6 +218,7 @@ def run_alpha_point(
             gurobi_numeric_mode=gurobi_numeric_mode,
             day2_interval_hours=day2_interval_hours,
             day1_only_robust=day1_only_robust,
+            fix_wind_z=fix_wind_z,
         )
         data = daruc_out["data"]
         daruc_res = daruc_out["daruc_results"]
@@ -256,6 +258,7 @@ def run_alpha_point(
             gurobi_numeric_mode=gurobi_numeric_mode,
             day2_interval_hours=day2_interval_hours,
             day1_only_robust=day1_only_robust,
+            fix_wind_z=fix_wind_z,
         )
         aruc_res = aruc_out["results"]
         aruc_obj = aruc_res["obj"]
@@ -580,6 +583,11 @@ def main():
         help="Only enforce robust constraints for day 1 (first 24 periods)",
     )
     parser.add_argument(
+        "--fix-wind-z",
+        action="store_true",
+        help="Fix wind Z diagonal to 1 (wind fully tracks own realization, no curtailment)",
+    )
+    parser.add_argument(
         "--out-dir",
         type=str,
         default=None,
@@ -682,6 +690,7 @@ def main():
             gurobi_numeric_mode=args.gurobi_numeric_mode,
             day2_interval_hours=args.day2_interval,
             day1_only_robust=args.day1_only_robust,
+            fix_wind_z=args.fix_wind_z,
             out_dir=out_dir,
         )
         if row is not None:

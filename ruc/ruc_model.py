@@ -345,6 +345,11 @@ def build_phase1_model(
                 data, r_m, m_idx, enforce_lines,
             )
             scen_vars[m_idx] = sv
+            # Penalise scenario slack — without this, Phase 1 can satisfy
+            # any scenario trivially via free slack and never adds commitments
+            for t in range(T):
+                obj.addTerms(M_p * dt[t], sv["s_p"][t])
+        m.setObjective(obj, GRB.MINIMIZE)
 
     m.Params.OutputFlag = 1
     m.Params.MIPGap = 0.005

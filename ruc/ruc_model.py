@@ -914,11 +914,11 @@ def build_phase2_model(
                 name=f"wind_rob_w{k_wind}_t{t}",
             )
 
-    # Gurobi params
+    # Gurobi params — use homogeneous barrier for numerical stability
     m.Params.OutputFlag = 1
-    m.Params.NumericFocus = 1
-    m.Params.BarHomogeneous = -1
-    m.Params.ScaleFlag = 1
+    m.Params.NumericFocus = 2
+    m.Params.BarHomogeneous = 1
+    m.Params.ScaleFlag = 2
 
     vars_dict = {
         "p0": p0,
@@ -981,9 +981,11 @@ def extract_worst_case_scenario(
 
     time_varying = Sigma.ndim == 3
 
-    # Find the period with maximum slack
-    s_vals = np.array([phase2_vars["s"][t].X for t in range(T)])
-    t_worst = int(np.argmax(s_vals))
+    # Find the period with maximum slack (if solution exists)
+    t_worst = 0
+    if phase2_model.SolCount > 0:
+        s_vals = np.array([phase2_vars["s"][t].X for t in range(T)])
+        t_worst = int(np.argmax(s_vals))
 
     if time_varying:
         Sigma_t = Sigma[t_worst]

@@ -637,8 +637,9 @@ def build_phase2_model(
     p0 = m.addVars(I, T, lb=0.0, name="p0")
     p0_block = m.addVars(I, T, B, lb=0.0, name="p0_block")
 
-    # Power balance slack (objective)
-    s = m.addVars(T, lb=0.0, name="s")
+    # Power balance slack (objective): shortfall and surplus
+    s = m.addVars(T, lb=0.0, name="s")       # load shedding (gen < load)
+    s_dn = m.addVars(T, lb=0.0, name="s_dn") # spill/curtail (gen > load)
 
     # LDR coefficients (only for z-eligible generators in robust periods)
     Z = m.addVars(
@@ -656,10 +657,11 @@ def build_phase2_model(
         lb=-GRB.INFINITY, name="y_gen",
     )
 
-    # Objective: minimise total slack
+    # Objective: minimise total slack (shortfall + surplus)
     obj = gp.LinExpr()
     for t in range(T):
         obj.addTerms(1.0, s[t])
+        obj.addTerms(1.0, s_dn[t])
     m.setObjective(obj, GRB.MINIMIZE)
 
     # ------------------------------------------------------------------
@@ -789,7 +791,7 @@ def build_phase2_model(
     for t in range(T):
         total_load = float(d[:, t].sum())
         m.addConstr(
-            gp.quicksum(p0[i, t] for i in range(I)) + s[t] == total_load,
+            gp.quicksum(p0[i, t] for i in range(I)) + s[t] - s_dn[t] == total_load,
             name=f"bal_t{t}",
         )
         if robust_mask[t]:
@@ -930,6 +932,7 @@ def build_phase2_model(
         "p0_block": p0_block,
         "Z": Z,
         "s": s,
+        "s_dn": s_dn,
         "z_gen": z_gen,
         "y_gen": y_gen,
         "z_line": z_line,
@@ -986,10 +989,12 @@ def extract_worst_case_scenario(
 
     time_varying = Sigma.ndim == 3
 
-    # Find the period with maximum slack (if solution exists)
+    # Find the period with maximum total slack (if solution exists)
     t_worst = 0
     if phase2_model.SolCount > 0:
-        s_vals = np.array([phase2_vars["s"][t].X for t in range(T)])
+        s_up = np.array([phase2_vars["s"][t].X for t in range(T)])
+        s_dn = np.array([phase2_vars["s_dn"][t].X for t in range(T)])
+        s_vals = s_up + s_dn
         t_worst = int(np.argmax(s_vals))
 
     if time_varying:
@@ -1155,9 +1160,13 @@ def solve_ruc_ccg(
                 scenarios.append(r_star)
                 continue
 
-        total_slack = sum(p2_vars["s"][t].X for t in range(T))
+        total_slack_up = sum(p2_vars["s"][t].X for t in range(T))
+        total_slack_dn = sum(p2_vars["s_dn"][t].X for t in range(T))
+        total_slack = total_slack_up + total_slack_dn
         gap_history.append(total_slack)
-        print(f"  Phase 2 total slack: {total_slack:.4f} MW (solve time: {t_p2:.1f}s)")
+        print(f"  Phase 2 total slack: {total_slack:.4f} MW "
+              f"(shed={total_slack_up:.1f}, spill={total_slack_dn:.1f}, "
+              f"solve time: {t_p2:.1f}s)")
 
         if total_slack <= gap_tolerance:
             print(f"\n  ROBUST SUFFICIENT (slack {total_slack:.4f} <= tol {gap_tolerance})")

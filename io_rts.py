@@ -458,6 +458,7 @@ def build_damdata_from_rts(
     spp_forecasts_parquet: str | Path | None = None,
     spp_start_idx: int = 0,
     day2_interval_hours: int = 1,
+    single_block: bool = False,
 ) -> DAMData:
     """
     High-level function:
@@ -587,6 +588,20 @@ def build_damdata_from_rts(
             block_cost[i, 0] = row.get("HR_incr_1") * row["Fuel Price $/MMBTU"] / 1000
             block_cost[i, 1] = row.get("HR_incr_2") * row["Fuel Price $/MMBTU"] / 1000
             block_cost[i, 2] = row.get("HR_incr_3") * row["Fuel Price $/MMBTU"] / 1000
+
+    # Collapse 3 blocks → 1 block with weighted-average marginal cost
+    if single_block:
+        avg_cost = np.zeros(I)
+        for i in range(I):
+            total_cap = block_cap[i, :].sum()
+            if total_cap > 0:
+                avg_cost[i] = (block_cost[i, :] * block_cap[i, :]).sum() / total_cap
+        block_cap_1 = np.zeros((I, 1))
+        block_cap_1[:, 0] = Pmax
+        block_cost_1 = np.zeros((I, 1))
+        block_cost_1[:, 0] = avg_cost
+        block_cap = block_cap_1
+        block_cost = block_cost_1
 
     # 5) Load / net injection array d[n,t]
     # 0) Build full time-series once

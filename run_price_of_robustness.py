@@ -69,6 +69,7 @@ def run_sweep(args) -> pd.DataFrame:
                 enforce_lines=args.enforce_lines,
                 rho_lines_frac=args.rho_lines_frac,
                 mip_gap=args.mip_gap,
+                single_block=not args.three_blocks,
             )
             data = daruc_out["data"]
             daruc_res = daruc_out["daruc_results"]
@@ -104,6 +105,7 @@ def run_sweep(args) -> pd.DataFrame:
                 enforce_lines=args.enforce_lines,
                 rho_lines_frac=args.rho_lines_frac,
                 mip_gap=args.mip_gap,
+                single_block=not args.three_blocks,
             )
             aruc_res = aruc_out["results"]
             aruc_obj = aruc_res["obj"]
@@ -212,6 +214,7 @@ def main():
     parser.set_defaults(enforce_lines=True)
     parser.add_argument("--rho-lines-frac", type=float, default=None, help="Fraction of rho for line constraints")
     parser.add_argument("--mip-gap", type=float, default=0.005, help="MIP gap (default: 0.005)")
+    parser.add_argument("--three-blocks", action="store_true", help="Use original 3-block piecewise cost (default: single block with weighted-average cost)")
     parser.add_argument("--out-dir", type=str, default="price_of_robustness", help="Output directory (default: price_of_robustness/)")
     args = parser.parse_args()
 

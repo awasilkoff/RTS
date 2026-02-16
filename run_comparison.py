@@ -77,6 +77,8 @@ def main():
                         help="Only enforce robust constraints for day 1 (first 24 periods)")
     parser.add_argument("--fix-wind-z", action="store_true",
                         help="Fix wind Z diagonal to 1 (wind fully tracks own realization, no curtailment)")
+    parser.add_argument("--three-blocks", action="store_true",
+                        help="Use original 3-block piecewise cost (default: single block with weighted-average cost)")
     parser.add_argument("--out-dir", type=str, default=None,
                         help="Output directory (auto-generated if not specified)")
     args = parser.parse_args()
@@ -146,6 +148,7 @@ def main():
         day2_interval_hours=args.day2_interval,
         day1_only_robust=args.day1_only_robust,
         fix_wind_z=args.fix_wind_z,
+        single_block=not args.three_blocks,
     )
 
     daruc_results = daruc_outputs["daruc_results"]
@@ -205,6 +208,7 @@ def main():
         day2_interval_hours=args.day2_interval,
         day1_only_robust=args.day1_only_robust,
         fix_wind_z=args.fix_wind_z,
+        single_block=not args.three_blocks,
     )
 
     aruc_results = aruc_outputs["results"]

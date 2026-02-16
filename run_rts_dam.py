@@ -150,6 +150,7 @@ def run_rts_dam(
     spp_start_idx: int = SPP_START_IDX,
     enforce_lines: bool = True,
     day2_interval_hours: int = 1,
+    single_block: bool = True,
 ) -> Dict[str, Any]:
     """
     Full pipeline:
@@ -176,6 +177,7 @@ def run_rts_dam(
         spp_forecasts_parquet=spp_forecasts_parquet,
         spp_start_idx=spp_start_idx,
         day2_interval_hours=day2_interval_hours,
+        single_block=single_block,
     )
     print("  Done. Data shapes:")
     print(f"    n_gens   = {data.n_gens}")

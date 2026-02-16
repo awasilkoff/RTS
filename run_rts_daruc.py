@@ -220,6 +220,7 @@ def run_rts_daruc(
     day2_interval_hours: int = 1,
     day1_only_robust: bool = False,
     fix_wind_z: bool = False,
+    single_block: bool = True,
 ) -> Dict[str, Any]:
     """
     Two-step DARUC pipeline (Setup 1):
@@ -268,6 +269,7 @@ def run_rts_daruc(
         spp_start_idx=spp_start_idx,
         enforce_lines=enforce_lines,
         day2_interval_hours=day2_interval_hours,
+        single_block=single_block,
     )
 
     dam_results = dam_outputs["results"]

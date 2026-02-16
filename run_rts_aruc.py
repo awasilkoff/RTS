@@ -418,6 +418,7 @@ def run_rts_aruc(
     day2_interval_hours: int = 1,
     day1_only_robust: bool = False,
     fix_wind_z: bool = False,
+    single_block: bool = True,
 ) -> Dict[str, Any]:
     """
     Full pipeline for ARUC-LDR:
@@ -471,6 +472,7 @@ def run_rts_aruc(
         spp_forecasts_parquet=spp_forecasts_parquet,
         spp_start_idx=spp_start_idx,
         day2_interval_hours=day2_interval_hours,
+        single_block=single_block,
     )
     T = data.n_periods
     print("  Done. Data shapes:")

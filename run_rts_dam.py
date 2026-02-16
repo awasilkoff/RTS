@@ -155,6 +155,7 @@ def run_rts_dam(
     include_nuclear: bool = False,
     include_zero_marginal: Optional[bool] = None,
     ramp_scale: float = 1.0,
+    pmin_scale: float = 1.0,
 ) -> Dict[str, Any]:
     """
     Full pipeline:
@@ -186,6 +187,7 @@ def run_rts_dam(
         include_nuclear=include_nuclear,
         include_zero_marginal=include_zero_marginal,
         ramp_scale=ramp_scale,
+        pmin_scale=pmin_scale,
     )
     print("  Done. Data shapes:")
     print(f"    n_gens   = {data.n_gens}")

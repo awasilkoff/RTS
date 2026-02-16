@@ -28,7 +28,7 @@ from matplotlib.colors import TwoSlopeNorm
 
 
 # ---------------------------------------------------------------------------
-# Gen-type color palette
+# Color palettes
 # ---------------------------------------------------------------------------
 GENTYPE_COLORS = {
     "THERMAL": "#808080",
@@ -37,9 +37,43 @@ GENTYPE_COLORS = {
     "HYDRO": "#17becf",
 }
 
+FUEL_COLORS = {
+    "Coal": "#4a4a4a",
+    "Gas CC": "#ff7f0e",
+    "Gas CT": "#ffbb78",
+    "Oil": "#d62728",
+    "CSP": "#f0c929",
+    "Wind": "#1f77b4",
+}
+FUEL_ORDER = ["Coal", "Gas CC", "Gas CT", "Oil", "CSP", "Wind"]
+
 
 def _gentype_color(gt: str) -> str:
     return GENTYPE_COLORS.get(gt.upper(), "#999999")
+
+
+def build_fuel_category_map(data) -> dict[str, str]:
+    """Map gen_id -> fuel category using data.gens_df."""
+    if data is None or data.gens_df is None:
+        return {}
+    fuel_map = {}
+    for _, row in data.gens_df.iterrows():
+        uid = row["GEN UID"]
+        utype = str(row["Unit Type"]).upper()
+        fuel = str(row.get("Fuel", "")).upper()
+        if utype == "WIND":
+            fuel_map[uid] = "Wind"
+        elif utype == "CSP":
+            fuel_map[uid] = "CSP"
+        elif utype == "CC":
+            fuel_map[uid] = "Gas CC"
+        elif utype == "CT":
+            fuel_map[uid] = "Oil" if "OIL" in fuel else "Gas CT"
+        elif utype == "STEAM":
+            fuel_map[uid] = "Oil" if "OIL" in fuel else "Coal"
+        else:
+            fuel_map[uid] = "Coal"  # fallback
+    return fuel_map
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +233,7 @@ def fig_commitment_and_cost(
     aruc: dict, daruc: dict, dam: dict | None, common_times: list[str],
     cost_aruc: dict | None, cost_daruc: dict | None, cost_dam: dict | None,
     out_dir: Path,
+    data=None,
 ):
     """Three-panel figure: commitment diff heatmap, dispatch stacked area, cost bars."""
     fig, axes = plt.subplots(1, 3, figsize=(14, 10), gridspec_kw={"width_ratios": [3, 4, 3]})
@@ -234,66 +269,117 @@ def fig_commitment_and_cost(
         plt.colorbar(im, ax=ax, shrink=0.5, label="DARUC − ARUC")
         ax.set_title("(a) Commitment difference\n(blue=DARUC more, red=ARUC more)", fontsize=9)
 
-    # --- (b) Dispatch by gen type ---
+    # --- (b) Dispatch by fuel type ---
     ax = axes[1]
-    # Build gen_type lookup from Z_analysis_full
-    gen_type_map = {}
-    for res in [aruc, daruc]:
-        if res["z_full"] is not None:
-            for _, row in res["z_full"][["gen_id", "gen_type"]].drop_duplicates().iterrows():
-                gen_type_map[row["gen_id"]] = row["gen_type"]
-
-    # Compute stacked dispatch by gen type
-    T_common = len(common_times)
-    gen_types_ordered = ["THERMAL", "WIND", "SOLAR", "HYDRO"]
-    # Filter to types that actually exist
-    all_types_present = sorted(set(gen_type_map.values()))
-    gen_types_ordered = [gt for gt in gen_types_ordered if gt in all_types_present]
-    # Add any not in the predefined list
-    for gt in all_types_present:
-        if gt not in gen_types_ordered:
-            gen_types_ordered.append(gt)
-
-    def _dispatch_by_type(p0_df, times):
-        result = {}
-        for gt in gen_types_ordered:
-            gens = [g for g in p0_df.index if gen_type_map.get(g, "THERMAL") == gt]
-            if gens:
-                result[gt] = p0_df.loc[gens, times].sum(axis=0).values
-            else:
-                result[gt] = np.zeros(len(times))
-        return result
-
-    aruc_by_type = _dispatch_by_type(aruc["p0"], common_times)
-    daruc_by_type = _dispatch_by_type(daruc["p0"], common_times)
-
-    x = np.arange(T_common)
-    width = 0.35
-
-    # Stacked bars: ARUC on left, DARUC on right
-    for side, by_type, offset, alpha_val in [
-        ("ARUC", aruc_by_type, -width / 2, 0.85),
-        ("DARUC", daruc_by_type, width / 2, 0.85),
-    ]:
-        bottom = np.zeros(T_common)
-        for gt in gen_types_ordered:
-            vals = by_type[gt]
-            ax.bar(x + offset, vals, width, bottom=bottom, color=_gentype_color(gt),
-                   alpha=alpha_val, label=f"{side} {gt}" if side == "ARUC" else None)
-            bottom += vals
-
-    # Load line (total demand) — use sum of dispatch as proxy if no data object
-    total_aruc = sum(aruc_by_type[gt] for gt in gen_types_ordered)
-    total_daruc = sum(daruc_by_type[gt] for gt in gen_types_ordered)
-    ax.plot(x - width / 2, total_aruc, "k--", linewidth=0.8, alpha=0.5)
-    ax.plot(x + width / 2, total_daruc, "k--", linewidth=0.8, alpha=0.5)
-
-    # Legend for gen types only
     from matplotlib.patches import Patch
-    legend_patches = [Patch(facecolor=_gentype_color(gt), label=gt) for gt in gen_types_ordered]
-    legend_patches += [Patch(facecolor="white", edgecolor="black", label="ARUC (left)"),
-                       Patch(facecolor="white", edgecolor="black", hatch="///", label="DARUC (right)")]
-    ax.legend(handles=legend_patches, fontsize=7, loc="upper left", ncol=2)
+
+    fuel_map = build_fuel_category_map(data)
+    use_fuel = bool(fuel_map)
+
+    T_common = len(common_times)
+
+    if use_fuel:
+        # Fuel-category based dispatch with Pmin shading
+        categories = [f for f in FUEL_ORDER if any(fuel_map.get(g) == f for g in aruc["p0"].index)]
+
+        def _dispatch_by_fuel(p0_df, u_df, times):
+            dispatch = {}
+            pmin_floor = {}
+            for cat in categories:
+                gens = [g for g in p0_df.index if fuel_map.get(g) == cat]
+                if gens:
+                    dispatch[cat] = p0_df.loc[gens, times].clip(lower=0).sum(axis=0).values
+                    if data is not None:
+                        # Pmin floor: sum(u[i,t] * Pmin[i]) for committed generators
+                        pmin_vals = np.zeros(len(times))
+                        for g in gens:
+                            if g in u_df.index:
+                                idx = data.gen_ids.index(g)
+                                pmin_i = data.Pmin[idx]
+                                u_vals = np.round(u_df.loc[g, times].values).clip(0, 1)
+                                pmin_vals += u_vals * pmin_i
+                        pmin_floor[cat] = pmin_vals
+                    else:
+                        pmin_floor[cat] = np.zeros(len(times))
+                else:
+                    dispatch[cat] = np.zeros(len(times))
+                    pmin_floor[cat] = np.zeros(len(times))
+            return dispatch, pmin_floor
+
+        aruc_disp, aruc_pmin = _dispatch_by_fuel(aruc["p0"], aruc["u"], common_times)
+        daruc_disp, daruc_pmin = _dispatch_by_fuel(daruc["p0"], daruc["u"], common_times)
+
+        x = np.arange(T_common)
+        width = 0.35
+
+        for side, disp, pmin_f, offset in [
+            ("ARUC", aruc_disp, aruc_pmin, -width / 2),
+            ("DARUC", daruc_disp, daruc_pmin, width / 2),
+        ]:
+            bottom = np.zeros(T_common)
+            for cat in categories:
+                vals = disp[cat]
+                ax.bar(x + offset, vals, width, bottom=bottom,
+                       color=FUEL_COLORS[cat], alpha=0.85)
+                # Pmin hatching: overdraw the Pmin portion with hatching
+                pmin_vals = np.minimum(pmin_f[cat], vals)
+                ax.bar(x + offset, pmin_vals, width, bottom=bottom,
+                       color="none", edgecolor="black", linewidth=0,
+                       hatch="///", alpha=0.3)
+                bottom += vals
+
+        # Legend: fuel categories + Pmin indicator
+        legend_patches = [Patch(facecolor=FUEL_COLORS[c], label=c) for c in categories]
+        legend_patches.append(Patch(facecolor="white", edgecolor="black", hatch="///",
+                                    alpha=0.3, label="Pmin floor"))
+        legend_patches += [Patch(facecolor="white", edgecolor="black", label="ARUC (left)"),
+                           Patch(facecolor="white", edgecolor="gray", linestyle="--",
+                                 label="DARUC (right)")]
+        ax.legend(handles=legend_patches, fontsize=6, loc="upper left", ncol=2)
+
+    else:
+        # Fallback: gen_type based (no data available)
+        gen_type_map = {}
+        for res in [aruc, daruc]:
+            if res["z_full"] is not None:
+                for _, row in res["z_full"][["gen_id", "gen_type"]].drop_duplicates().iterrows():
+                    gen_type_map[row["gen_id"]] = row["gen_type"]
+
+        gen_types_ordered = ["THERMAL", "WIND", "SOLAR", "HYDRO"]
+        all_types_present = sorted(set(gen_type_map.values()))
+        gen_types_ordered = [gt for gt in gen_types_ordered if gt in all_types_present]
+        for gt in all_types_present:
+            if gt not in gen_types_ordered:
+                gen_types_ordered.append(gt)
+
+        def _dispatch_by_type(p0_df, times):
+            result = {}
+            for gt in gen_types_ordered:
+                gens = [g for g in p0_df.index if gen_type_map.get(g, "THERMAL") == gt]
+                result[gt] = p0_df.loc[gens, times].sum(axis=0).values if gens else np.zeros(len(times))
+            return result
+
+        aruc_by_type = _dispatch_by_type(aruc["p0"], common_times)
+        daruc_by_type = _dispatch_by_type(daruc["p0"], common_times)
+
+        x = np.arange(T_common)
+        width = 0.35
+
+        for side, by_type, offset in [
+            ("ARUC", aruc_by_type, -width / 2),
+            ("DARUC", daruc_by_type, width / 2),
+        ]:
+            bottom = np.zeros(T_common)
+            for gt in gen_types_ordered:
+                vals = by_type[gt]
+                ax.bar(x + offset, vals, width, bottom=bottom, color=_gentype_color(gt),
+                       alpha=0.85, label=f"{side} {gt}" if side == "ARUC" else None)
+                bottom += vals
+
+        legend_patches = [Patch(facecolor=_gentype_color(gt), label=gt) for gt in gen_types_ordered]
+        legend_patches += [Patch(facecolor="white", edgecolor="black", label="ARUC (left)"),
+                           Patch(facecolor="white", edgecolor="black", hatch="///", label="DARUC (right)")]
+        ax.legend(handles=legend_patches, fontsize=7, loc="upper left", ncol=2)
 
     tick_step = max(1, T_common // 8)
     ax.set_xticks(range(0, T_common, tick_step))
@@ -301,7 +387,7 @@ def fig_commitment_and_cost(
                         else str(i) for i in range(0, T_common, tick_step)], fontsize=7, rotation=45)
     ax.set_xlabel("Hour", fontsize=9)
     ax.set_ylabel("Dispatch (MW)", fontsize=9)
-    ax.set_title("(b) Dispatch by generator type", fontsize=10)
+    ax.set_title("(b) Dispatch by fuel type", fontsize=10)
 
     # --- (c) Cost comparison (3-way if DAM available) ---
     ax = axes[2]
@@ -483,6 +569,109 @@ def fig_z_heatmaps(aruc: dict, daruc: dict, common_times: list[str], out_dir: Pa
         fig.savefig(out_dir / f"fig_z_comparison.{ext}", dpi=300, bbox_inches="tight")
     plt.close(fig)
     print(f"  Saved fig_z_comparison.pdf/.png")
+
+
+# ---------------------------------------------------------------------------
+# Figure: Pmin floor vs economic dispatch
+# ---------------------------------------------------------------------------
+
+
+def fig_pmin_vs_dispatch(
+    aruc: dict, daruc: dict, dam: dict | None,
+    common_times: list[str], data, out_dir: Path,
+):
+    """Stacked area chart: Pmin floor vs dispatch-above-Pmin by fuel type, one panel per formulation."""
+    from matplotlib.patches import Patch
+
+    fuel_map = build_fuel_category_map(data)
+    if not fuel_map:
+        print("  Skipping Pmin vs dispatch — no fuel map (data.gens_df missing).")
+        return
+
+    categories = [f for f in FUEL_ORDER if any(fuel_map.get(g) == f for g in aruc["p0"].index)]
+    T = len(common_times)
+    x = np.arange(T)
+
+    formulations = []
+    if dam is not None:
+        formulations.append(("DAM", dam))
+    formulations.append(("DARUC", daruc))
+    formulations.append(("ARUC", aruc))
+
+    n_panels = len(formulations)
+    fig, axes = plt.subplots(1, n_panels, figsize=(5 * n_panels, 5), sharey=True)
+    if n_panels == 1:
+        axes = [axes]
+
+    for ax_idx, (name, res) in enumerate(formulations):
+        ax = axes[ax_idx]
+        p0_df = res["p0"]
+        u_df = _round_commitment(res["u"][common_times])
+
+        # Compute Pmin floor and above-Pmin dispatch per fuel category
+        pmin_by_cat = {}
+        above_by_cat = {}
+        for cat in categories:
+            gens = [g for g in p0_df.index if fuel_map.get(g) == cat]
+            pmin_vals = np.zeros(T)
+            above_vals = np.zeros(T)
+            for g in gens:
+                if g not in u_df.index:
+                    continue
+                idx = data.gen_ids.index(g)
+                pmin_i = data.Pmin[idx]
+                u_vals = u_df.loc[g, common_times].values.astype(float)
+                p_vals = p0_df.loc[g, common_times].values.astype(float).clip(min=0)
+                floor = u_vals * pmin_i
+                pmin_vals += floor
+                above_vals += np.maximum(0.0, p_vals - floor)
+            pmin_by_cat[cat] = pmin_vals
+            above_by_cat[cat] = above_vals
+
+        # Stacked bars: Pmin floor (solid), above-Pmin (lighter)
+        bottom = np.zeros(T)
+        for cat in categories:
+            # Pmin floor: solid color
+            ax.bar(x, pmin_by_cat[cat], width=1.0, bottom=bottom,
+                   color=FUEL_COLORS[cat], alpha=0.9, linewidth=0)
+            bottom_pmin_top = bottom + pmin_by_cat[cat]
+            # Above-Pmin: lighter shade
+            ax.bar(x, above_by_cat[cat], width=1.0, bottom=bottom_pmin_top,
+                   color=FUEL_COLORS[cat], alpha=0.4, linewidth=0)
+            bottom = bottom_pmin_top + above_by_cat[cat]
+
+        # Total load line
+        total_load = data.d.sum(axis=0)[:T]
+        ax.plot(x, total_load, "k-", linewidth=1.2, label="Load")
+
+        ax.set_title(f"({chr(97 + ax_idx)}) {name}", fontsize=10)
+        ax.set_xlabel("Hour", fontsize=9)
+        tick_step = max(1, T // 8)
+        ax.set_xticks(range(0, T, tick_step))
+        ax.set_xticklabels(
+            [common_times[i].split(" ")[1][:5] if " " in common_times[i]
+             else str(i) for i in range(0, T, tick_step)],
+            fontsize=7, rotation=45,
+        )
+
+    axes[0].set_ylabel("Generation (MW)", fontsize=9)
+
+    # Shared legend
+    legend_patches = []
+    for cat in categories:
+        legend_patches.append(Patch(facecolor=FUEL_COLORS[cat], alpha=0.9, label=f"{cat} (Pmin)"))
+        legend_patches.append(Patch(facecolor=FUEL_COLORS[cat], alpha=0.4, label=f"{cat} (above Pmin)"))
+    legend_patches.append(Patch(facecolor="none", edgecolor="black", label="Load"))
+    fig.legend(handles=legend_patches, loc="lower center", ncol=min(len(legend_patches), 6),
+               fontsize=7, bbox_to_anchor=(0.5, -0.02))
+
+    fig.suptitle("Pmin Floor vs Economic Dispatch by Fuel Type", fontsize=12, y=0.98)
+    fig.tight_layout(rect=[0, 0.06, 1, 0.95])
+
+    for ext in ["pdf", "png"]:
+        fig.savefig(out_dir / f"fig_pmin_vs_dispatch.{ext}", dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  Saved fig_pmin_vs_dispatch.pdf/.png")
 
 
 # ---------------------------------------------------------------------------
@@ -815,10 +1004,12 @@ def main():
 
     # Generate figures
     print("\nGenerating figures...")
-    fig_commitment_and_cost(aruc, daruc, dam, common_times, cost_aruc, cost_daruc, cost_dam, out_dir)
+    fig_commitment_and_cost(aruc, daruc, dam, common_times, cost_aruc, cost_daruc, cost_dam, out_dir,
+                            data=data)
     fig_z_heatmaps(aruc, daruc, common_times, out_dir)
     if data is not None:
         fig_wind_curtailment(aruc, daruc, dam, common_times, data, out_dir)
+        fig_pmin_vs_dispatch(aruc, daruc, dam, common_times, data, out_dir)
 
     # Text summary
     print()

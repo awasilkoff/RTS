@@ -39,6 +39,7 @@ from compare_aruc_vs_daruc import (
     fig_commitment_and_cost,
     fig_z_heatmaps,
     fig_wind_curtailment,
+    fig_pmin_vs_dispatch,
     write_summary,
 )
 
@@ -286,10 +287,11 @@ def main():
     print("\nGenerating figures...")
     fig_commitment_and_cost(
         aruc_loaded, daruc_loaded, dam_loaded, common_times,
-        cost_aruc, cost_daruc, cost_dam, out_dir,
+        cost_aruc, cost_daruc, cost_dam, out_dir, data=data,
     )
     fig_z_heatmaps(aruc_loaded, daruc_loaded, common_times, out_dir)
     fig_wind_curtailment(aruc_loaded, daruc_loaded, dam_loaded, common_times, data, out_dir)
+    fig_pmin_vs_dispatch(aruc_loaded, daruc_loaded, dam_loaded, common_times, data, out_dir)
 
     # Text summary
     print()

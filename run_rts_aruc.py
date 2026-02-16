@@ -419,6 +419,7 @@ def run_rts_aruc(
     day1_only_robust: bool = False,
     fix_wind_z: bool = False,
     single_block: bool = True,
+    worst_case_cost: bool = True,
 ) -> Dict[str, Any]:
     """
     Full pipeline for ARUC-LDR:
@@ -537,6 +538,7 @@ def run_rts_aruc(
         gurobi_numeric_mode=gurobi_numeric_mode,
         robust_mask=robust_mask,
         fix_wind_z=fix_wind_z,
+        worst_case_cost=worst_case_cost,
     )
 
     # Warm start from a quick DAM solve (~5s) — provides binary commitment

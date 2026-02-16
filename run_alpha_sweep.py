@@ -196,6 +196,7 @@ def run_alpha_point(
     fix_wind_z: bool = False,
     out_dir: Path | None = None,
     single_block: bool = True,
+    worst_case_cost: bool = True,
 ) -> dict | None:
     """Run DARUC + ARUC with a given NPZ and return metrics row."""
     print(f"\n{'#' * 70}")
@@ -221,6 +222,7 @@ def run_alpha_point(
             day1_only_robust=day1_only_robust,
             fix_wind_z=fix_wind_z,
             single_block=single_block,
+            worst_case_cost=worst_case_cost,
         )
         data = daruc_out["data"]
         daruc_res = daruc_out["daruc_results"]
@@ -262,6 +264,7 @@ def run_alpha_point(
             day1_only_robust=day1_only_robust,
             fix_wind_z=fix_wind_z,
             single_block=single_block,
+            worst_case_cost=worst_case_cost,
         )
         aruc_res = aruc_out["results"]
         aruc_obj = aruc_res["obj"]
@@ -596,6 +599,13 @@ def main():
         help="Use original 3-block piecewise cost (default: single block with weighted-average cost)",
     )
     parser.add_argument(
+        "--no-worst-case-cost",
+        dest="worst_case_cost",
+        action="store_false",
+        help="Disable worst-case dispatch cost epigraph (use nominal dispatch cost only)",
+    )
+    parser.set_defaults(worst_case_cost=True)
+    parser.add_argument(
         "--out-dir",
         type=str,
         default=None,
@@ -701,6 +711,7 @@ def main():
             fix_wind_z=args.fix_wind_z,
             out_dir=out_dir,
             single_block=not args.three_blocks,
+            worst_case_cost=args.worst_case_cost,
         )
         if row is not None:
             rows.append(row)

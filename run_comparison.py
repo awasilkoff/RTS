@@ -79,6 +79,9 @@ def main():
                         help="Fix wind Z diagonal to 1 (wind fully tracks own realization, no curtailment)")
     parser.add_argument("--three-blocks", action="store_true",
                         help="Use original 3-block piecewise cost (default: single block with weighted-average cost)")
+    parser.add_argument("--no-worst-case-cost", dest="worst_case_cost", action="store_false",
+                        help="Disable worst-case dispatch cost epigraph (use nominal dispatch cost only)")
+    parser.set_defaults(worst_case_cost=True)
     parser.add_argument("--out-dir", type=str, default=None,
                         help="Output directory (auto-generated if not specified)")
     args = parser.parse_args()
@@ -149,6 +152,7 @@ def main():
         day1_only_robust=args.day1_only_robust,
         fix_wind_z=args.fix_wind_z,
         single_block=not args.three_blocks,
+        worst_case_cost=args.worst_case_cost,
     )
 
     daruc_results = daruc_outputs["daruc_results"]
@@ -209,6 +213,7 @@ def main():
         day1_only_robust=args.day1_only_robust,
         fix_wind_z=args.fix_wind_z,
         single_block=not args.three_blocks,
+        worst_case_cost=args.worst_case_cost,
     )
 
     aruc_results = aruc_outputs["results"]

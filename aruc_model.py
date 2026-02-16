@@ -82,6 +82,7 @@ def build_aruc_ldr_model(
     gurobi_numeric_mode: str = "balanced",
     robust_mask: Optional[np.ndarray] = None,
     fix_wind_z: bool = False,
+    worst_case_cost: bool = True,
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Adaptive robust UC with linear decision rules:
@@ -137,6 +138,11 @@ def build_aruc_ldr_model(
     L = data.n_lines
     T = data.n_periods
     B = data.n_blocks
+
+    if worst_case_cost:
+        assert B == 1, (
+            f"worst_case_cost requires single_block (B=1), got B={B}"
+        )
 
     data.validate_shapes()
 
@@ -273,6 +279,20 @@ def build_aruc_ldr_model(
     s_p = m.addVars(T, vtype=GRB.CONTINUOUS, lb=0.0, name="s_p")
 
     # ------------------------------------------------------------------
+    # Worst-case dispatch cost epigraph variables
+    # ------------------------------------------------------------------
+    if worst_case_cost:
+        gamma_cost = m.addVar(lb=0.0, name="gamma_cost")
+        z_cost = m.addVars(
+            [t for t in range(T) if robust_mask[t]],
+            lb=0.0, name="z_cost",
+        )
+        y_cost = m.addVars(
+            [(t, k) for t in range(T) if robust_mask[t] for k in range(K)],
+            lb=-GRB.INFINITY, name="y_cost",
+        )
+
+    # ------------------------------------------------------------------
     # Fix commitment for zero-cost generators (WIND, SOLAR, HYDRO).
     # These have Pmin=0, MUT=0, MDT=0 and all costs=0, so the commitment
     # variable is degenerate (u=0 and u=1 give identical objective).
@@ -329,19 +349,28 @@ def build_aruc_ldr_model(
         # Incremental objective: only pay commitment costs for additional
         # units (u_dam=0), scale dispatch costs down to break ties.
         u_dam_arr = dam_commitment["u"]
-        print(f"  [ARUC] Incremental objective: commitment costs for "
-              f"additional units only, dispatch scaled by {dispatch_cost_scale}")
+        if worst_case_cost:
+            print(f"  [ARUC] Incremental objective: commitment costs for "
+                  f"additional units only, worst-case dispatch scaled by {dispatch_cost_scale}")
+        else:
+            print(f"  [ARUC] Incremental objective: commitment costs for "
+                  f"additional units only, dispatch scaled by {dispatch_cost_scale}")
         for i in range(I):
             for t in range(T):
                 if u_dam_arr[i, t] < 0.5:  # not committed by DAM
                     obj.addTerms(C_NL[i] * dt[t], u[i, t])
                     obj.addTerms(C_SU[i], v[i, t])
                     obj.addTerms(C_SD[i], w[i, t])
-                for b in range(B):
-                    obj.addTerms(
-                        dispatch_cost_scale * block_cost[i, b] * dt[t],
-                        p0_block[i, t, b],
-                    )
+        if worst_case_cost:
+            obj.addTerms(dispatch_cost_scale, gamma_cost)
+        else:
+            for i in range(I):
+                for t in range(T):
+                    for b in range(B):
+                        obj.addTerms(
+                            dispatch_cost_scale * block_cost[i, b] * dt[t],
+                            p0_block[i, t, b],
+                        )
     else:
         # Full cost objective (standard)
         for i in range(I):
@@ -349,8 +378,13 @@ def build_aruc_ldr_model(
                 obj.addTerms(C_NL[i] * dt[t], u[i, t])     # no-load: $/hr × hours
                 obj.addTerms(C_SU[i], v[i, t])               # startup: one-time
                 obj.addTerms(C_SD[i], w[i, t])               # shutdown: one-time
-                for b in range(B):
-                    obj.addTerms(block_cost[i, b] * dt[t], p0_block[i, t, b])
+        if worst_case_cost:
+            obj.addTerms(1.0, gamma_cost)
+        else:
+            for i in range(I):
+                for t in range(T):
+                    for b in range(B):
+                        obj.addTerms(block_cost[i, b] * dt[t], p0_block[i, t, b])
 
     for t in range(T):
         obj.addTerms(M_p * dt[t], s_p[t])
@@ -780,6 +814,49 @@ def build_aruc_ldr_model(
                     name=f"wind_max_rob_i{i}_t{t}",
                 )
 
+    # ------------------------------------------------------------------
+    # 4) Worst-case dispatch cost epigraph
+    # ------------------------------------------------------------------
+    if worst_case_cost:
+        C_dispatch = block_cost[:, 0]  # (I,) — one marginal cost per generator
+
+        epigraph_rhs = gp.LinExpr()
+        # Nominal dispatch cost for ALL periods
+        for i in range(I):
+            for t in range(T):
+                epigraph_rhs += C_dispatch[i] * dt[t] * p0[i, t]
+
+        # Worst-case redispatch cost for ROBUST periods only
+        for t in range(T):
+            if not robust_mask[t]:
+                continue
+            sqrt_Sigma_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
+            rho_t = rho[t] if time_varying else rho
+
+            # y_cost[t,k] = (L_t^T @ c_t)[k] = sum_j L[j,k] * sum_i C_i * Z[i,t,j]
+            for k_idx in range(K):
+                expr = gp.LinExpr()
+                for j_idx in range(K):
+                    coef_L = float(sqrt_Sigma_t[j_idx, k_idx])
+                    if abs(coef_L) < 1e-12:
+                        continue
+                    for i in z_elig:
+                        if abs(C_dispatch[i]) < 1e-12:
+                            continue
+                        expr += coef_L * C_dispatch[i] * Z[i, t, j_idx]
+                m.addConstr(y_cost[t, k_idx] == expr, name=f"y_cost_def_t{t}_k{k_idx}")
+
+            # SOC: z_cost[t] >= ||y_cost[t,:]||
+            m.addConstr(
+                z_cost[t] * z_cost[t]
+                >= gp.quicksum(y_cost[t, k] * y_cost[t, k] for k in range(K)),
+                name=f"soc_cost_t{t}",
+            )
+
+            epigraph_rhs += rho_t * dt[t] * z_cost[t]
+
+        m.addConstr(gamma_cost >= epigraph_rhs, name="epigraph_cost")
+
     # Gurobi params — numeric tuning for MISOCP with wide coefficient range
     _NUMERIC_MODES = {
         "fast":     {"NumericFocus": 0, "BarHomogeneous": -1, "ScaleFlag": 1},
@@ -819,6 +896,11 @@ def build_aruc_ldr_model(
         "z_wind": z_wind,
         "y_wind": y_wind,
     }
+
+    if worst_case_cost:
+        vars_dict["gamma_cost"] = gamma_cost
+        vars_dict["z_cost"] = z_cost
+        vars_dict["y_cost"] = y_cost
 
     if dam_commitment is not None:
         vars_dict["u_prime"] = u_prime

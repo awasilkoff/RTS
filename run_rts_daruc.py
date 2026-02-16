@@ -221,6 +221,7 @@ def run_rts_daruc(
     day1_only_robust: bool = False,
     fix_wind_z: bool = False,
     single_block: bool = True,
+    worst_case_cost: bool = True,
 ) -> Dict[str, Any]:
     """
     Two-step DARUC pipeline (Setup 1):
@@ -350,6 +351,7 @@ def run_rts_daruc(
         gurobi_numeric_mode=gurobi_numeric_mode,
         robust_mask=robust_mask,
         fix_wind_z=fix_wind_z,
+        worst_case_cost=worst_case_cost,
     )
 
     # Warm start ARUC from DAM solution

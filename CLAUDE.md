@@ -118,6 +118,8 @@ Outputs (in `comparison_outputs/<run_tag>/`): commitment heatmaps, dispatch bars
 
 CLI args for variable intervals: `--day2-interval 2` (2-hour blocks for day 2), `--day1-only-robust` (no Z/SOC for day 2).
 
+Generator filtering: `--include-renewables`, `--include-nuclear`, `--include-zero-marginal` (see Generator Filtering section).
+
 ### Price of Robustness Sweep (rho)
 
 ```bash
@@ -166,6 +168,27 @@ The `DAMData` Pydantic model (in `models.py`) is the canonical interface between
 - **Initial conditions:** `u_init`, `init_up_time`, `init_down_time`
 
 Generator types: `"THERMAL"`, `"WIND"`, `"SOLAR"`, `"HYDRO"` (stored in `gen_type` list)
+
+### Generator Filtering (Solar/Hydro/Nuclear Exclusion)
+
+By default, solar (PV, RTPV), hydro (HYDRO, ROR), and nuclear generators are **excluded** from the model so that wind is the only low-marginal-cost resource. This makes wind uncertainty the dominant driver of commitment decisions.
+
+Controlled by three parameters on `build_damdata_from_rts()` and all runner scripts:
+
+| Parameter | Default | Controls |
+|-----------|---------|----------|
+| `include_renewables` | `False` | PV, RTPV, HYDRO, ROR generators |
+| `include_nuclear` | `False` | NUCLEAR generators |
+| `include_zero_marginal` | `None` | Override: when explicitly True/False, overrides both above |
+
+CLI flags (available on `run_comparison.py`, `run_alpha_sweep.py`, `run_price_of_robustness.py`):
+- `--include-renewables` / `--no-include-renewables`
+- `--include-nuclear` / `--no-include-nuclear`
+- `--include-zero-marginal` / `--no-include-zero-marginal` (overrides both)
+
+With defaults (~77 generators): 39 CT + 23 STEAM + 10 CC + 1 CSP + 4 WIND. With `--include-zero-marginal` (~154 generators): adds 56 solar + 20 hydro + 1 nuclear.
+
+Filtering happens at the earliest point in `io_rts.py` (extending the existing `keep_mask` that excludes STORAGE and SYNC_COND), so all downstream code works unchanged.
 
 ### Variable-Duration Periods
 

@@ -657,11 +657,31 @@ def build_phase2_model(
         lb=-GRB.INFINITY, name="y_gen",
     )
 
-    # Objective: minimise total slack (shortfall + surplus)
+    # Robustness slack for wind availability and line flow constraints
+    # These ensure Phase 2 is always feasible; slack measures the gap.
+    s_wind = m.addVars(
+        [(kw, t) for kw in range(n_wind) for t in range(T) if robust_mask[t]],
+        lb=0.0, name="s_wind",
+    )
+    s_line = m.addVars(
+        [(l, t) for l in range(L) for t in range(T) if robust_mask[t]],
+        lb=0.0, name="s_line",
+    )
+
+    # Objective: minimise total slack (shortfall + surplus + wind + line)
     obj = gp.LinExpr()
     for t in range(T):
         obj.addTerms(1.0, s[t])
         obj.addTerms(1.0, s_dn[t])
+    for kw in range(n_wind):
+        for t in range(T):
+            if robust_mask[t]:
+                obj.addTerms(1.0, s_wind[kw, t])
+    if enforce_lines:
+        for l in range(L):
+            for t in range(T):
+                if robust_mask[t]:
+                    obj.addTerms(1.0, s_line[l, t])
     m.setObjective(obj, GRB.MINIMIZE)
 
     # ------------------------------------------------------------------
@@ -859,11 +879,13 @@ def build_phase2_model(
                 )
 
                 m.addConstr(
-                    flow_nom + rho_lines_t * z_line[l_idx, t] <= Fmax[l_idx],
+                    flow_nom + rho_lines_t * z_line[l_idx, t]
+                    <= Fmax[l_idx] + s_line[l_idx, t],
                     name=f"lmax_rob_l{l_idx}_t{t}",
                 )
                 m.addConstr(
-                    -flow_nom + rho_lines_t * z_line[l_idx, t] <= Fmax[l_idx],
+                    -flow_nom + rho_lines_t * z_line[l_idx, t]
+                    <= Fmax[l_idx] + s_line[l_idx, t],
                     name=f"lmin_rob_l{l_idx}_t{t}",
                 )
 
@@ -917,7 +939,7 @@ def build_phase2_model(
             )
 
             m.addConstr(
-                alpha_expr + rho_t * z_wind[k_wind, t] <= 0.0,
+                alpha_expr + rho_t * z_wind[k_wind, t] <= s_wind[k_wind, t],
                 name=f"wind_rob_w{k_wind}_t{t}",
             )
 
@@ -933,6 +955,8 @@ def build_phase2_model(
         "Z": Z,
         "s": s,
         "s_dn": s_dn,
+        "s_wind": s_wind,
+        "s_line": s_line,
         "z_gen": z_gen,
         "y_gen": y_gen,
         "z_line": z_line,
@@ -994,7 +1018,13 @@ def extract_worst_case_scenario(
     if phase2_model.SolCount > 0:
         s_up = np.array([phase2_vars["s"][t].X for t in range(T)])
         s_dn = np.array([phase2_vars["s_dn"][t].X for t in range(T)])
-        s_vals = s_up + s_dn
+        # Also consider wind slack per period
+        s_wind_t = np.zeros(T)
+        for kw in range(K):
+            for t in range(T):
+                if (kw, t) in phase2_vars["s_wind"]:
+                    s_wind_t[t] += phase2_vars["s_wind"][kw, t].X
+        s_vals = s_up + s_dn + s_wind_t
         t_worst = int(np.argmax(s_vals))
 
     if time_varying:
@@ -1004,17 +1034,36 @@ def extract_worst_case_scenario(
         Sigma_t = Sigma
         rho_t = float(rho)
 
-    # Simple fallback: worst case = direction that maximally reduces
-    # total wind output. Direction: -Sigma^{1/2} @ ones / ||...||
     try:
         L_chol = np.linalg.cholesky(Sigma_t)
     except np.linalg.LinAlgError:
         L_chol = np.linalg.cholesky(Sigma_t + 1e-6 * np.eye(K))
 
-    direction = -L_chol @ np.ones(K)
+    # Use solved Z values to find worst-case direction when solution exists
+    if phase2_model.SolCount > 0:
+        # For the worst period, find the wind farm with largest slack
+        # and construct worst-case along that direction
+        wind_slacks = np.zeros(K)
+        for kw in range(K):
+            if (kw, t_worst) in phase2_vars["s_wind"]:
+                wind_slacks[kw] = phase2_vars["s_wind"][kw, t_worst].X
+
+        if np.max(wind_slacks) > 1e-6:
+            # Worst case for the most constrained wind farm: negative direction
+            # along that wind farm's column in the uncertainty space
+            kw_worst = int(np.argmax(wind_slacks))
+            direction = -np.zeros(K)
+            direction[kw_worst] = -1.0
+        else:
+            # General fallback: direction that reduces all wind output
+            direction = -L_chol @ np.ones(K)
+    else:
+        # No solution — use general fallback
+        direction = -L_chol @ np.ones(K)
+
+    # Project to ellipsoidal boundary: r* = rho * Sigma @ d / ||L^T d||
     norm = np.linalg.norm(L_chol.T @ direction)
     if norm < 1e-12:
-        # Degenerate: use first principal component
         direction = -L_chol[:, 0]
         norm = np.linalg.norm(L_chol.T @ direction)
 
@@ -1080,6 +1129,8 @@ def solve_ruc_ccg(
     """
     I = data.n_gens
     T = data.n_periods
+    is_wind = np.array([gt.upper() == "WIND" for gt in data.gen_type])
+    K = int(is_wind.sum())
 
     scenarios: List[np.ndarray] = []
     gap_history: List[float] = []
@@ -1160,12 +1211,22 @@ def solve_ruc_ccg(
                 scenarios.append(r_star)
                 continue
 
+        rm = robust_mask if robust_mask is not None else np.ones(T, dtype=bool)
         total_slack_up = sum(p2_vars["s"][t].X for t in range(T))
         total_slack_dn = sum(p2_vars["s_dn"][t].X for t in range(T))
-        total_slack = total_slack_up + total_slack_dn
+        total_slack_wind = sum(
+            p2_vars["s_wind"][kw, t].X
+            for kw in range(K) for t in range(T) if rm[t]
+        )
+        total_slack_line = sum(
+            p2_vars["s_line"][l, t].X
+            for l in range(data.n_lines) for t in range(T) if rm[t]
+        ) if enforce_lines else 0.0
+        total_slack = total_slack_up + total_slack_dn + total_slack_wind + total_slack_line
         gap_history.append(total_slack)
         print(f"  Phase 2 total slack: {total_slack:.4f} MW "
               f"(shed={total_slack_up:.1f}, spill={total_slack_dn:.1f}, "
+              f"wind={total_slack_wind:.1f}, line={total_slack_line:.1f}, "
               f"solve time: {t_p2:.1f}s)")
 
         if total_slack <= gap_tolerance:

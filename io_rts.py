@@ -568,7 +568,11 @@ def build_damdata_from_rts(
             block_cap[i, 0] = Pmax[i]
             block_cap[i, 1] = 0.0
             block_cap[i, 2] = 0.0
-            block_cost[i, :] = 0.0
+            # Tiny negative cost for wind to break LP degeneracy:
+            # ensures optimizer maximizes wind dispatch before other zero-cost gen.
+            block_cost[i, 0] = -0.001 if gen_type[i] == "WIND" else 0.0
+            block_cost[i, 1] = 0.0
+            block_cost[i, 2] = 0.0
         else:
             block_cap[i, 0] = np.clip(row.get("Output_pct_1", 0), 0, 1) * Pmax[i]
             block_cap[i, 1] = (

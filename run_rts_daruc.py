@@ -225,6 +225,7 @@ def run_rts_daruc(
     include_renewables: bool = False,
     include_nuclear: bool = False,
     include_zero_marginal: Optional[bool] = None,
+    ramp_scale: float = 1.0,
 ) -> Dict[str, Any]:
     """
     Two-step DARUC pipeline (Setup 1):
@@ -277,6 +278,7 @@ def run_rts_daruc(
         include_renewables=include_renewables,
         include_nuclear=include_nuclear,
         include_zero_marginal=include_zero_marginal,
+        ramp_scale=ramp_scale,
     )
 
     dam_results = dam_outputs["results"]

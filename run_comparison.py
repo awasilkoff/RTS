@@ -89,6 +89,8 @@ def main():
                         help="Include nuclear generators (default: exclude)")
     parser.add_argument("--include-zero-marginal", action=argparse.BooleanOptionalAction, default=None,
                         help="Override: include/exclude all zero-marginal-cost non-wind generators")
+    parser.add_argument("--ramp-scale", type=float, default=1.0,
+                        help="Multiply all ramp rates (RU, RD) by this factor (default: 1.0)")
     parser.add_argument("--out-dir", type=str, default=None,
                         help="Output directory (auto-generated if not specified)")
     args = parser.parse_args()
@@ -107,10 +109,11 @@ def main():
             rho_tag = f"rho{args.rho}_linesfrac{args.rho_lines_frac}"
         else:
             rho_tag = f"rho{args.rho}"
+        ramp_tag = f"_ramp{args.ramp_scale}x" if args.ramp_scale != 1.0 else ""
         out_dir = Path(
             f"comparison_outputs/"
             f"m{args.start_month:02d}d{args.start_day:02d}_"
-            f"{args.hours}h_{rho_tag}_{net}"
+            f"{args.hours}h_{rho_tag}_{net}{ramp_tag}"
         )
     out_dir.mkdir(parents=True, exist_ok=True)
     aruc_dir = out_dir / "aruc"
@@ -133,6 +136,8 @@ def main():
         print(f"  DARUC obj: incremental (dispatch scale={args.dispatch_cost_scale})")
     if args.fix_wind_z:
         print(f"  Wind Z:   FIXED (diagonal=1, no curtailment)")
+    if args.ramp_scale != 1.0:
+        print(f"  Ramp scale: {args.ramp_scale}x")
     print(f"  Network:  {'with line limits' if args.enforce_lines else 'copperplate'}")
     print(f"  Output:   {out_dir}")
     print("=" * 70)
@@ -163,6 +168,7 @@ def main():
         include_renewables=args.include_renewables,
         include_nuclear=args.include_nuclear,
         include_zero_marginal=args.include_zero_marginal,
+        ramp_scale=args.ramp_scale,
     )
 
     daruc_results = daruc_outputs["daruc_results"]
@@ -227,6 +233,7 @@ def main():
         include_renewables=args.include_renewables,
         include_nuclear=args.include_nuclear,
         include_zero_marginal=args.include_zero_marginal,
+        ramp_scale=args.ramp_scale,
     )
 
     aruc_results = aruc_outputs["results"]

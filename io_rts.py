@@ -462,6 +462,7 @@ def build_damdata_from_rts(
     include_renewables: bool = False,
     include_nuclear: bool = False,
     include_zero_marginal: bool | None = None,
+    ramp_scale: float = 1.0,
 ) -> DAMData:
     """
     High-level function:
@@ -606,6 +607,12 @@ def build_damdata_from_rts(
             block_cost[i, 0] = row.get("HR_incr_1") * row["Fuel Price $/MMBTU"] / 1000
             block_cost[i, 1] = row.get("HR_incr_2") * row["Fuel Price $/MMBTU"] / 1000
             block_cost[i, 2] = row.get("HR_incr_3") * row["Fuel Price $/MMBTU"] / 1000
+
+    # Scale ramp rates if requested
+    if ramp_scale != 1.0:
+        RU *= ramp_scale
+        RD *= ramp_scale
+        print(f"  Ramp rates scaled by {ramp_scale}x")
 
     # Collapse 3 blocks → 1 block with weighted-average marginal cost
     if single_block:

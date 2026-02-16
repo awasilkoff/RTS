@@ -151,6 +151,9 @@ def run_rts_dam(
     enforce_lines: bool = True,
     day2_interval_hours: int = 1,
     single_block: bool = True,
+    include_renewables: bool = False,
+    include_nuclear: bool = False,
+    include_zero_marginal: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """
     Full pipeline:
@@ -178,6 +181,9 @@ def run_rts_dam(
         spp_start_idx=spp_start_idx,
         day2_interval_hours=day2_interval_hours,
         single_block=single_block,
+        include_renewables=include_renewables,
+        include_nuclear=include_nuclear,
+        include_zero_marginal=include_zero_marginal,
     )
     print("  Done. Data shapes:")
     print(f"    n_gens   = {data.n_gens}")

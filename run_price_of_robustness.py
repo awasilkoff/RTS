@@ -71,6 +71,9 @@ def run_sweep(args) -> pd.DataFrame:
                 mip_gap=args.mip_gap,
                 single_block=not args.three_blocks,
                 worst_case_cost=args.worst_case_cost,
+                include_renewables=args.include_renewables,
+                include_nuclear=args.include_nuclear,
+                include_zero_marginal=args.include_zero_marginal,
             )
             data = daruc_out["data"]
             daruc_res = daruc_out["daruc_results"]
@@ -108,6 +111,9 @@ def run_sweep(args) -> pd.DataFrame:
                 mip_gap=args.mip_gap,
                 single_block=not args.three_blocks,
                 worst_case_cost=args.worst_case_cost,
+                include_renewables=args.include_renewables,
+                include_nuclear=args.include_nuclear,
+                include_zero_marginal=args.include_zero_marginal,
             )
             aruc_res = aruc_out["results"]
             aruc_obj = aruc_res["obj"]
@@ -219,6 +225,9 @@ def main():
     parser.add_argument("--three-blocks", action="store_true", help="Use original 3-block piecewise cost (default: single block with weighted-average cost)")
     parser.add_argument("--no-worst-case-cost", dest="worst_case_cost", action="store_false", help="Disable worst-case dispatch cost epigraph (use nominal dispatch cost only)")
     parser.set_defaults(worst_case_cost=True)
+    parser.add_argument("--include-renewables", action=argparse.BooleanOptionalAction, default=False, help="Include solar (PV/RTPV) and hydro generators (default: exclude)")
+    parser.add_argument("--include-nuclear", action=argparse.BooleanOptionalAction, default=False, help="Include nuclear generators (default: exclude)")
+    parser.add_argument("--include-zero-marginal", action=argparse.BooleanOptionalAction, default=None, help="Override: include/exclude all zero-marginal-cost non-wind generators")
     parser.add_argument("--out-dir", type=str, default="price_of_robustness", help="Output directory (default: price_of_robustness/)")
     args = parser.parse_args()
 

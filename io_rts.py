@@ -459,6 +459,9 @@ def build_damdata_from_rts(
     spp_start_idx: int = 0,
     day2_interval_hours: int = 1,
     single_block: bool = False,
+    include_renewables: bool = False,
+    include_nuclear: bool = False,
+    include_zero_marginal: bool | None = None,
 ) -> DAMData:
     """
     High-level function:
@@ -481,8 +484,23 @@ def build_damdata_from_rts(
     gens_df = tables["gens"]
 
     # 1) Simplify/filter generators
-    # e.g., drop storage, sync cond, maybe hydro, keep thermal + wind.
-    keep_mask = ~gens_df["Unit Type"].isin(["STORAGE", "SYNC_COND"])
+    # Resolve combined flag
+    if include_zero_marginal is not None:
+        include_renewables = include_zero_marginal
+        include_nuclear = include_zero_marginal
+
+    # Base filter: always exclude STORAGE and SYNC_COND
+    exclude_types = {"STORAGE", "SYNC_COND"}
+    if not include_renewables:
+        exclude_types |= {"PV", "RTPV", "HYDRO", "ROR"}
+    if not include_nuclear:
+        exclude_types |= {"NUCLEAR"}
+
+    keep_mask = ~gens_df["Unit Type"].isin(exclude_types)
+    n_excluded = (~keep_mask).sum()
+    if n_excluded > 0:
+        excluded_types = gens_df.loc[~keep_mask, "Unit Type"].value_counts()
+        print(f"  Excluded {n_excluded} generators: {dict(excluded_types)}")
     gens_df = gens_df.loc[keep_mask].copy()
 
     # Example: add type labels compatible with DAMData.gen_type
@@ -660,21 +678,25 @@ def build_damdata_from_rts(
         )
 
     # 6b) Build time-varying Pmax for solar generators (PV + RTPV)
-    pv_window = pv_df.loc[
-        (pv_df.index >= start_time) & (pv_df.index < end_time)
-    ].copy()
-    rtpv_window = rtpv_df.loc[
-        (rtpv_df.index >= start_time) & (rtpv_df.index < end_time)
-    ].copy()
+    has_solar = any(gt == "SOLAR" for gt in gen_type)
+    if has_solar:
+        pv_window = pv_df.loc[
+            (pv_df.index >= start_time) & (pv_df.index < end_time)
+        ].copy()
+        rtpv_window = rtpv_df.loc[
+            (rtpv_df.index >= start_time) & (rtpv_df.index < end_time)
+        ].copy()
 
-    pmax_solar = build_solar_pmax_array(
-        pv_df=pv_window,
-        rtpv_df=rtpv_window,
-        gens_df=gens_df,
-        gen_ids=gen_ids,
-        time_index=time_index,
-        gen_type=gen_type,
-    )
+        pmax_solar = build_solar_pmax_array(
+            pv_df=pv_window,
+            rtpv_df=rtpv_window,
+            gens_df=gens_df,
+            gen_ids=gen_ids,
+            time_index=time_index,
+            gen_type=gen_type,
+        )
+    else:
+        pmax_solar = np.zeros((I, T))
 
     # Create Pmax_t array: I x T
     # Wind and solar use time-varying forecasts; thermal/hydro use static Pmax

@@ -222,6 +222,9 @@ def run_rts_daruc(
     fix_wind_z: bool = False,
     single_block: bool = True,
     worst_case_cost: bool = True,
+    include_renewables: bool = False,
+    include_nuclear: bool = False,
+    include_zero_marginal: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """
     Two-step DARUC pipeline (Setup 1):
@@ -271,6 +274,9 @@ def run_rts_daruc(
         enforce_lines=enforce_lines,
         day2_interval_hours=day2_interval_hours,
         single_block=single_block,
+        include_renewables=include_renewables,
+        include_nuclear=include_nuclear,
+        include_zero_marginal=include_zero_marginal,
     )
 
     dam_results = dam_outputs["results"]

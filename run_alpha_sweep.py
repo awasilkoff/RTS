@@ -197,6 +197,9 @@ def run_alpha_point(
     out_dir: Path | None = None,
     single_block: bool = True,
     worst_case_cost: bool = True,
+    include_renewables: bool = False,
+    include_nuclear: bool = False,
+    include_zero_marginal: bool | None = None,
 ) -> dict | None:
     """Run DARUC + ARUC with a given NPZ and return metrics row."""
     print(f"\n{'#' * 70}")
@@ -223,6 +226,9 @@ def run_alpha_point(
             fix_wind_z=fix_wind_z,
             single_block=single_block,
             worst_case_cost=worst_case_cost,
+            include_renewables=include_renewables,
+            include_nuclear=include_nuclear,
+            include_zero_marginal=include_zero_marginal,
         )
         data = daruc_out["data"]
         daruc_res = daruc_out["daruc_results"]
@@ -265,6 +271,9 @@ def run_alpha_point(
             fix_wind_z=fix_wind_z,
             single_block=single_block,
             worst_case_cost=worst_case_cost,
+            include_renewables=include_renewables,
+            include_nuclear=include_nuclear,
+            include_zero_marginal=include_zero_marginal,
         )
         aruc_res = aruc_out["results"]
         aruc_obj = aruc_res["obj"]
@@ -606,6 +615,24 @@ def main():
     )
     parser.set_defaults(worst_case_cost=True)
     parser.add_argument(
+        "--include-renewables",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Include solar (PV/RTPV) and hydro generators (default: exclude)",
+    )
+    parser.add_argument(
+        "--include-nuclear",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Include nuclear generators (default: exclude)",
+    )
+    parser.add_argument(
+        "--include-zero-marginal",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Override: include/exclude all zero-marginal-cost non-wind generators",
+    )
+    parser.add_argument(
         "--out-dir",
         type=str,
         default=None,
@@ -712,6 +739,9 @@ def main():
             out_dir=out_dir,
             single_block=not args.three_blocks,
             worst_case_cost=args.worst_case_cost,
+            include_renewables=args.include_renewables,
+            include_nuclear=args.include_nuclear,
+            include_zero_marginal=args.include_zero_marginal,
         )
         if row is not None:
             rows.append(row)

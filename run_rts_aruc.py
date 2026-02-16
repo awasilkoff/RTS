@@ -420,6 +420,9 @@ def run_rts_aruc(
     fix_wind_z: bool = False,
     single_block: bool = True,
     worst_case_cost: bool = True,
+    include_renewables: bool = False,
+    include_nuclear: bool = False,
+    include_zero_marginal: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """
     Full pipeline for ARUC-LDR:
@@ -474,6 +477,9 @@ def run_rts_aruc(
         spp_start_idx=spp_start_idx,
         day2_interval_hours=day2_interval_hours,
         single_block=single_block,
+        include_renewables=include_renewables,
+        include_nuclear=include_nuclear,
+        include_zero_marginal=include_zero_marginal,
     )
     T = data.n_periods
     print("  Done. Data shapes:")

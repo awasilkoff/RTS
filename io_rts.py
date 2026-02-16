@@ -558,8 +558,8 @@ def build_damdata_from_rts(
         gen_to_bus[i] = bus_idx[row["Bus ID"]]
         Pmin[i] = row["PMin MW"]
         Pmax[i] = row["PMax MW"]
-        RU[i] = row["Ramp Rate MW/Min"]
-        RD[i] = row["Ramp Rate MW/Min"]
+        RU[i] = row["Ramp Rate MW/Min"] * 60  # MW/min → MW/h
+        RD[i] = row["Ramp Rate MW/Min"] * 60  # MW/min → MW/h
         MUT[i] = row["Min Up Time Hr"]
         MDT[i] = row["Min Down Time Hr"]
         startup_cost[i] = (

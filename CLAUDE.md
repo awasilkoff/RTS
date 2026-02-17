@@ -105,6 +105,8 @@ Regenerate v2 parquets: `cd uncertainty_sets_refactored && python mapping.py`
 
 **Wind block capacity fix:** Wind generators in gen.csv have `Output_pct_1/2/3 = 0` (no heat rate curve), which previously caused `block_cap = [0,0,0]` and forced zero dispatch. `io_rts.py` now sets `block_cap[i,0] = Pmax[i]` for wind generators with zero marginal cost.
 
+**Ramp rate units fix:** gen.csv stores `Ramp Rate MW/Min` but the ramp constraints in `dam_model.py` and `aruc_model.py` apply `RU * dt_ramp` where `dt_ramp` is in hours. `io_rts.py` now multiplies by 60 at read time (MW/min → MW/h). Without this, ramp rates were 60× too tight, forcing thermals to stay elevated overnight and causing ~54% wind curtailment in DAM.
+
 ## Runner Scripts
 
 ### ARUC vs DARUC Comparison

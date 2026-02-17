@@ -1,0 +1,89 @@
+{
+  "created_at": "2026-02-15T19:54:43.786016+00:00",
+  "data_source": "rts4_constellation_v1",
+  "n_hours": 2949,
+  "n_wind_resources": 4,
+  "wind_resource_ids": [
+    "122_WIND_1",
+    "303_WIND_1",
+    "309_WIND_1",
+    "317_WIND_1"
+  ],
+  "feature_cols": [
+    "SYS_MEAN",
+    "SYS_STD",
+    "WIND_122_MEAN",
+    "WIND_303_MEAN",
+    "WIND_309_MEAN",
+    "WIND_317_MEAN",
+    "WIND_122_STD",
+    "WIND_303_STD",
+    "WIND_309_STD",
+    "WIND_317_STD",
+    "HOUR_SIN",
+    "HOUR_COS",
+    "DOW_SIN",
+    "DOW_COS",
+    "SYS_MEAN_DELTA_3H",
+    "SYS_MEAN_DELTA_1H",
+    "SYS_STD_ROLLING_6H",
+    "FORECAST_SPREAD"
+  ],
+  "conformal_feature_cols": [
+    "ens_mean",
+    "ens_std",
+    "ens_min",
+    "ens_max",
+    "n_models",
+    "hour",
+    "dow",
+    "forecast_range",
+    "forecast_range_normalized",
+    "forecast_cv",
+    "y_lag24",
+    "forecast_error_lag24"
+  ],
+  "config": {
+    "tau": 0.05,
+    "ridge": 0.001,
+    "k": 128,
+    "alpha_target": 0.99,
+    "n_bins": 1,
+    "quantile_alpha": 0.05,
+    "safety_margin": 0.0,
+    "scaler_type": "standard",
+    "feature_set": "high_dim_16d",
+    "train_frac": 0.75,
+    "omega_constraint": "softmax"
+  },
+  "conformal_metrics": {
+    "coverage": 0.9855334538878843,
+    "rmse": 760.2397549235219
+  },
+  "omega": [
+    0.06486617028713226,
+    0.046238068491220474,
+    0.0617828369140625,
+    0.06495894491672516,
+    0.0654531940817833,
+    0.06536514312028885,
+    0.04111603647470474,
+    0.04328764230012894,
+    0.06200480833649635,
+    0.04206522926688194,
+    0.06422661989927292,
+    0.041630715131759644,
+    0.047718144953250885,
+    0.05833444371819496,
+    0.058872394263744354,
+    0.04496674984693527,
+    0.06540217250585556,
+    0.06171061098575592
+  ],
+  "rho_stats": {
+    "min": 0.0,
+    "max": 5079.5214490283615,
+    "mean": 8.009868154361966,
+    "std": 102.92464426721043
+  }
+}

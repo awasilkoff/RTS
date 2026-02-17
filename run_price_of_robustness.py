@@ -74,6 +74,8 @@ def run_sweep(args) -> pd.DataFrame:
                 include_renewables=args.include_renewables,
                 include_nuclear=args.include_nuclear,
                 include_zero_marginal=args.include_zero_marginal,
+                ramp_scale=args.ramp_scale,
+                pmin_scale=args.pmin_scale,
             )
             data = daruc_out["data"]
             daruc_res = daruc_out["daruc_results"]
@@ -114,6 +116,8 @@ def run_sweep(args) -> pd.DataFrame:
                 include_renewables=args.include_renewables,
                 include_nuclear=args.include_nuclear,
                 include_zero_marginal=args.include_zero_marginal,
+                ramp_scale=args.ramp_scale,
+                pmin_scale=args.pmin_scale,
             )
             aruc_res = aruc_out["results"]
             aruc_obj = aruc_res["obj"]
@@ -228,6 +232,8 @@ def main():
     parser.add_argument("--include-renewables", action=argparse.BooleanOptionalAction, default=False, help="Include solar (PV/RTPV) and hydro generators (default: exclude)")
     parser.add_argument("--include-nuclear", action=argparse.BooleanOptionalAction, default=False, help="Include nuclear generators (default: exclude)")
     parser.add_argument("--include-zero-marginal", action=argparse.BooleanOptionalAction, default=None, help="Override: include/exclude all zero-marginal-cost non-wind generators")
+    parser.add_argument("--ramp-scale", type=float, default=1.0, help="Multiply all ramp rates (RU, RD) by this factor (default: 1.0)")
+    parser.add_argument("--pmin-scale", type=float, default=1.0, help="Multiply all Pmin by this factor (default: 1.0)")
     parser.add_argument("--out-dir", type=str, default="price_of_robustness", help="Output directory (default: price_of_robustness/)")
     args = parser.parse_args()
 

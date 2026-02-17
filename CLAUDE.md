@@ -234,6 +234,8 @@ sum_{i in THERMAL} r[i,t] >= R[t]          (system requirement)
 
 Requires `--uncertainty-npz`. Results saved to `dam_reserve/` subdirectory and included as a fourth series in all comparison figures and summary.
 
+**Reserve ramp cap vs inter-period ramp:** The reserve constraint uses `r[i,t] <= RU[i] * dt[t]` (full period duration), not `dt_ramp = (dt[t-1]+dt[t])/2` (transition time). This is intentional: spinning reserve measures how much a unit can ramp **within** the current period, so the full `dt[t]` is the relevant time window. Inter-period ramp constraints use transition time `dt_ramp` because they span the boundary between two periods.
+
 Expected cost ordering: DAM < DAM+Reserve < DARUC/ARUC.
 
 ### ARUC Model Variables

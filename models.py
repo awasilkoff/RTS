@@ -94,10 +94,10 @@ class DAMData(BaseModel):
     )
 
     RU: np.ndarray = Field(
-        ..., description="Ramp-up limit (MW per period). shape (I,)."
+        ..., description="Ramp-up rate (MW/h). shape (I,)."
     )
     RD: np.ndarray = Field(
-        ..., description="Ramp-down limit (MW per period). shape (I,)."
+        ..., description="Ramp-down rate (MW/h). shape (I,)."
     )
     MUT: np.ndarray = Field(
         ..., description="Minimum up time (in periods). shape (I,)."

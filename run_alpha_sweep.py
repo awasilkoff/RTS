@@ -201,6 +201,8 @@ def run_alpha_point(
     include_nuclear: bool = False,
     include_zero_marginal: bool | None = None,
     robust_ramp: bool = False,
+    ramp_scale: float = 1.0,
+    pmin_scale: float = 1.0,
 ) -> dict | None:
     """Run DARUC + ARUC with a given NPZ and return metrics row."""
     print(f"\n{'#' * 70}")
@@ -231,6 +233,8 @@ def run_alpha_point(
             include_nuclear=include_nuclear,
             include_zero_marginal=include_zero_marginal,
             robust_ramp=robust_ramp,
+            ramp_scale=ramp_scale,
+            pmin_scale=pmin_scale,
         )
         data = daruc_out["data"]
         daruc_res = daruc_out["daruc_results"]
@@ -277,6 +281,8 @@ def run_alpha_point(
             include_nuclear=include_nuclear,
             include_zero_marginal=include_zero_marginal,
             robust_ramp=robust_ramp,
+            ramp_scale=ramp_scale,
+            pmin_scale=pmin_scale,
         )
         aruc_res = aruc_out["results"]
         aruc_obj = aruc_res["obj"]
@@ -641,6 +647,18 @@ def main():
         help="Use robust (SOC-based) ramp constraints that account for worst-case dispatch deviations",
     )
     parser.add_argument(
+        "--ramp-scale",
+        type=float,
+        default=1.0,
+        help="Multiply all ramp rates (RU, RD) by this factor (default: 1.0)",
+    )
+    parser.add_argument(
+        "--pmin-scale",
+        type=float,
+        default=1.0,
+        help="Multiply all Pmin by this factor (default: 1.0)",
+    )
+    parser.add_argument(
         "--out-dir",
         type=str,
         default=None,
@@ -751,6 +769,8 @@ def main():
             include_nuclear=args.include_nuclear,
             include_zero_marginal=args.include_zero_marginal,
             robust_ramp=args.robust_ramp,
+            ramp_scale=args.ramp_scale,
+            pmin_scale=args.pmin_scale,
         )
         if row is not None:
             rows.append(row)

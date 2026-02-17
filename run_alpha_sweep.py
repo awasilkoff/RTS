@@ -200,6 +200,7 @@ def run_alpha_point(
     include_renewables: bool = False,
     include_nuclear: bool = False,
     include_zero_marginal: bool | None = None,
+    robust_ramp: bool = False,
 ) -> dict | None:
     """Run DARUC + ARUC with a given NPZ and return metrics row."""
     print(f"\n{'#' * 70}")
@@ -229,6 +230,7 @@ def run_alpha_point(
             include_renewables=include_renewables,
             include_nuclear=include_nuclear,
             include_zero_marginal=include_zero_marginal,
+            robust_ramp=robust_ramp,
         )
         data = daruc_out["data"]
         daruc_res = daruc_out["daruc_results"]
@@ -274,6 +276,7 @@ def run_alpha_point(
             include_renewables=include_renewables,
             include_nuclear=include_nuclear,
             include_zero_marginal=include_zero_marginal,
+            robust_ramp=robust_ramp,
         )
         aruc_res = aruc_out["results"]
         aruc_obj = aruc_res["obj"]
@@ -633,6 +636,11 @@ def main():
         help="Override: include/exclude all zero-marginal-cost non-wind generators",
     )
     parser.add_argument(
+        "--robust-ramp",
+        action="store_true",
+        help="Use robust (SOC-based) ramp constraints that account for worst-case dispatch deviations",
+    )
+    parser.add_argument(
         "--out-dir",
         type=str,
         default=None,
@@ -742,6 +750,7 @@ def main():
             include_renewables=args.include_renewables,
             include_nuclear=args.include_nuclear,
             include_zero_marginal=args.include_zero_marginal,
+            robust_ramp=args.robust_ramp,
         )
         if row is not None:
             rows.append(row)

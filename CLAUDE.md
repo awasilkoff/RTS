@@ -210,6 +210,15 @@ When `day1_only_robust=True`, the ARUC/DARUC model only creates Z variables and 
 
 - **`robust_mask`** (on `build_aruc_ldr_model`): Optional `(T,)` bool array. `True` = robust period. `None` = all robust (backward compatible).
 
+### Robust Ramp Constraints
+
+When `robust_ramp=True` (`--robust-ramp` CLI flag), ramp constraints account for worst-case dispatch deviations under uncertainty:
+
+- **Ramp up:** `p0[i,t] + ρ_t·‖Z_{i,t} L_t‖ - p0[i,t-1] + ρ_{t-1}·‖Z_{i,t-1} L_{t-1}‖ ≤ RU_i · dt_ramp · (u[i,t-1] + v[i,t])`
+- **Ramp down:** `p0[i,t-1] + ρ_{t-1}·‖Z_{i,t-1} L_{t-1}‖ - p0[i,t] + ρ_t·‖Z_{i,t} L_t‖ ≤ RD_i · dt_ramp · (u[i,t] + w[i,t])`
+
+The norm terms reuse the existing `z_gen[i,t]` SOC variables (no new SOC constraints needed). Only applied when both periods `t` and `t-1` are robust (per `robust_mask`); otherwise falls back to nominal ramp constraints. Default is `False` (nominal ramps only) for backward compatibility.
+
 ### ARUC Model Variables
 
 - `u[i,t]`: Binary commitment status

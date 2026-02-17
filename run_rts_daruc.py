@@ -227,6 +227,7 @@ def run_rts_daruc(
     include_zero_marginal: Optional[bool] = None,
     ramp_scale: float = 1.0,
     pmin_scale: float = 1.0,
+    robust_ramp: bool = False,
 ) -> Dict[str, Any]:
     """
     Two-step DARUC pipeline (Setup 1):
@@ -362,6 +363,7 @@ def run_rts_daruc(
         robust_mask=robust_mask,
         fix_wind_z=fix_wind_z,
         worst_case_cost=worst_case_cost,
+        robust_ramp=robust_ramp,
     )
 
     # Warm start ARUC from DAM solution

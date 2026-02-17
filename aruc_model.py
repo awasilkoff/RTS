@@ -83,6 +83,7 @@ def build_aruc_ldr_model(
     robust_mask: Optional[np.ndarray] = None,
     fix_wind_z: bool = False,
     worst_case_cost: bool = True,
+    robust_ramp: bool = False,
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Adaptive robust UC with linear decision rules:
@@ -532,23 +533,46 @@ def build_aruc_ldr_model(
                 name=f"p0_min_rob_i{i}_t{t}",
             )
 
-    # Ramps on nominal dispatch (paper formulation uses nominal ramps)
+    # Ramps — nominal or robust depending on robust_ramp flag.
     # dt_ramp = (dt[t-1] + dt[t]) / 2  (transition time between period midpoints)
     # Skip non-thermal generators: wind/solar/hydro have RU=PMax in RTS-GMLC
     # data (effectively unlimited ramp), so these constraints are non-binding.
+    #
+    # Robust ramp (when robust_ramp=True and both periods are robust):
+    #   p0[i,t] + rho_t * z_gen[i,t] - p0[i,t-1] + rho_{t-1} * z_gen[i,t-1]
+    #       <= RU_i * dt_ramp * (u[i,t-1] + v[i,t])
+    # This ensures worst-case dispatch stays within ramp limits.
+    if robust_ramp:
+        print(f"  [ARUC] robust_ramp=True: using SOC-based ramp constraints for robust periods")
     for i in range(I):
         if data.gen_type[i] != "THERMAL":
             continue
         for t in range(1, T):
             dt_ramp = (dt[t - 1] + dt[t]) / 2.0
-            m.addConstr(
-                p0[i, t] - p0[i, t - 1] <= RU[i] * dt_ramp * u[i, t - 1] + RU[i] * dt_ramp * v[i, t],
-                name=f"ramp_up_i{i}_t{t}",
-            )
-            m.addConstr(
-                p0[i, t - 1] - p0[i, t] <= RD[i] * dt_ramp * u[i, t] + RD[i] * dt_ramp * w[i, t],
-                name=f"ramp_down_i{i}_t{t}",
-            )
+            if robust_ramp and robust_mask[t] and robust_mask[t - 1] and i in z_elig_set:
+                rho_t = rho[t] if time_varying else rho
+                rho_tm1 = rho[t - 1] if time_varying else rho
+                m.addConstr(
+                    p0[i, t] + rho_t * z_gen[i, t]
+                    - p0[i, t - 1] + rho_tm1 * z_gen[i, t - 1]
+                    <= RU[i] * dt_ramp * u[i, t - 1] + RU[i] * dt_ramp * v[i, t],
+                    name=f"ramp_up_rob_i{i}_t{t}",
+                )
+                m.addConstr(
+                    p0[i, t - 1] + rho_tm1 * z_gen[i, t - 1]
+                    - p0[i, t] + rho_t * z_gen[i, t]
+                    <= RD[i] * dt_ramp * u[i, t] + RD[i] * dt_ramp * w[i, t],
+                    name=f"ramp_down_rob_i{i}_t{t}",
+                )
+            else:
+                m.addConstr(
+                    p0[i, t] - p0[i, t - 1] <= RU[i] * dt_ramp * u[i, t - 1] + RU[i] * dt_ramp * v[i, t],
+                    name=f"ramp_up_i{i}_t{t}",
+                )
+                m.addConstr(
+                    p0[i, t - 1] - p0[i, t] <= RD[i] * dt_ramp * u[i, t] + RD[i] * dt_ramp * w[i, t],
+                    name=f"ramp_down_i{i}_t{t}",
+                )
 
     # Commitment logic u,v,w exactly as in DAM (you can keep or relax init)
     for i in range(I):

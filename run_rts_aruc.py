@@ -425,6 +425,7 @@ def run_rts_aruc(
     include_zero_marginal: Optional[bool] = None,
     ramp_scale: float = 1.0,
     pmin_scale: float = 1.0,
+    robust_ramp: bool = False,
 ) -> Dict[str, Any]:
     """
     Full pipeline for ARUC-LDR:
@@ -549,6 +550,7 @@ def run_rts_aruc(
         robust_mask=robust_mask,
         fix_wind_z=fix_wind_z,
         worst_case_cost=worst_case_cost,
+        robust_ramp=robust_ramp,
     )
 
     # Warm start from a quick DAM solve (~5s) — provides binary commitment

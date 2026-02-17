@@ -93,6 +93,8 @@ def main():
                         help="Multiply all ramp rates (RU, RD) by this factor (default: 1.0)")
     parser.add_argument("--pmin-scale", type=float, default=1.0,
                         help="Multiply all Pmin by this factor (default: 1.0)")
+    parser.add_argument("--robust-ramp", action="store_true",
+                        help="Use robust (SOC-based) ramp constraints that account for worst-case dispatch deviations")
     parser.add_argument("--out-dir", type=str, default=None,
                         help="Output directory (auto-generated if not specified)")
     args = parser.parse_args()
@@ -143,6 +145,8 @@ def main():
         print(f"  Ramp scale: {args.ramp_scale}x")
     if args.pmin_scale != 1.0:
         print(f"  Pmin scale: {args.pmin_scale}x")
+    if args.robust_ramp:
+        print(f"  Robust ramp: ON (SOC-based worst-case ramp constraints)")
     print(f"  Network:  {'with line limits' if args.enforce_lines else 'copperplate'}")
     print(f"  Output:   {out_dir}")
     print("=" * 70)
@@ -175,6 +179,7 @@ def main():
         include_zero_marginal=args.include_zero_marginal,
         ramp_scale=args.ramp_scale,
         pmin_scale=args.pmin_scale,
+        robust_ramp=args.robust_ramp,
     )
 
     daruc_results = daruc_outputs["daruc_results"]
@@ -241,6 +246,7 @@ def main():
         include_zero_marginal=args.include_zero_marginal,
         ramp_scale=args.ramp_scale,
         pmin_scale=args.pmin_scale,
+        robust_ramp=args.robust_ramp,
     )
 
     aruc_results = aruc_outputs["results"]

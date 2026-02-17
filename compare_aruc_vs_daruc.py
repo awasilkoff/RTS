@@ -135,6 +135,26 @@ def load_dam_results(daruc_dir: Path) -> dict | None:
     }
 
 
+def load_reserve_results(reserve_dir: Path) -> dict | None:
+    """Load DAM+Reserve commitment/dispatch from its output directory."""
+    u_path = reserve_dir / "commitment_u.csv"
+    p0_path = reserve_dir / "dispatch_p0.csv"
+    if not u_path.exists() or not p0_path.exists():
+        return None
+    out = {
+        "label": "DAM+Reserve",
+        "u": pd.read_csv(u_path, index_col=0),
+        "p0": pd.read_csv(p0_path, index_col=0),
+    }
+    summary_path = reserve_dir / "summary.json"
+    if summary_path.exists():
+        with open(summary_path) as f:
+            out["summary"] = json.load(f)
+    else:
+        out["summary"] = None
+    return out
+
+
 def _round_commitment(u_df: pd.DataFrame) -> pd.DataFrame:
     """Round commitment values to clean 0/1 (Gurobi solver noise)."""
     return u_df.round().clip(0, 1).astype(int)
@@ -234,6 +254,8 @@ def fig_commitment_and_cost(
     cost_aruc: dict | None, cost_daruc: dict | None, cost_dam: dict | None,
     out_dir: Path,
     data=None,
+    reserve: dict | None = None,
+    cost_reserve: dict | None = None,
 ):
     """Three-panel figure: commitment diff heatmap, dispatch stacked area, cost bars."""
     fig, axes = plt.subplots(1, 3, figsize=(14, 10), gridspec_kw={"width_ratios": [3, 4, 3]})
@@ -400,6 +422,9 @@ def fig_commitment_and_cost(
     if cost_dam is not None:
         bar_data["DAM"] = [cost_dam[k] for k in cost_keys]
         bar_colors["DAM"] = "#2ca02c"
+    if cost_reserve is not None:
+        bar_data["DAM+Res"] = [cost_reserve[k] for k in cost_keys]
+        bar_colors["DAM+Res"] = "#9467bd"
     if cost_daruc is not None:
         bar_data["DARUC"] = [cost_daruc[k] for k in cost_keys]
         bar_colors["DARUC"] = "#ff7f0e"
@@ -579,6 +604,7 @@ def fig_z_heatmaps(aruc: dict, daruc: dict, common_times: list[str], out_dir: Pa
 def fig_pmin_vs_dispatch(
     aruc: dict, daruc: dict, dam: dict | None,
     common_times: list[str], data, out_dir: Path,
+    reserve: dict | None = None,
 ):
     """Stacked area chart: Pmin floor vs dispatch-above-Pmin by fuel type, one panel per formulation."""
     from matplotlib.patches import Patch
@@ -595,6 +621,8 @@ def fig_pmin_vs_dispatch(
     formulations = []
     if dam is not None:
         formulations.append(("DAM", dam))
+    if reserve is not None:
+        formulations.append(("DAM+Res", reserve))
     formulations.append(("DARUC", daruc))
     formulations.append(("ARUC", aruc))
 
@@ -743,6 +771,7 @@ def compute_wind_curtailment(p0_df: pd.DataFrame, data, common_times: list[str])
 def fig_wind_curtailment(
     aruc: dict, daruc: dict, dam: dict | None,
     common_times: list[str], data, out_dir: Path,
+    reserve: dict | None = None,
 ):
     """Two-panel figure: (a) curtailment time series, (b) per-farm bar chart."""
     formulations = []
@@ -750,6 +779,9 @@ def fig_wind_curtailment(
     if dam is not None:
         formulations.append(("DAM", dam))
         colors["DAM"] = "#2ca02c"
+    if reserve is not None:
+        formulations.append(("DAM+Res", reserve))
+        colors["DAM+Res"] = "#9467bd"
     formulations.append(("DARUC", daruc))
     colors["DARUC"] = "#ff7f0e"
     formulations.append(("ARUC", aruc))
@@ -820,6 +852,8 @@ def write_summary(
     cost_aruc: dict | None, cost_daruc: dict | None, cost_dam: dict | None,
     out_dir: Path,
     data=None,
+    reserve: dict | None = None,
+    cost_reserve: dict | None = None,
 ):
     """Write comparison summary to console and file."""
     lines = []
@@ -832,10 +866,13 @@ def write_summary(
     daruc_obj = (daruc["summary"].get("daruc_objective") or daruc["summary"].get("objective")) \
         if daruc.get("summary") else None
     dam_obj = daruc["summary"].get("dam_objective") if daruc.get("summary") else None
+    reserve_obj = reserve["summary"]["objective"] if (reserve and reserve.get("summary")) else None
 
     lines.append("\n--- Objective Values ---")
     if dam_obj is not None:
         lines.append(f"  DAM (deterministic):  {dam_obj:>14,.2f}")
+    if reserve_obj is not None:
+        lines.append(f"  DAM+Reserve:          {reserve_obj:>14,.2f}")
     if daruc_obj is not None:
         lines.append(f"  DARUC (two-step):     {daruc_obj:>14,.2f}")
     if aruc_obj is not None:
@@ -844,6 +881,10 @@ def write_summary(
         diff = aruc_obj - daruc_obj
         pct = 100 * diff / daruc_obj if daruc_obj else 0
         lines.append(f"  ARUC − DARUC:         {diff:>14,.2f}  ({pct:+.2f}%)")
+    if dam_obj is not None and reserve_obj is not None:
+        diff = reserve_obj - dam_obj
+        pct = 100 * diff / dam_obj if dam_obj else 0
+        lines.append(f"  DAM+Res − DAM:        {diff:>14,.2f}  ({pct:+.2f}%)")
     if dam_obj is not None and daruc_obj is not None:
         diff = daruc_obj - dam_obj
         pct = 100 * diff / dam_obj if dam_obj else 0
@@ -859,7 +900,7 @@ def write_summary(
         header = (f"  {'':20s}  {'No-Load':>12s}  {'Startup':>12s}  {'Shutdown':>12s}"
                   f"  {'Energy':>12s}  {'Slack':>12s}  {'Total':>12s}")
         lines.append(header)
-        for name, cost in [("DAM", cost_dam), ("DARUC", cost_daruc), ("ARUC-LDR", cost_aruc)]:
+        for name, cost in [("DAM", cost_dam), ("DAM+Reserve", cost_reserve), ("DARUC", cost_daruc), ("ARUC-LDR", cost_aruc)]:
             if cost:
                 lines.append(
                     f"  {name:20s}  {cost['no_load']:>12,.2f}  {cost['startup']:>12,.2f}  "
@@ -876,6 +917,9 @@ def write_summary(
     if dam is not None:
         u_dam = _round_commitment(dam["u"][common_times])
         lines.append(f"  DAM   total unit-hours: {u_dam.values.sum()}")
+    if reserve is not None:
+        u_res = _round_commitment(reserve["u"][common_times])
+        lines.append(f"  DAM+Res total unit-hrs: {u_res.values.sum()}")
 
     # Generators unique to each
     aruc_ever = set(u_aruc.index[u_aruc.sum(axis=1) > 0])
@@ -935,6 +979,8 @@ def write_summary(
         header = f"  {'':10s}  {'Total (MWh)':>12s}  {'% Available':>12s}"
         lines.append(header)
         formulations = [("ARUC", aruc), ("DARUC", daruc)]
+        if reserve is not None:
+            formulations.insert(0, ("DAM+Res", reserve))
         if dam is not None:
             formulations.insert(0, ("DAM", dam))
         for name, res in formulations:

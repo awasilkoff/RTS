@@ -17,7 +17,7 @@ Simplifications:
 
 from __future__ import annotations
 
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 import gurobipy as gp
@@ -31,6 +31,7 @@ def build_dam_model(
     M_p: float = 1e5,
     model_name: str = "DAM_UC",
     enforce_lines: bool = True,
+    reserve_requirement: Optional[np.ndarray] = None,
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Build a deterministic day-ahead UC model using Gurobi.
@@ -350,6 +351,33 @@ def build_dam_model(
                 )
 
     # ------------------------------------------------------------------
+    # Spinning reserve constraints (optional)
+    # ------------------------------------------------------------------
+    if reserve_requirement is not None:
+        is_thermal = [i for i in range(I) if data.gen_type[i] == "THERMAL"]
+        r = m.addVars(
+            [(i, t) for i in is_thermal for t in range(T)],
+            lb=0.0, name="r",
+        )
+        for i in is_thermal:
+            for t in range(T):
+                # Headroom cap: reserve <= capacity headroom
+                m.addConstr(
+                    r[i, t] <= Pmax_2d[i, t] * u[i, t] - p[i, t],
+                    name=f"res_headroom_i{i}_t{t}",
+                )
+                # Ramp cap: reserve <= ramp-up capability over the period
+                m.addConstr(
+                    r[i, t] <= RU[i] * dt[t],
+                    name=f"res_ramp_i{i}_t{t}",
+                )
+        for t in range(T):
+            m.addConstr(
+                gp.quicksum(r[i, t] for i in is_thermal) >= reserve_requirement[t],
+                name=f"spinning_reserve_t{t}",
+            )
+
+    # ------------------------------------------------------------------
     # Basic Gurobi parameters (tune as you like)
     # ------------------------------------------------------------------
     m.Params.OutputFlag = 1  # solver log on; set to 0 to silence
@@ -362,6 +390,8 @@ def build_dam_model(
         "p": p,
         "s_p": s_p,
     }
+    if reserve_requirement is not None:
+        vars_dict["r"] = r
 
     return m, vars_dict
 

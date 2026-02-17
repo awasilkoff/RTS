@@ -27,12 +27,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from dam_model import build_dam_model
 from run_rts_daruc import run_rts_daruc
 from run_rts_aruc import run_rts_aruc
+from run_rts_dam import extract_solution as extract_dam_solution
 from test_daruc_quick import analyze_Z
 from compare_aruc_vs_daruc import (
     load_results,
     load_dam_results,
+    load_reserve_results,
     _align_time,
     _round_commitment,
     compute_cost_breakdown,
@@ -42,6 +45,29 @@ from compare_aruc_vs_daruc import (
     fig_pmin_vs_dispatch,
     write_summary,
 )
+
+
+def compute_reserve_from_uncertainty(Sigma, rho):
+    """Compute spinning reserve requirement from ellipsoidal uncertainty set.
+
+    R[t] = rho[t] * sqrt(1^T Sigma[t] 1) -- worst-case total wind shortfall.
+
+    Parameters
+    ----------
+    Sigma : (T, K, K) array -- covariance matrices per period
+    rho : scalar or (T,) array -- ellipsoid radii
+
+    Returns
+    -------
+    R : (T,) array -- reserve requirement per period (MW)
+    """
+    rho_arr = np.atleast_1d(rho)
+    T = Sigma.shape[0]
+    if rho_arr.shape[0] == 1:
+        rho_arr = np.full(T, rho_arr[0])
+    ones = np.ones(Sigma.shape[1])
+    R = np.array([rho_arr[t] * np.sqrt(ones @ Sigma[t] @ ones) for t in range(T)])
+    return R
 
 
 def main():
@@ -95,6 +121,8 @@ def main():
                         help="Multiply all Pmin by this factor (default: 1.0)")
     parser.add_argument("--robust-ramp", action="store_true",
                         help="Use robust (SOC-based) ramp constraints that account for worst-case dispatch deviations")
+    parser.add_argument("--with-reserve", action="store_true",
+                        help="Re-solve DAM with spinning reserve derived from uncertainty set (requires --uncertainty-npz)")
     parser.add_argument("--out-dir", type=str, default=None,
                         help="Output directory (auto-generated if not specified)")
     args = parser.parse_args()
@@ -147,6 +175,8 @@ def main():
         print(f"  Pmin scale: {args.pmin_scale}x")
     if args.robust_ramp:
         print(f"  Robust ramp: ON (SOC-based worst-case ramp constraints)")
+    if args.with_reserve:
+        print(f"  DAM+Reserve: ON (spinning reserve from uncertainty set)")
     print(f"  Network:  {'with line limits' if args.enforce_lines else 'copperplate'}")
     print(f"  Output:   {out_dir}")
     print("=" * 70)
@@ -276,6 +306,56 @@ def main():
     print(f"\nARUC-LDR objective: {aruc_results['obj']:,.2f}")
 
     # ==================================================================
+    # Step 2b (optional): DAM + Spinning Reserve
+    # ==================================================================
+    reserve_results = None
+    reserve_dir = out_dir / "dam_reserve"
+    if args.with_reserve:
+        print("\n" + "=" * 70)
+        print("RUNNING DAM + SPINNING RESERVE")
+        print("=" * 70)
+
+        Sigma = daruc_outputs["Sigma"]
+        rho_val = daruc_outputs["rho"]
+        R = compute_reserve_from_uncertainty(Sigma, rho_val)
+        print(f"  Reserve requirement R[t]: min={R.min():.1f}, max={R.max():.1f}, mean={R.mean():.1f} MW")
+
+        reserve_dir.mkdir(exist_ok=True)
+
+        print("\nBuilding DAM model with spinning reserve constraint...")
+        reserve_model, reserve_vars = build_dam_model(
+            data, M_p=1e4, model_name="DAM_Reserve",
+            enforce_lines=args.enforce_lines,
+            reserve_requirement=R,
+        )
+        reserve_model.Params.MIPGap = args.mip_gap
+        print("  Model built. Starting optimization...")
+        reserve_model.optimize()
+
+        from gurobipy import GRB as _GRB
+        if reserve_model.Status not in [_GRB.OPTIMAL, _GRB.SUBOPTIMAL]:
+            print(f"WARNING: DAM+Reserve did not solve optimally. Status: {reserve_model.Status}")
+        else:
+            reserve_results = extract_dam_solution(data, reserve_model, reserve_vars)
+            reserve_results["u"].to_csv(reserve_dir / "commitment_u.csv")
+            reserve_results["p"].to_csv(reserve_dir / "dispatch_p0.csv")
+
+            reserve_summary = {
+                "objective": reserve_results["obj"],
+                "hours": args.hours,
+                "reserve_min_mw": float(R.min()),
+                "reserve_max_mw": float(R.max()),
+                "reserve_mean_mw": float(R.mean()),
+                "enforce_lines": args.enforce_lines,
+                "start_time": str(start_time),
+            }
+            with open(reserve_dir / "summary.json", "w") as f:
+                json.dump(reserve_summary, f, indent=2)
+            np.save(reserve_dir / "reserve_requirement.npy", R)
+
+            print(f"\nDAM+Reserve objective: {reserve_results['obj']:,.2f}")
+
+    # ==================================================================
     # Step 3: Compare
     # ==================================================================
     print("\n" + "=" * 70)
@@ -286,6 +366,7 @@ def main():
     aruc_loaded = load_results(aruc_dir, "ARUC-LDR")
     daruc_loaded = load_results(daruc_dir, "DARUC")
     dam_loaded = load_dam_results(daruc_dir)
+    reserve_loaded = load_reserve_results(reserve_dir) if args.with_reserve else None
 
     common_times = _align_time(aruc_loaded, daruc_loaded, dam_loaded)
     print(f"  Common time periods: {len(common_times)}")
@@ -302,22 +383,35 @@ def main():
         cost_dam = compute_cost_breakdown(
             dam_loaded["u"][common_times], dam_loaded["p0"][common_times], data
         )
+    cost_reserve = None
+    if reserve_loaded is not None:
+        cost_reserve = compute_cost_breakdown(
+            reserve_loaded["u"][common_times], reserve_loaded["p0"][common_times], data
+        )
 
     # Figures
     print("\nGenerating figures...")
     fig_commitment_and_cost(
         aruc_loaded, daruc_loaded, dam_loaded, common_times,
         cost_aruc, cost_daruc, cost_dam, out_dir, data=data,
+        reserve=reserve_loaded, cost_reserve=cost_reserve,
     )
     fig_z_heatmaps(aruc_loaded, daruc_loaded, common_times, out_dir)
-    fig_wind_curtailment(aruc_loaded, daruc_loaded, dam_loaded, common_times, data, out_dir)
-    fig_pmin_vs_dispatch(aruc_loaded, daruc_loaded, dam_loaded, common_times, data, out_dir)
+    fig_wind_curtailment(
+        aruc_loaded, daruc_loaded, dam_loaded, common_times, data, out_dir,
+        reserve=reserve_loaded,
+    )
+    fig_pmin_vs_dispatch(
+        aruc_loaded, daruc_loaded, dam_loaded, common_times, data, out_dir,
+        reserve=reserve_loaded,
+    )
 
     # Text summary
     print()
     write_summary(
         aruc_loaded, daruc_loaded, dam_loaded, common_times,
         cost_aruc, cost_daruc, cost_dam, out_dir, data=data,
+        reserve=reserve_loaded, cost_reserve=cost_reserve,
     )
 
     # Quick delta report
@@ -325,6 +419,9 @@ def main():
     print("QUICK COMPARISON")
     print("=" * 70)
     print(f"  DAM objective:   {dam_results['obj']:>14,.2f}")
+    if reserve_results is not None:
+        print(f"  DAM+Reserve obj: {reserve_results['obj']:>14,.2f}  "
+              f"(+{reserve_results['obj'] - dam_results['obj']:,.2f} vs DAM)")
     print(f"  DARUC objective: {daruc_results['obj']:>14,.2f}  "
           f"(+{daruc_results['obj'] - dam_results['obj']:,.2f} vs DAM)")
     print(f"  ARUC objective:  {aruc_results['obj']:>14,.2f}  "

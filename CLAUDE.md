@@ -219,6 +219,23 @@ When `robust_ramp=True` (`--robust-ramp` CLI flag), ramp constraints account for
 
 The norm terms reuse the existing `z_gen[i,t]` SOC variables (no new SOC constraints needed). Only applied when both periods `t` and `t-1` are robust (per `robust_mask`); otherwise falls back to nominal ramp constraints. Default is `False` (nominal ramps only) for backward compatibility.
 
+### DAM + Spinning Reserve Baseline
+
+The `--with-reserve` flag on `run_comparison.py` re-solves the DAM with a system-level spinning reserve constraint derived from the same uncertainty set used by ARUC/DARUC. This provides a "what if we just added reserves?" baseline to quantify the value of adaptive robust optimization (LDR) vs a naive reserve policy.
+
+**Reserve requirement:** `R[t] = rho[t] * sqrt(1^T Sigma[t] 1)` -- worst-case total wind shortfall over the ellipsoid.
+
+**Spinning reserve constraints** (thermal generators only):
+```
+r[i,t] <= Pmax[i,t] * u[i,t] - p[i,t]    (capacity headroom)
+r[i,t] <= RU[i] * dt[t]                    (ramp capability)
+sum_{i in THERMAL} r[i,t] >= R[t]          (system requirement)
+```
+
+Requires `--uncertainty-npz`. Results saved to `dam_reserve/` subdirectory and included as a fourth series in all comparison figures and summary.
+
+Expected cost ordering: DAM < DAM+Reserve < DARUC/ARUC.
+
 ### ARUC Model Variables
 
 - `u[i,t]`: Binary commitment status

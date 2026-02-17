@@ -1,0 +1,1018 @@
+======================================================================
+ARUC vs DARUC COMPARISON
+  Start:    2020-05-15 00:00:00
+  Horizon:  24h
+  Rho:      from NPZ (uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha95.npz)
+  MIP gap:  0.0050 (0.50%)
+  DARUC obj: incremental (dispatch scale=0.1)
+  Wind Z:   FIXED (diagonal=1, no curtailment)
+  Ramp scale: 2.0x
+  Network:  copperplate
+  Output:   comparison_outputs/m05d15_24h_rho_npz_copperplate_ramp2.0x
+======================================================================
+
+======================================================================
+RUNNING DARUC (two-step: DAM → robust reliability)
+======================================================================
+======================================================================
+STEP 1: DETERMINISTIC DAY-AHEAD UC
+======================================================================
+Building DAMData from RTS-GMLC...
+  Excluded 81 generators: {'RTPV': 31, 'PV': 25, 'HYDRO': 19, 'SYNC_COND': 3, 'NUCLEAR': 1, 'ROR': 1, 'STORAGE': 1}
+  Ramp rates scaled by 2.0x
+  Using SPP ensemble mean for wind Pmax: uncertainty_sets_refactored/data/forecasts_filtered_rts4_constellation_v2.parquet
+  Done. Data shapes:
+    n_gens   = 77
+    n_buses  = 73
+    n_lines  = 120
+    n_periods= 24
+
+Building Gurobi DAM UC model...
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2739141
+Academic license 2739141 - for non-commercial use only - registered to wa___@bu.edu
+  [DAM] Line flow constraints DISABLED (copper-plate mode)
+Set parameter OutputFlag to value 1
+  Model built. Starting optimization...
+Gurobi Optimizer version 13.0.0 build v13.0.0rc1 (mac64[x86] - Darwin 21.6.0 21H1320)
+
+CPU model: Intel(R) Core(TM) i5-6267U CPU @ 2.90GHz
+Thread count: 2 physical cores, 4 logical processors, using up to 4 threads
+
+Academic license 2739141 - for non-commercial use only - registered to wa___@bu.edu
+Optimize a model with 16126 rows, 9264 columns and 52746 nonzeros (Min)
+Model fingerprint: 0x6cabeb45
+Model has 5328 linear objective coefficients
+Variable types: 3720 continuous, 5544 integer (5544 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 8e+02]
+  Objective range  [1e-03, 2e+04]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 6e+03]
+Found heuristic solution: objective 1.081076e+09
+Presolve removed 9171 rows and 7322 columns
+Presolve time: 0.25s
+Presolved: 6955 rows, 1942 columns, 19182 nonzeros
+Variable types: 1800 continuous, 142 integer (142 binary)
+
+Root relaxation: objective 2.297419e+06, 3706 iterations, 0.23 seconds (0.11 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 2297418.61    0    1 1.0811e+09 2297418.61   100%     -    0s
+H    0     0                    2305240.2176 2297418.61  0.34%     -    0s
+H    0     0                    2297503.4221 2297418.61  0.00%     -    0s
+
+Explored 1 nodes (3706 simplex iterations) in 0.56 seconds (0.25 work units)
+Thread count was 4 (of 4 available processors)
+
+Solution count 3: 2.2975e+06 2.30524e+06 1.08108e+09 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 2.297503422065e+06, best bound 2.297418607413e+06, gap 0.0037%
+
+=== DAM UC Summary ===
+Objective value: 2,297,503.42
+Number of generators: 77
+Number of buses:      73
+Number of lines:      120
+Number of periods:    24
+Total generation (MWh across horizon): 108,107.63
+Total load (MWh across horizon):       108,107.63
+Units committed at least once: 32
+
+Extracting DAM commitments for DARUC input...
+  Total DAM unit-hours: 758
+  Total DAM startups:   5
+
+======================================================================
+STEP 2: DARUC (ROBUST RELIABILITY COMMITMENT)
+======================================================================
+
+Loading time-varying uncertainty from uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha95.npz...
+  Sigma shape: (24, 4, 4)
+  rho range: [0.727, 32.618]
+
+Building Gurobi DARUC model (with DAM commitment floor)...
+  [ARUC] fix_wind_z=True: fixing Z[wind_k,t,k]=1 (diagonal), Z[wind_k,t,j!=k]=0 (off-diagonal)
+  [ARUC] Incremental objective: commitment costs for additional units only, worst-case dispatch scaled by 0.1
+  [ARUC] Line flow constraints DISABLED (copper-plate mode)
+Set parameter OutputFlag to value 1
+Set parameter NumericFocus to value 1
+Set parameter BarHomogeneous to value -1
+Set parameter ScaleFlag to value 1
+Set parameter MIPGap to value 0.005
+Set parameter Heuristics to value 0.2
+Set parameter MIPFocus to value 1
+Warm start: set 5544 binary start values from DAM solution
+  Model built. Starting optimization...
+Gurobi Optimizer version 13.0.0 build v13.0.0rc1 (mac64[x86] - Darwin 21.6.0 21H1320)
+
+CPU model: Intel(R) Core(TM) i5-6267U CPU @ 2.90GHz
+Thread count: 2 physical cores, 4 logical processors, using up to 4 threads
+
+Non-default parameters:
+MIPGap  0.005
+ScaleFlag  1
+Heuristics  0.2
+MIPFocus  1
+NumericFocus  1
+
+Academic license 2739141 - for non-commercial use only - registered to wa___@bu.edu
+Optimize a model with 28775 rows, 45481 columns and 121003 nonzeros (Min)
+Model fingerprint: 0x94d2d886
+Model has 2195 linear objective coefficients
+Model has 1776 quadratic constraints
+Variable types: 39937 continuous, 5544 integer (5544 binary)
+Coefficient statistics:
+  Matrix range     [1e-04, 3e+04]
+  QMatrix range    [1e+00, 1e+00]
+  Objective range  [1e-01, 2e+04]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 6e+03]
+
+User MIP start did not produce a new incumbent solution
+
+Presolve removed 16849 rows and 29913 columns
+Presolve time: 0.71s
+Presolved: 11926 rows, 15568 columns, 58249 nonzeros
+Presolved model has 1776 quadratic constraint(s)
+Variable types: 15497 continuous, 71 integer (71 binary)
+
+Root relaxation: objective 2.021723e+05, 7774 iterations, 0.29 seconds (0.14 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+H    0     0                    1.062718e+07 202172.270  98.1%     -    2s
+*    0     0               0    1.062718e+07 202172.270  98.1%     -    2s
+     0     0 202392.701    0    - 1.0627e+07 202392.701  98.1%     -    2s
+     0     0 203362.304    0    - 1.0627e+07 203362.304  98.1%     -    3s
+     0     0 206441.142    0    - 1.0627e+07 206441.142  98.1%     -    4s
+     0     0 215187.078    0    - 1.0627e+07 215187.078  98.0%     -    5s
+     0     0 221742.075    0    - 1.0627e+07 221742.075  97.9%     -    8s
+     0     0 224584.062    0    2 1.0627e+07 224584.062  97.9%     -   11s
+Another try with MIP start
+     0     0 224584.062    0    2 1.0627e+07 224584.062  97.9%     -   16s
+     0     0 224584.062    0    2 1.0627e+07 224584.062  97.9%     -   22s
+     0     0 224584.062    0    2 1.0627e+07 224584.062  97.9%     -   30s
+     0     0 224584.062    0    2 1.0627e+07 224584.062  97.9%     -   38s
+     0     0 224584.062    0    2 1.0627e+07 224584.062  97.9%     -   49s
+     0     0 224584.062    0    2 1.0627e+07 224584.062  97.9%     -   64s
+     0     0 236765.300    0    2 1.0627e+07 236765.300  97.8%     -   72s
+     0     0 238927.133    0    1 1.0627e+07 238927.133  97.8%     -   74s
+     0     0 239920.627    0    2 1.0627e+07 239920.627  97.7%     -   76s
+     0     0 239926.267    0    2 1.0627e+07 239926.267  97.7%     -   76s
+     0     0 240439.679    0    1 1.0627e+07 240439.679  97.7%     -   77s
+     0     0 240461.860    0    1 1.0627e+07 240461.860  97.7%     -   78s
+     0     0 240721.589    0    1 1.0627e+07 240721.589  97.7%     -   78s
+     0     0 240738.437    0    1 1.0627e+07 240738.437  97.7%     -   79s
+     0     0 240971.596    0    1 1.0627e+07 240971.596  97.7%     -   80s
+     0     0 240971.596    0    1 1.0627e+07 240971.596  97.7%     -   80s
+     0     0 240971.596    0    1 1.0627e+07 240971.596  97.7%     -   98s
+     0     0 240971.596    0    1 1.0627e+07 240971.596  97.7%     -  111s
+     0     0 240971.596    0    1 1.0627e+07 240971.596  97.7%     -  130s
+     0     0 240971.596    0    1 1.0627e+07 240971.596  97.7%     -  146s
+H    0     0                    243301.54891 240971.596  0.96%     -  169s
+     0     0 241185.258    0    1 243301.549 241185.258  0.87%     -  187s
+     0     0 241185.258    0    1 243301.549 241185.258  0.87%     -  190s
+     0     0 241185.854    0    1 243301.549 241185.854  0.87%     -  190s
+     0     0 241745.917    0    2 243301.549 241745.917  0.64%     -  191s
+     0     0 241891.865    0    2 243301.549 241891.865  0.58%     -  192s
+     0     0 241902.388    0    2 243301.549 241902.388  0.58%     -  192s
+     0     0 241949.509    0    2 243301.549 241949.509  0.56%     -  193s
+     0     0 241949.674    0    2 243301.549 241949.674  0.56%     -  194s
+     0     0 241974.600    0    2 243301.549 241974.600  0.55%     -  195s
+     0     0 241977.391    0    2 243301.549 241977.391  0.54%     -  196s
+     0     0 241990.095    0    2 243301.549 241990.095  0.54%     -  196s
+     0     0 241990.095    0    2 243301.549 241990.095  0.54%     -  196s
+H    0     0                    243301.53982 241990.095  0.54%     -  206s
+     0     0 241990.095    0    1 243301.540 241990.095  0.54%     -  216s
+     0     0 242011.279    0    2 243301.540 242011.279  0.53%     -  217s
+     0     0 242024.422    0    2 243301.540 242024.422  0.52%     -  217s
+     0     0 242029.073    0    2 243301.540 242029.073  0.52%     -  217s
+     0     0 242040.251    0    2 243301.540 242040.251  0.52%     -  218s
+     0     0 242042.539    0    2 243301.540 242042.539  0.52%     -  218s
+     0     0 242048.867    0    2 243301.540 242048.867  0.51%     -  218s
+     0     0 242048.919    0    2 243301.540 242048.919  0.51%     -  219s
+     0     0 242053.863    0    2 243301.540 242053.863  0.51%     -  219s
+     0     0 242053.863    0    2 243301.540 242053.863  0.51%     -  219s
+     0     0 242053.863    0    1 243301.540 242053.863  0.51%     -  238s
+     0     0 242055.038    0    2 243301.540 242055.038  0.51%     -  239s
+     0     0 242057.424    0    2 243301.540 242057.424  0.51%     -  239s
+     0     0 242057.526    0    2 243301.540 242057.526  0.51%     -  239s
+     0     0 242059.886    0    2 243301.540 242059.886  0.51%     -  240s
+     0     0 242059.887    0    2 243301.540 242059.887  0.51%     -  240s
+     0     0 242061.441    0    2 243301.540 242061.441  0.51%     -  240s
+     0     0 242061.642    0    2 243301.540 242061.642  0.51%     -  240s
+     0     0 242063.284    0    2 243301.540 242063.284  0.51%     -  241s
+     0     0 242063.284    0    2 243301.540 242063.284  0.51%     -  241s
+     0     2 242063.284    0    2 243301.540 242063.284  0.51%     -  252s
+     1     1 infeasible    1      243301.540 242067.579  0.51% 19073  257s
+
+Cutting planes:
+  Gomory: 1
+
+Explored 3 nodes (229794 simplex iterations) in 257.63 seconds (119.51 work units)
+Thread count was 4 (of 4 available processors)
+
+Solution count 2: 243302 1.06272e+07 
+
+Optimal solution found (tolerance 5.00e-03)
+Best objective 2.433015398212e+05, best bound 2.432930463874e+05, gap 0.0035%
+
+=== ARUC-LDR UC Summary ===
+Objective value: 243,301.54
+Number of generators: 77
+Number of buses:      73
+Number of lines:      120
+Number of periods:    24
+Total nominal generation (MWh): 108,107.63
+Total load (MWh):               108,107.63
+Units committed at least once: 33
+
+======================================================================
+Z COEFFICIENT ANALYSIS
+======================================================================
+
+Generators with non-zero Z coefficients: 33
+Wind generators in problem: 4
+
+Top 5 generators by total |Z|:
+  309_WIND_1 (WIND): 24.00
+  122_WIND_1 (WIND): 24.00
+  317_WIND_1 (WIND): 24.00
+  303_WIND_1 (WIND): 24.00
+  223_STEAM_3 (THERMAL): 23.41
+
+Example Z pattern for 101_STEAM_3:
+  Shape: (24, 4) (time x K)
+  First few rows:
+k                               0             1             2             3
+time                                                                       
+2020-05-15 00:00:00 -4.520390e-08 -6.118771e-08 -3.977725e-08 -5.093677e-08
+2020-05-15 01:00:00 -1.068389e-02 -1.068383e-02 -1.068379e-02 -1.068349e-02
+2020-05-15 02:00:00 -6.921576e-03 -6.921965e-03 -6.921155e-03 -6.921213e-03
+2020-05-15 03:00:00 -1.381804e-02 -1.381801e-02 -1.381831e-02 -1.381766e-02
+2020-05-15 04:00:00 -2.418823e-02 -2.419653e-02 -2.427174e-02 -2.424436e-02
+
+======================================================================
+DARUC DEVIATION ANALYSIS (DARUC vs DAM)
+======================================================================
+
+DAM objective:     2,297,503.42
+DARUC objective:     243,301.54
+Cost increase:    -2,054,201.88  (-89.41%)
+
+Generators with additional commitments: 2
+Total extra unit-hours committed: 27
+
+Details:
+   gen_id gen_type  extra_committed_hours  dam_committed_hours  daruc_committed_hours                                                                          periods_added
+212_CSP_1  THERMAL                      3                   14                     17                                                                           [21, 22, 23]
+ 318_CC_1  THERMAL                     24                    0                     24 [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+
+Verified: u_DARUC >= u_DAM for all (i, t).
+
+======================================================================
+Z MATRIX ANALYSIS
+======================================================================
+
+  Period 2020-05-15 00:00:00:  rho=1.1507
+    Column sums (all gens):  [ 5.80091530e-13  2.09299245e-12  5.40212319e-12 -5.27009958e-16]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 01:00:00:  rho=4.4412
+    Column sums (all gens):  [ 3.03090886e-13  1.10073062e-12  4.41158221e-12 -1.64937285e-16]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 02:00:00:  rho=7.4231
+    Column sums (all gens):  [2.92932345e-13 5.54889468e-13 2.21681007e-12 5.22151766e-16]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 03:00:00:  rho=5.9112
+    Column sums (all gens):  [ 1.40212841e-12  1.06126219e-12  1.43790535e-12 -2.77555756e-17]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 04:00:00:  rho=2.6366
+    Column sums (all gens):  [1.14142029e-12 1.70119474e-12 2.22666330e-12 2.28983499e-16]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 05:00:00:  rho=1.9519
+    Column sums (all gens):  [3.41093820e-12 2.11497486e-12 4.25059987e-12 5.55111512e-17]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 06:00:00:  rho=32.6183
+    Column sums (all gens):  [3.02458059e-11 3.39753226e-12 3.53472807e-11 7.63278329e-17]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 07:00:00:  rho=15.9636
+    Column sums (all gens):  [5.09087217e-12 1.18935417e-12 3.80664389e-11 5.55111512e-17]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 08:00:00:  rho=6.5097
+    Column sums (all gens):  [ 2.35450548e-12  5.94024829e-13  4.72732964e-12 -1.38777878e-17]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 09:00:00:  rho=1.2399
+    Column sums (all gens):  [1.38067335e-12 3.61932706e-13 2.60769184e-12 1.38777878e-16]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 10:00:00:  rho=1.2850
+    Column sums (all gens):  [ 1.09390275e-12  4.10227408e-13  3.64752673e-12 -1.24900090e-16]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 11:00:00:  rho=2.2137
+    Column sums (all gens):  [ 3.45223850e-13  6.36934949e-13  3.22586402e-12 -2.77555756e-16]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 12:00:00:  rho=3.6997
+    Column sums (all gens):  [5.93636251e-13 1.04327658e-12 3.73412412e-12 1.94289029e-16]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 13:00:00:  rho=2.7989
+    Column sums (all gens):  [ 5.94357896e-13  9.26647648e-13  5.15210097e-12 -7.63278329e-17]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 14:00:00:  rho=2.7556
+    Column sums (all gens):  [ 5.93414207e-13  7.18480830e-13  2.87714297e-12 -4.16333634e-17]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 15:00:00:  rho=2.9647
+    Column sums (all gens):  [ 5.97411010e-13  6.86894985e-13  1.90958360e-12 -1.38777878e-16]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 16:00:00:  rho=2.6999
+    Column sums (all gens):  [5.89528426e-13 8.11684053e-13 2.03770334e-12 0.00000000e+00]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 17:00:00:  rho=3.4403
+    Column sums (all gens):  [ 6.68576305e-13  6.31716901e-13  2.57138755e-12 -1.38777878e-16]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 18:00:00:  rho=8.4689
+    Column sums (all gens):  [ 1.07158726e-12  1.28269617e-12  5.78237458e-12 -2.61943245e-16]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 19:00:00:  rho=19.0396
+    Column sums (all gens):  [ 1.19129706e-12  4.76563233e-12  3.80480092e-11 -1.38777878e-17]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 20:00:00:  rho=3.2745
+    Column sums (all gens):  [ 2.70428124e-12  6.65856259e-13  5.10902431e-12 -5.55111512e-16]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 21:00:00:  rho=0.7272
+    Column sums (all gens):  [1.32949207e-12 1.19326771e-12 6.55475674e-12 5.55111512e-17]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 22:00:00:  rho=1.5937
+    Column sums (all gens):  [5.18585175e-13 5.97522032e-13 2.72670775e-12 4.16333634e-16]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 23:00:00:  rho=3.5096
+    Column sums (all gens):  [ 5.82422999e-13  1.20248256e-12  9.58610968e-12 -9.71445147e-17]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1. -1. -1. -1.]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Non-wind generators with non-zero Z (553 entries):
+             Z_row_sum  Z_row_abs_sum
+gen_id                               
+223_STEAM_3  -0.847038       0.975512
+107_CC_1     -0.039445       0.713993
+123_STEAM_3  -0.563351       0.691799
+221_CC_1     -0.267230       0.687814
+118_CC_1     -0.100404       0.651610
+212_CSP_1    -0.640739       0.640739
+323_CC_1      0.165208       0.594237
+123_STEAM_2  -0.272226       0.530859
+323_CC_2      0.186499       0.519480
+223_STEAM_1  -0.474773       0.507991
+321_CC_1     -0.154165       0.481508
+318_CC_1      0.029260       0.447762
+115_STEAM_3  -0.095717       0.444902
+116_STEAM_1  -0.146124       0.427956
+223_STEAM_2  -0.352178       0.358248
+216_STEAM_1  -0.209030       0.352720
+316_STEAM_1  -0.215708       0.288207
+202_STEAM_4  -0.037994       0.248587
+102_STEAM_3  -0.053224       0.213882
+201_STEAM_3  -0.118516       0.198722
+======================================================================
+
+DARUC objective: 243,301.54
+DAM objective:   2,297,503.42
+
+======================================================================
+RUNNING ARUC-LDR (one-shot robust)
+======================================================================
+Building DAMData from RTS-GMLC...
+  Excluded 81 generators: {'RTPV': 31, 'PV': 25, 'HYDRO': 19, 'SYNC_COND': 3, 'NUCLEAR': 1, 'ROR': 1, 'STORAGE': 1}
+  Ramp rates scaled by 2.0x
+  Using SPP ensemble mean for wind Pmax: uncertainty_sets_refactored/data/forecasts_filtered_rts4_constellation_v2.parquet
+  Done. Data shapes:
+    n_gens   = 77
+    n_buses  = 73
+    n_lines  = 120
+    n_periods= 24 (total_hours=24)
+
+Loading time-varying uncertainty from uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha95.npz...
+  Wind IDs from provider: ['122_WIND_1', '303_WIND_1', '309_WIND_1', '317_WIND_1']
+  Sigma shape: (24, 4, 4)
+  rho range: [0.727, 32.618]
+
+Building Gurobi ARUC-LDR model...
+  [ARUC] fix_wind_z=True: fixing Z[wind_k,t,k]=1 (diagonal), Z[wind_k,t,j!=k]=0 (off-diagonal)
+  [ARUC] Line flow constraints DISABLED (copper-plate mode)
+Set parameter OutputFlag to value 1
+Set parameter NumericFocus to value 1
+Set parameter BarHomogeneous to value -1
+Set parameter ScaleFlag to value 1
+Set parameter MIPGap to value 0.005
+Set parameter Heuristics to value 0.2
+Set parameter MIPFocus to value 1
+  Solving quick DAM for warm start...
+  [DAM] Line flow constraints DISABLED (copper-plate mode)
+Set parameter OutputFlag to value 1
+Warm start: set 5544 binary start values from DAM solution
+  Model built. Starting optimization...
+Gurobi Optimizer version 13.0.0 build v13.0.0rc1 (mac64[x86] - Darwin 21.6.0 21H1320)
+
+CPU model: Intel(R) Core(TM) i5-6267U CPU @ 2.90GHz
+Thread count: 2 physical cores, 4 logical processors, using up to 4 threads
+
+Non-default parameters:
+MIPGap  0.005
+ScaleFlag  1
+Heuristics  0.2
+MIPFocus  1
+NumericFocus  1
+
+Academic license 2739141 - for non-commercial use only - registered to wa___@bu.edu
+Optimize a model with 23231 rows, 39937 columns and 109915 nonzeros (Min)
+Model fingerprint: 0x464e3352
+Model has 3505 linear objective coefficients
+Model has 1776 quadratic constraints
+Variable types: 34393 continuous, 5544 integer (5544 binary)
+Coefficient statistics:
+  Matrix range     [1e-04, 3e+04]
+  QMatrix range    [1e+00, 1e+00]
+  Objective range  [1e+00, 2e+04]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 6e+03]
+
+User MIP start produced solution with objective 1.29091e+07 (0.61s)
+User MIP start produced solution with objective 1.29091e+07 (0.63s)
+Loaded user MIP start with objective 1.29091e+07
+
+Presolve removed 11259 rows and 24290 columns
+Presolve time: 0.70s
+Presolved: 11972 rows, 15647 columns, 62815 nonzeros
+Presolved model has 1776 quadratic constraint(s)
+Variable types: 15505 continuous, 142 integer (142 binary)
+
+Root relaxation: objective 2.297419e+06, 8617 iterations, 0.39 seconds (0.27 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 2297418.61    0    4 1.2909e+07 2297418.61  82.2%     -    1s
+     0     0 2298849.11    0    1 1.2909e+07 2298849.11  82.2%     -    2s
+     0     0 2298893.94    0    2 1.2909e+07 2298893.94  82.2%     -    2s
+     0     0 2304349.06    0    5 1.2909e+07 2304349.06  82.1%     -    2s
+     0     0 2306790.08    0    2 1.2909e+07 2306790.08  82.1%     -    3s
+     0     0 2327465.64    0    2 1.2909e+07 2327465.64  82.0%     -    3s
+     0     0 2332289.12    0    8 1.2909e+07 2332289.12  81.9%     -    4s
+     0     0 2388454.14    0   10 1.2909e+07 2388454.14  81.5%     -    5s
+     0     0 2407638.76    0    6 1.2909e+07 2407638.76  81.3%     -    6s
+     0     0 2461009.26    0    1 1.2909e+07 2461009.26  80.9%     -    8s
+     0     0 2461009.26    0    1 1.2909e+07 2461009.26  80.9%     -    8s
+H    0     0                    2543303.9622 2461009.26  3.24%     -   12s
+     0     2 2461009.26    0    1 2543303.96 2461009.26  3.24%     -   12s
+     3     6 2489641.11    2    1 2543303.96 2461228.60  3.23%  3209   15s
+     9    10 2505845.12    4    2 2543303.96 2461228.60  3.23%  4009   21s
+    15    14 2519256.58    5    4 2543303.96 2461228.60  3.23%  3047   26s
+    17    14 2519271.56    6    3 2543303.96 2461228.60  3.23%  3012   43s
+    21    16 2529820.89    5    1 2543303.96 2461228.60  3.23%  3240   47s
+    23    17 2531301.83    6    1 2543303.96 2461228.60  3.23%  3509   52s
+    25    18 2534721.52    7    - 2543303.96 2461228.60  3.23%  4937   69s
+    27    19     cutoff    7      2543303.96 2461228.60  3.23%  5165   74s
+    29    19     cutoff    6      2543303.96 2461228.60  3.23%  5302   78s
+    31    19     cutoff    6      2543303.96 2461228.60  3.23%  5166   82s
+    33    22 2539373.32   10    - 2543303.96 2464853.72  3.08%  4866   95s
+    38    22     cutoff   13      2543303.96 2464853.72  3.08%  5506  122s
+    39    22 2533427.45    3    2 2543303.96 2464853.72  3.08%  5468  125s
+    44    23 2540368.98    5    3 2543303.96 2464853.72  3.08%  5124  131s
+    48    23 2542081.93    6    2 2543303.96 2464853.72  3.08%  4796  137s
+    49    23 2540065.69    7    - 2543303.96 2464853.72  3.08%  4754  140s
+    51    23     cutoff    7      2543303.96 2464853.72  3.08%  4662  151s
+    55    24     cutoff    7      2543303.96 2489646.90  2.11%  4861  161s
+H   60    24                    2541911.6140 2489646.90  2.06%  4808  164s
+*   60    24               6    2541911.6140 2489646.90  2.06%  4810  164s
+    63    24     cutoff    4      2541911.61 2489646.90  2.06%  4590  176s
+    68    25 2541102.69    4    1 2541911.61 2506457.71  1.39%  4826  191s
+    71    20 2541850.81    6    - 2541911.61 2506457.71  1.39%  5143  218s
+    78    19     cutoff    7      2541911.61 2519271.57  0.89%  5195  234s
+    82    17     cutoff    7      2541911.61 2524200.39  0.70%  5511  245s
+    84    17 2537824.67    3    1 2541911.61 2533484.58  0.33%  5653  251s
+
+Cutting planes:
+  Implied bound: 65
+  MIR: 3
+  Relax-and-lift: 17
+
+Explored 86 nodes (540630 simplex iterations) in 251.15 seconds (169.68 work units)
+Thread count was 4 (of 4 available processors)
+
+Solution count 5: 2.54191e+06 2.54191e+06 2.5433e+06 ... 1.29091e+07
+
+Optimal solution found (tolerance 5.00e-03)
+Warning: max constraint violation (5.8512e-03) exceeds tolerance
+Best objective 2.541911600241e+06, best bound 2.534721523316e+06, gap 0.2829%
+
+=== ARUC-LDR UC Summary ===
+Objective value: 2,541,911.60
+Number of generators: 77
+Number of buses:      73
+Number of lines:      120
+Number of periods:    24
+Total nominal generation (MWh): 108,107.63
+Total load (MWh):               108,107.63
+Units committed at least once: 33
+
+======================================================================
+Z COEFFICIENT ANALYSIS
+======================================================================
+
+Generators with non-zero Z coefficients: 33
+Wind generators in problem: 4
+
+Top 5 generators by total |Z|:
+  317_WIND_1 (WIND): 24.00
+  122_WIND_1 (WIND): 24.00
+  303_WIND_1 (WIND): 24.00
+  309_WIND_1 (WIND): 24.00
+  223_STEAM_3 (THERMAL): 15.56
+
+Example Z pattern for 101_STEAM_3:
+  Shape: (24, 4) (time x K)
+  First few rows:
+k                           0         1         2         3
+time                                                       
+2020-05-15 00:00:00  0.000000  0.000000  0.000000  0.000000
+2020-05-15 01:00:00  0.000000  0.000000  0.000000  0.000000
+2020-05-15 02:00:00 -0.006906 -0.006906 -0.006906 -0.006906
+2020-05-15 03:00:00 -0.013804 -0.013804 -0.013804 -0.013804
+2020-05-15 04:00:00 -0.024211 -0.024212 -0.024212 -0.024212
+
+======================================================================
+Z MATRIX ANALYSIS
+======================================================================
+
+  Period 2020-05-15 00:00:00:  rho=1.1507
+    Column sums (all gens):  [-7.96370934e-08 -1.42762400e-08  6.14947360e-09 -2.42471084e-08]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1.00000008 -1.00000001 -0.99999999 -1.00000002]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 01:00:00:  rho=4.4412
+    Column sums (all gens):  [-9.81786633e-08 -1.48628585e-08  3.70926301e-08 -2.47035864e-08]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1.0000001  -1.00000001 -0.99999996 -1.00000002]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 02:00:00:  rho=7.4231
+    Column sums (all gens):  [-8.38526187e-08  1.46645474e-09 -1.38164635e-09 -4.18914102e-08]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1.00000008 -1.         -1.         -1.00000004]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 03:00:00:  rho=5.9112
+    Column sums (all gens):  [-5.23180581e-08 -3.13342978e-08  1.35668561e-08 -3.38634027e-08]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1.00000005 -1.00000003 -0.99999999 -1.00000003]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 04:00:00:  rho=2.6366
+    Column sums (all gens):  [-2.14179201e-08 -2.69529177e-08  1.90485501e-07 -2.58703713e-08]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1.00000002 -1.00000003 -0.99999981 -1.00000003]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 05:00:00:  rho=1.9519
+    Column sums (all gens):  [-2.13656973e-07  4.07171612e-08  3.58926169e-08 -7.22236283e-09]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1.00000021 -0.99999996 -0.99999996 -1.00000001]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 06:00:00:  rho=32.6183
+    Column sums (all gens):  [-1.92127224e-07  2.50853716e-09  3.87226988e-08 -2.68404231e-08]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1.00000019 -1.         -0.99999996 -1.00000003]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 07:00:00:  rho=15.9636
+    Column sums (all gens):  [ 1.01727219e-07 -3.62136152e-08  4.22146424e-08 -3.38763702e-08]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-0.9999999  -1.00000004 -0.99999996 -1.00000003]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 08:00:00:  rho=6.5097
+    Column sums (all gens):  [ 3.00035534e-08  2.04045368e-08 -3.36592345e-07 -2.25625182e-08]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-0.99999997 -0.99999998 -1.00000034 -1.00000002]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 09:00:00:  rho=1.2399
+    Column sums (all gens):  [ 7.48073103e-09 -8.77228201e-09  3.73978117e-08 -2.67993475e-09]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-0.99999999 -1.00000001 -0.99999996 -1.        ]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 10:00:00:  rho=1.2850
+    Column sums (all gens):  [ 1.62404632e-07 -9.73757874e-09  1.64419565e-07  3.34693606e-10]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-0.99999984 -1.00000001 -0.99999984 -1.        ]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 11:00:00:  rho=2.2137
+    Column sums (all gens):  [-6.37095376e-09  3.93629538e-08  3.08317727e-08 -6.12206309e-09]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1.00000001 -0.99999996 -0.99999997 -1.00000001]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 12:00:00:  rho=3.6997
+    Column sums (all gens):  [-1.56479094e-08 -8.06473799e-09 -2.39320457e-08 -1.66996742e-08]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1.00000002 -1.00000001 -1.00000002 -1.00000002]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 13:00:00:  rho=2.7989
+    Column sums (all gens):  [-2.33748727e-08 -3.15328554e-08 -8.90416629e-09 -7.09757768e-09]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1.00000002 -1.00000003 -1.00000001 -1.00000001]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 14:00:00:  rho=2.7556
+    Column sums (all gens):  [-7.93417554e-09 -8.20232948e-09  6.30490256e-08  8.55511165e-09]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1.00000001 -1.00000001 -0.99999994 -0.99999999]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 15:00:00:  rho=2.9647
+    Column sums (all gens):  [ 2.47738123e-08  2.97098894e-08 -9.54477821e-08 -4.11682637e-09]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-0.99999998 -0.99999997 -1.0000001  -1.        ]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 16:00:00:  rho=2.6999
+    Column sums (all gens):  [ 6.11586648e-09  3.36257737e-08 -1.03216174e-07 -9.56762491e-09]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-0.99999999 -0.99999997 -1.0000001  -1.00000001]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 17:00:00:  rho=3.4403
+    Column sums (all gens):  [ 1.16594812e-07 -3.16771437e-08  6.31139153e-08 -9.31658649e-09]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-0.99999988 -1.00000003 -0.99999994 -1.00000001]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 18:00:00:  rho=8.4689
+    Column sums (all gens):  [-1.54858115e-09  1.14772142e-08  4.73809231e-08 -2.27431300e-08]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1.         -0.99999999 -0.99999995 -1.00000002]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 19:00:00:  rho=19.0396
+    Column sums (all gens):  [ 1.37621157e-08  2.57601149e-08  6.35725470e-08 -9.13932532e-09]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-0.99999999 -0.99999997 -0.99999994 -1.00000001]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 20:00:00:  rho=3.2745
+    Column sums (all gens):  [-4.82044907e-08 -7.24771045e-08 -2.52418104e-08 -6.16461221e-09]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1.00000005 -1.00000007 -1.00000003 -1.00000001]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 21:00:00:  rho=0.7272
+    Column sums (all gens):  [4.65109221e-08 4.74827382e-08 4.67231396e-08 4.70632144e-11]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-0.99999995 -0.99999995 -0.99999995 -1.        ]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 22:00:00:  rho=1.5937
+    Column sums (all gens):  [-1.43592427e-09  3.33277703e-08  3.72975801e-08  2.52546981e-09]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1.         -0.99999997 -0.99999996 -1.        ]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Period 2020-05-15 23:00:00:  rho=3.5096
+    Column sums (all gens):  [-2.48606360e-08 -7.52301177e-09  1.39706744e-07 -2.45102951e-08]
+    Column sums (wind only): [1. 1. 1. 1.]
+    Column sums (non-wind):  [-1.00000002 -1.00000001 -0.99999986 -1.00000002]
+    122_WIND_1            Z=[+1.0000, +0.0000, +0.0000, +0.0000]  sum=+1.0000
+    303_WIND_1            Z=[+0.0000, +1.0000, +0.0000, +0.0000]  sum=+1.0000
+    309_WIND_1            Z=[+0.0000, +0.0000, +1.0000, +0.0000]  sum=+1.0000
+    317_WIND_1            Z=[+0.0000, +0.0000, +0.0000, +1.0000]  sum=+1.0000
+
+  Non-wind generators with non-zero Z (559 entries):
+             Z_row_sum  Z_row_abs_sum
+gen_id                               
+212_CSP_1    -0.814745       0.814745
+223_STEAM_3  -0.648247       0.648247
+123_STEAM_3  -0.549940       0.583648
+107_CC_1     -0.177540       0.497892
+118_CC_1     -0.174684       0.489409
+221_CC_1      0.003191       0.488905
+321_CC_1     -0.074014       0.473735
+318_CC_1     -0.002316       0.393122
+323_CC_1      0.190631       0.312540
+323_CC_2      0.190631       0.312540
+116_STEAM_1  -0.279943       0.279943
+115_STEAM_3  -0.246668       0.279790
+216_STEAM_1  -0.278059       0.278059
+223_STEAM_1  -0.275097       0.275097
+223_STEAM_2  -0.275097       0.275097
+316_STEAM_1  -0.236883       0.270006
+123_STEAM_2  -0.024081       0.243891
+101_STEAM_3  -0.126377       0.126377
+101_STEAM_4  -0.126377       0.126377
+102_STEAM_4  -0.125513       0.125513
+======================================================================
+
+ARUC-LDR objective: 2,541,911.60
+
+======================================================================
+GENERATING COMPARISON
+======================================================================
+  Common time periods: 24
+
+Generating figures...
+  Saved fig_commitment_cost.pdf/.png
+  Saved fig_z_comparison.pdf/.png
+  Saved fig_wind_curtailment.pdf/.png
+  Saved fig_pmin_vs_dispatch.pdf/.png
+
+======================================================================
+ARUC vs DARUC COMPARISON SUMMARY
+======================================================================
+
+--- Objective Values ---
+  DAM (deterministic):    2,297,503.42
+  DARUC (two-step):         243,301.54
+  ARUC-LDR (one-shot):    2,541,911.60
+  ARUC − DARUC:           2,298,610.06  (+944.76%)
+  DARUC − DAM:           -2,054,201.88  (-89.41%)
+  ARUC − DAM:               244,408.18  (+10.64%)
+
+--- Cost Breakdown ---
+                             No-Load       Startup      Shutdown        Energy         Slack         Total
+  DAM                     265,780.72     10,000.00          0.00  2,021,722.70          0.00  2,297,503.42
+  DARUC                   282,370.13     10,000.00          0.00  2,014,974.00          0.00  2,307,344.13
+  ARUC-LDR                282,370.13     10,000.00          0.00  2,015,217.19          0.21  2,307,587.53
+
+--- Commitment Summary ---
+  ARUC  total unit-hours: 792
+  DARUC total unit-hours: 785
+  DAM   total unit-hours: 758
+  Generators committed only in ARUC:  0
+  Generators committed only in DARUC: 0
+
+--- Dispatch Totals (MWh over common horizon) ---
+  ARUC  : THERMAL=88,899.7, WIND=19,207.9
+  DARUC : THERMAL=88,017.5, WIND=20,090.1
+
+--- Z Matrix Summary ---
+  ARUC: 33 generators with active Z, mean wind ||Z||=1.0000
+  DARUC: 33 generators with active Z, mean wind ||Z||=1.0000
+
+--- DARUC Extra Commitments (beyond DAM) ---
+  Generators with extra hours: 2
+  Total extra unit-hours:      27
+    212_CSP_1 (THERMAL): +3h (DAM=14h)
+    318_CC_1 (THERMAL): +24h (DAM=0h)
+
+--- Wind Curtailment ---
+               Total (MWh)   % Available
+  DAM             15,992.1         44.9%
+    122_WIND_1: 189.9 MW avg
+    303_WIND_1: 257.6 MW avg
+    309_WIND_1: 65.6 MW avg
+    317_WIND_1: 153.3 MW avg
+  ARUC            16,430.9         46.1%
+    122_WIND_1: 168.4 MW avg
+    303_WIND_1: 213.4 MW avg
+    309_WIND_1: 66.8 MW avg
+    317_WIND_1: 236.0 MW avg
+  DARUC           15,548.7         43.6%
+    122_WIND_1: 173.4 MW avg
+    303_WIND_1: 202.5 MW avg
+    309_WIND_1: 64.7 MW avg
+    317_WIND_1: 207.3 MW avg
+
+======================================================================
+
+  Saved comparison_summary.txt
+
+======================================================================
+QUICK COMPARISON
+======================================================================
+  DAM objective:     2,297,503.42
+  DARUC objective:     243,301.54  (+-2,054,201.88 vs DAM)
+  ARUC objective:    2,541,911.60  (+244,408.18 vs DAM)
+
+  Commitment differences: 7 (gen,hour) entries differ
+
+  All outputs: comparison_outputs/m05d15_24h_rho_npz_copperplate_ramp2.0x/
+======================================================================

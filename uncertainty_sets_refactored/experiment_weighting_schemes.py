@@ -85,8 +85,8 @@ def compute_time_weights_exponential(
 
     if causal:
         # Only use past calibration data
-        # dt > 0: calibration is in the past → apply decay
-        # dt <= 0: calibration is in the future → weight = 0
+        # dt > 0: calibration is in the past -> apply decay
+        # dt <= 0: calibration is in the future -> weight = 0
         weights = np.where(
             dt > min_lag_days,
             np.exp(-lam * (dt - min_lag_days)),  # Decay from (t - min_lag)
@@ -182,7 +182,7 @@ def train_time_weighted_conformal(
         Weighting scheme:
         - 'exponential': Exponential decay based on time distance
         - 'sliding_window': Binary weights within time window
-        - 'combined': Feature kernel × time decay (hybrid)
+        - 'combined': Feature kernel x time decay (hybrid)
     time_col : str
         Column name for timestamps
     feature_cols : list[str]
@@ -294,7 +294,7 @@ def train_time_weighted_conformal(
         W = compute_time_weights_sliding_window(times_cal, times_test, window_days, causal, min_lag_days)
 
     elif weighting == 'combined':
-        # Feature kernel × time decay
+        # Feature kernel x time decay
         if omega is None:
             omega = np.ones(len(kernel_feature_cols))
 
@@ -482,7 +482,7 @@ def run_weighting_schemes_experiment(
             print(f"    Coverage: {metrics['coverage']:.3f} (gap: {gap:.3f})")
             print(f"    q_hat: {metrics.get('q_hat_global_r', np.nan):.3f}\n")
         except Exception as e:
-            print(f"    ✗ Failed: {e}\n")
+            print(f"    (x) Failed: {e}\n")
 
         # =====================================================================
         # 2. FEATURE KERNEL (current weighted conformal)
@@ -516,7 +516,7 @@ def run_weighting_schemes_experiment(
 
                 print(f"      Coverage: {metrics['coverage']:.3f} (gap: {metrics['gap']:.3f})")
             except Exception as e:
-                print(f"      ✗ Failed: {e}")
+                print(f"      (x) Failed: {e}")
         print()
 
         # =====================================================================
@@ -549,7 +549,7 @@ def run_weighting_schemes_experiment(
 
                 print(f"      Coverage: {metrics['coverage']:.3f} (gap: {metrics['gap']:.3f})")
             except Exception as e:
-                print(f"      ✗ Failed: {e}")
+                print(f"      (x) Failed: {e}")
         print()
 
         # =====================================================================
@@ -582,7 +582,7 @@ def run_weighting_schemes_experiment(
 
                 print(f"      Coverage: {metrics['coverage']:.3f} (gap: {metrics['gap']:.3f})")
             except Exception as e:
-                print(f"      ✗ Failed: {e}")
+                print(f"      (x) Failed: {e}")
         print()
 
         # =====================================================================
@@ -618,7 +618,7 @@ def run_weighting_schemes_experiment(
 
                     print(f"      Coverage: {metrics['coverage']:.3f} (gap: {metrics['gap']:.3f})")
                 except Exception as e:
-                    print(f"      ✗ Failed: {e}")
+                    print(f"      (x) Failed: {e}")
         print()
 
     # Convert to DataFrame
@@ -629,7 +629,7 @@ def run_weighting_schemes_experiment(
     output_dir.mkdir(exist_ok=True)
     results_path = output_dir / "weighting_schemes_comparison.csv"
     df_results.to_csv(results_path, index=False)
-    print(f"\n✓ Saved results to {results_path}")
+    print(f"\n(ok) Saved results to {results_path}")
 
     # Generate visualizations
     plot_weighting_schemes(df_results, output_dir)
@@ -731,7 +731,7 @@ def plot_weighting_schemes(df_results: pd.DataFrame, output_dir: Path):
 
     output_path = output_dir / 'weighting_schemes_comparison.png'
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
-    print(f"✓ Saved visualization to {output_path}")
+    print(f"(ok) Saved visualization to {output_path}")
 
     plt.close()
 
@@ -771,11 +771,11 @@ def print_weighting_summary(df_results: pd.DataFrame):
 
     print("\nKEY INSIGHTS:")
     print("- If time-based methods have similar gaps to feature-kernel:")
-    print("  → Temporal drift is not significant")
+    print("  -> Temporal drift is not significant")
     print("- If time-based methods have better coverage:")
-    print("  → Recent calibration points are more relevant")
+    print("  -> Recent calibration points are more relevant")
     print("- If combined (feature+time) is best:")
-    print("  → Both feature similarity AND recency matter")
+    print("  -> Both feature similarity AND recency matter")
     print("="*80 + "\n")
 
 
@@ -793,4 +793,4 @@ if __name__ == "__main__":
         omega_path="data/viz_artifacts/focused_2d/best_omega.npy",
     )
 
-    print("\n✓ Weighting schemes experiment complete!")
+    print("\n(ok) Weighting schemes experiment complete!")

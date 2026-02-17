@@ -273,12 +273,12 @@ def run_conformal_sweep(
         print(
             f"     Coverage: {best['coverage']:.3f} (gap: {best['coverage_gap']:.3f})"
         )
-        print(f"     Within 5%: {'✓' if best['within_5pct'] else '✗'}")
+        print(f"     Within 5%: {'(ok)' if best['within_5pct'] else '(x)'}")
 
         # Top 5 configs
         print(f"\n  📊 Top 5 configurations:")
         for i, row in alpha_results.head(5).iterrows():
-            status = "✓" if row["within_5pct"] else "✗"
+            status = "(ok)" if row["within_5pct"] else "(x)"
             print(
                 f"     {status} {row['binning_strategy']:8s} | "
                 f"{row['n_bins']:2d} {row['bin_strategy']:11s} bins | "

@@ -493,7 +493,7 @@ def run_diagnosis(
         print(f"\n⚠️  High variance tau values (std > 0.01): {high_variance_tau}")
         print("   These may be prone to local minima.")
     else:
-        print("\n✓ All tau values show consistent results across seeds.")
+        print("\n(ok) All tau values show consistent results across seeds.")
 
     # Best tau
     best_idx = stats["val_nll_mean"].idxmin()

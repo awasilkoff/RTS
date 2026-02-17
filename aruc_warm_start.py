@@ -201,7 +201,7 @@ def run_aruc_with_warm_start(
         if dam_model.Status not in [GRB.OPTIMAL, GRB.SUBOPTIMAL]:
             raise RuntimeError(f"DAM model failed with status {dam_model.Status}")
 
-        print(f"\n✓ DAM solved in {dam_time:.2f}s")
+        print(f"\n(ok) DAM solved in {dam_time:.2f}s")
         print(f"  Objective: {dam_model.ObjVal:,.2f}")
 
         results["dam_model"] = dam_model
@@ -238,7 +238,7 @@ def run_aruc_with_warm_start(
     if aruc_model.Status not in [GRB.OPTIMAL, GRB.SUBOPTIMAL]:
         print(f"WARNING: ARUC model status {aruc_model.Status}")
     else:
-        print(f"\n✓ ARUC solved in {aruc_time:.2f}s")
+        print(f"\n(ok) ARUC solved in {aruc_time:.2f}s")
         print(f"  Objective: {aruc_model.ObjVal:,.2f}")
 
     results["aruc_model"] = aruc_model
@@ -334,10 +334,10 @@ def compare_warm_start_benefit(
 
     if time_cold > time_warm + dam_time:
         speedup = time_cold / (time_warm + dam_time)
-        print(f"\n✓ Warm start is {speedup:.2f}x faster overall!")
+        print(f"\n(ok) Warm start is {speedup:.2f}x faster overall!")
     else:
         slowdown = (time_warm + dam_time) / time_cold
-        print(f"\n✗ Warm start is {slowdown:.2f}x slower overall")
+        print(f"\n(x) Warm start is {slowdown:.2f}x slower overall")
         print("  (This can happen for small problems or when DAM overhead dominates)")
 
     # Check both found same objective
@@ -345,7 +345,7 @@ def compare_warm_start_benefit(
         obj_diff = abs(aruc_cold.ObjVal - aruc_warm.ObjVal)
         print(f"\nObjective difference: {obj_diff:.2e}")
         if obj_diff < 1e-3:
-            print("✓ Both methods found the same solution")
+            print("(ok) Both methods found the same solution")
 
 
 if __name__ == "__main__":

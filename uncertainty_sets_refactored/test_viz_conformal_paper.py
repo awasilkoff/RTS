@@ -41,7 +41,7 @@ def test_wilson_score_interval():
     print(f"  Coverage=0.50, n=0: [{lower:.3f}, {upper:.3f}]")
     assert lower == 0.0 and upper == 1.0, "Zero n should return [0, 1]"
 
-    print("  ✓ All Wilson score tests passed\n")
+    print("  (ok) All Wilson score tests passed\n")
 
 
 def test_coverage_by_bin():
@@ -70,7 +70,7 @@ def test_coverage_by_bin():
     assert all(0 <= cov <= 1 for cov in coverage_df["coverage"]), "Coverage in [0, 1]"
     assert all(n > 0 for n in coverage_df["n_samples"]), "All bins should have samples"
 
-    print("  ✓ Coverage by bin tests passed\n")
+    print("  (ok) Coverage by bin tests passed\n")
 
 
 def test_plot_calibration_curve():
@@ -93,7 +93,7 @@ def test_plot_calibration_curve():
     assert len(fig.axes) == 1, "Should have one axis"
 
     plt.close(fig)
-    print("  ✓ Calibration curve plot test passed\n")
+    print("  (ok) Calibration curve plot test passed\n")
 
 
 def test_empty_results():
@@ -104,7 +104,7 @@ def test_empty_results():
         plot_calibration_curve([], output_path=None)
         assert False, "Should raise error for empty results"
     except ValueError as e:
-        print(f"  ✓ Correctly raised error: {e}\n")
+        print(f"  (ok) Correctly raised error: {e}\n")
 
 
 if __name__ == "__main__":

@@ -21,7 +21,7 @@ def main():
     print("  - focused_2d:  Clean 2D baseline (SYS_MEAN, SYS_STD)")
     print("  - high_dim_8d: High-D exploration (8 features)")
     print()
-    print("Grid: 2 taus × 2 regs × 2 scalers = 8 configs each")
+    print("Grid: 2 taus x 2 regs x 2 scalers = 8 configs each")
     print("Total: 16 configs")
     print()
     print("Expected runtime: ~30 minutes")

@@ -70,7 +70,7 @@ def test_shared_colorbar():
         save_path=save_path,
     )
 
-    print(f"✓ Plot saved to: {save_path}")
+    print(f"(ok) Plot saved to: {save_path}")
     print()
     print("Verification:")
     print("  1. Both subplots should have IDENTICAL colorbar ranges")
@@ -91,6 +91,6 @@ def test_shared_colorbar():
 if __name__ == "__main__":
     success = test_shared_colorbar()
     if success:
-        print("✓ Test passed!")
+        print("(ok) Test passed!")
     else:
-        print("✗ Test failed!")
+        print("(x) Test failed!")

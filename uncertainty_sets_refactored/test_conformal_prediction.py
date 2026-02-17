@@ -23,7 +23,7 @@ from data_processing import build_conformal_totals_df
 
 def test_imports():
     """Test 1: Check imports."""
-    print("✓ Test 1: Imports successful")
+    print("(ok) Test 1: Imports successful")
 
 
 def test_data_loading():
@@ -43,7 +43,7 @@ def test_data_loading():
     assert "y" in df.columns, "Missing target column"
     assert "ens_mean" in df.columns, "Missing feature column"
 
-    print(f"✓ Test 2: Data loaded ({len(df)} rows, {df['TIME_HOURLY'].min()} to {df['TIME_HOURLY'].max()})")
+    print(f"(ok) Test 2: Data loaded ({len(df)} rows, {df['TIME_HOURLY'].min()} to {df['TIME_HOURLY'].max()})")
     return df
 
 
@@ -79,7 +79,7 @@ def test_model_training(df):
     assert "coverage" in metrics, "Missing coverage metric"
     assert len(df_test) > 0, "Empty test set"
 
-    print(f"✓ Test 3: Model trained")
+    print(f"(ok) Test 3: Model trained")
     print(f"    Coverage: {metrics['coverage']:.2%} (target: 90%)")
     print(f"    Global q_hat: {metrics['q_hat_global_r']:.4f}")
     print(f"    RMSE: {metrics['rmse']:.2f} MW")
@@ -111,7 +111,7 @@ def test_prediction(bundle):
     assert len(df_pred) == len(df_new), "Output length mismatch"
     assert (df_pred["y_pred_conf"] <= df_pred["y_pred_base"]).all(), "Conformal bound should be <= base prediction"
 
-    print("✓ Test 4: Prediction successful")
+    print("(ok) Test 4: Prediction successful")
     print("\n    Sample predictions:")
     print(df_pred[["y_pred_base", "q_hat_r", "margin", "y_pred_conf"]].to_string(index=False))
 
@@ -157,10 +157,10 @@ def test_coverage_property(df):
             "alpha_target": alpha,
             "coverage": coverage,
             "error": error,
-            "status": "✓" if error < 0.10 else "⚠",
+            "status": "(ok)" if error < 0.10 else "⚠",
         })
 
-    print("✓ Test 5: Coverage verification")
+    print("(ok) Test 5: Coverage verification")
     print("\n    Alpha Target | Coverage | Error  | Status")
     print("    " + "-" * 45)
     for r in results:
@@ -197,7 +197,7 @@ def main():
 
         print()
         print("=" * 60)
-        print("✓ ALL TESTS PASSED")
+        print("(ok) ALL TESTS PASSED")
         print("=" * 60)
         print()
         print("Next steps:")
@@ -208,13 +208,13 @@ def main():
     except AssertionError as e:
         print()
         print("=" * 60)
-        print(f"✗ TEST FAILED: {e}")
+        print(f"(x) TEST FAILED: {e}")
         print("=" * 60)
         raise
     except Exception as e:
         print()
         print("=" * 60)
-        print(f"✗ UNEXPECTED ERROR: {e}")
+        print(f"(x) UNEXPECTED ERROR: {e}")
         print("=" * 60)
         raise
 

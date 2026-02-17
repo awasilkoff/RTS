@@ -16,7 +16,7 @@ def test_omega_reconstruction():
     test_row = {
         "standardize": True,
         "tau": 5.0,
-        "omega_l2_reg": 0.01,  # ← This should NOT be included in omega
+        "omega_l2_reg": 0.01,  # <- This should NOT be included in omega
         "omega_0_SYS_MEAN": 9.5,
         "omega_1_SYS_STD": 12.3,
         "eval_nll_learned": 5.2,
@@ -53,7 +53,7 @@ def test_omega_reconstruction():
     assert np.allclose(omega_reconstructed, expected_omega), "Omega values don't match"
     assert omega_reconstructed.shape[0] == len(x_cols), "Omega dimension should match x_cols"
 
-    print("✓ All checks passed!")
+    print("(ok) All checks passed!")
     print()
 
     # Test with 4D features
@@ -80,7 +80,7 @@ def test_omega_reconstruction():
     assert "omega_l2_reg" not in omega_cols_4d, "Should NOT include omega_l2_reg"
     assert np.allclose(omega_4d, expected_4d), "4D omega values don't match"
 
-    print("✓ 4D test passed!")
+    print("(ok) 4D test passed!")
     print()
 
     # Test sorting (make sure omega_10 comes after omega_9)
@@ -99,11 +99,11 @@ def test_omega_reconstruction():
     expected_order = ["omega_1_feat", "omega_2_feat", "omega_10_feat"]
     assert omega_cols_sort == expected_order, f"Wrong sort order: {omega_cols_sort}"
 
-    print("✓ Sorting test passed!")
+    print("(ok) Sorting test passed!")
     print()
 
     print("=" * 60)
-    print("All omega reconstruction tests passed! ✓")
+    print("All omega reconstruction tests passed! (ok)")
     print("=" * 60)
     print()
     print("The fix prevents omega_l2_reg from being included in omega.")

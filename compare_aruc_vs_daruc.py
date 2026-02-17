@@ -85,7 +85,7 @@ def load_results(result_dir: Path, label: str) -> dict:
     """Load commitment, dispatch, Z analysis, and optional summary from a results dir."""
     out = {"label": label, "dir": result_dir}
 
-    # Commitment u  (index_col=0 → gen_ids as index)
+    # Commitment u  (index_col=0 -> gen_ids as index)
     u_path = result_dir / "commitment_u.csv"
     if not u_path.exists():
         raise FileNotFoundError(f"Missing {u_path}")
@@ -189,13 +189,13 @@ def compute_cost_breakdown(u_df: pd.DataFrame, p0_df: pd.DataFrame, data) -> dic
     if T > 1:
         w[:, 1:] = np.maximum(0.0, u[:, :-1] - u[:, 1:])
 
-    # No-load cost: $/hr × hours per period
+    # No-load cost: $/hr x hours per period
     no_load = float((data.no_load_cost[:, None] * u * dt[None, :]).sum())
     # Startup/shutdown: one-time events, don't scale by duration
     startup = float((data.startup_cost[:, None] * v).sum())
     shutdown = float((data.shutdown_cost[:, None] * w).sum())
 
-    # Energy cost: $/MWh × MW × hours per period
+    # Energy cost: $/MWh x MW x hours per period
     energy = 0.0
     block_cap = data.block_cap   # (I, B)
     block_cost = data.block_cost  # (I, B)
@@ -482,7 +482,7 @@ def fig_z_heatmaps(aruc: dict, daruc: dict, common_times: list[str], out_dir: Pa
 
         zf_active = zf[zf["gen_id"].isin(active_gens)]
 
-        # Pivot to (gen_id × time)
+        # Pivot to (gen_id x time)
         pivot = zf_active.pivot(index="gen_id", columns="time", values="Z_row_norm")
         pivot = pivot.reindex(columns=common_times)
         pivot = pivot.fillna(0)

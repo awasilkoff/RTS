@@ -1,0 +1,373 @@
+=== Step 1/4: sweep_and_viz focused_2d (residuals) ===
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_and_viz_feature_set.py:70: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+
+*** Using RESIDUALS as target (ACTUAL - MEAN_FORECAST) ***
+
+Created artifact directory: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals
+  - Config: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/feature_config.json
+  - README: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/README.md
+================================================================================
+Running sweep for feature set: focused_2d
+================================================================================
+Feature set: focused_2d
+  Description: 2D focused baseline (SYS_MEAN, SYS_STD)
+  Data shape: X=(2952, 2), Y=(2952, 3)
+  Features: ['SYS_MEAN', 'SYS_STD']
+  Targets: ['122_WIND_1', '309_WIND_1', '317_WIND_1']
+
+Train: 1476, Val: 738, Test: 738
+Split: Random 50%/25%/25% (seed=42)
+  - Val used for hyperparameter selection
+  - Test used ONCE for final unbiased evaluation
+
+scaler=standard, tau=0.100, reg=0.00/softmax => ω=[0.573, 0.427], NLL: 11.616 vs kernel(+)11.625 euclid(-)11.600 global(+)11.904 | win%: 53/41/62
+scaler=standard, tau=0.250, reg=0.00/softmax => ω=[0.348, 0.652], NLL: 11.632 vs kernel(+)11.633 euclid(-)11.600 global(+)11.904 | win%: 50/40/62
+scaler=standard, tau=0.500, reg=0.00/softmax => ω=[0.322, 0.678], NLL: 11.627 vs kernel(+)11.639 euclid(-)11.600 global(+)11.904 | win%: 48/39/61
+scaler=standard, tau=0.750, reg=0.00/softmax => ω=[0.305, 0.695], NLL: 11.634 vs kernel(+)11.641 euclid(-)11.600 global(+)11.904 | win%: 47/40/61
+scaler=standard, tau=1.000, reg=0.00/softmax => ω=[0.288, 0.712], NLL: 11.639 vs kernel(+)11.642 euclid(-)11.600 global(+)11.904 | win%: 48/39/61
+scaler=standard, tau=2.500, reg=0.00/softmax => ω=[0.006, 0.994], NLL: 11.673 vs kernel(-)11.644 euclid(-)11.600 global(+)11.904 | win%: 43/40/59
+scaler=standard, tau=5.000, reg=0.00/softmax => ω=[0.003, 0.997], NLL: 11.689 vs kernel(-)11.645 euclid(-)11.600 global(+)11.904 | win%: 43/38/58
+scaler=standard, tau=7.500, reg=0.00/softmax => ω=[0.004, 0.996], NLL: 11.691 vs kernel(-)11.645 euclid(-)11.600 global(+)11.904 | win%: 42/38/58
+scaler=standard, tau=10.000, reg=0.00/softmax => ω=[0.004, 0.996], NLL: 11.691 vs kernel(-)11.645 euclid(-)11.600 global(+)11.904 | win%: 42/38/57
+scaler=standard, tau=15.000, reg=0.00/softmax => ω=[0.004, 0.996], NLL: 11.695 vs kernel(-)11.646 euclid(-)11.600 global(+)11.904 | win%: 42/38/58
+scaler=standard, tau=20.000, reg=0.00/softmax => ω=[0.004, 0.996], NLL: 11.690 vs kernel(-)11.646 euclid(-)11.600 global(+)11.904 | win%: 43/38/58
+
+Best configuration (selected on VALIDATION set):
+  scaler_type=standard, tau=0.5, omega_l2_reg=0.0, constraint=softmax
+  Learned omega: [0.32210472 0.67789525]
+  Validation NLL:
+    Learned:       11.6267
+    Uniform(ω=1/2): 11.6388
+    Euclidean kNN: 11.6003
+    Global:        11.9035
+
+--- Final Evaluation on TEST set (unbiased) ---
+  Test NLL (unbiased):
+    Learned:       11.5698
+    Uniform(ω=1/2): 11.5621
+    Euclidean kNN: 11.5427
+    Global:        11.8012
+  Test Improvement (positive = learned is better):
+    vs Uniform(ω=1/2): -0.0077
+    vs Euclidean kNN: -0.0270
+    vs Global:        0.2315
+Saved sweep results: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/sweep_results.csv
+Saved best omega: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/best_omega.npy
+Saved best config summary: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/best_config_summary.json
+
+Generating visualizations...
+✓ Saved NLL vs tau plot to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/nll_vs_tau.png
+✓ Saved PDF to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/nll_vs_tau.pdf
+Saved: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/omega_bar_chart.png
+Saved: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/kernel_distance_comparison.png
+Visualizations complete!
+
+All outputs saved to: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals
+
+Done!
+=== Step 2/4: sweep_and_viz high_dim_16d (residuals) ===
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_and_viz_feature_set.py:70: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+
+*** Using RESIDUALS as target (ACTUAL - MEAN_FORECAST) ***
+
+Created artifact directory: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals
+  - Config: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/feature_config.json
+  - README: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/README.md
+================================================================================
+Running sweep for feature set: high_dim_16d
+================================================================================
+Feature set: high_dim_16d
+  Description: 16D comprehensive (8D base + temporal + ramp + spread)
+  Data shape: X=(2949, 16), Y=(2949, 3)
+  Features: ['SYS_MEAN', 'SYS_STD', 'WIND_122_MEAN', 'WIND_309_MEAN', 'WIND_317_MEAN', 'WIND_122_STD', 'WIND_309_STD', 'WIND_317_STD', 'HOUR_SIN', 'HOUR_COS', 'DOW_SIN', 'DOW_COS', 'SYS_MEAN_DELTA_3H', 'SYS_MEAN_DELTA_1H', 'SYS_STD_ROLLING_6H', 'FORECAST_SPREAD']
+  Targets: ['122_WIND_1', '309_WIND_1', '317_WIND_1']
+
+Train: 1474, Val: 737, Test: 738
+Split: Random 50%/25%/25% (seed=42)
+  - Val used for hyperparameter selection
+  - Test used ONCE for final unbiased evaluation
+
+scaler=standard, tau=0.100, reg=0.00/softmax => ω=[0.056, 0.005, 0.166, 0.063, 0.036, 0.162, 0.094, 0.046, 0.046, 0.067, 0.041, 0.168, 0.013, 0.003, 0.020, 0.016], NLL: 11.015 vs kernel(+)11.512 euclid(+)11.363 global(+)11.846 | win%: 51/68/80
+scaler=standard, tau=0.250, reg=0.00/softmax => ω=[0.002, 0.000, 0.073, 0.061, 0.004, 0.192, 0.062, 0.102, 0.090, 0.055, 0.087, 0.114, 0.046, 0.001, 0.063, 0.051], NLL: 11.169 vs kernel(+)11.239 euclid(+)11.363 global(+)11.846 | win%: 58/57/74
+scaler=standard, tau=0.500, reg=0.00/softmax => ω=[0.028, 0.013, 0.025, 0.017, 0.060, 0.246, 0.106, 0.219, 0.085, 0.005, 0.047, 0.067, 0.005, 0.005, 0.021, 0.051], NLL: 11.272 vs kernel(+)11.342 euclid(+)11.363 global(+)11.846 | win%: 53/49/71
+scaler=standard, tau=0.750, reg=0.00/softmax => ω=[0.002, 0.002, 0.000, 0.001, 0.171, 0.256, 0.139, 0.333, 0.069, 0.000, 0.001, 0.001, 0.001, 0.001, 0.004, 0.020], NLL: 11.318 vs kernel(+)11.376 euclid(+)11.363 global(+)11.846 | win%: 53/48/69
+scaler=standard, tau=1.000, reg=0.00/softmax => ω=[0.002, 0.004, 0.000, 0.001, 0.112, 0.268, 0.175, 0.365, 0.038, 0.000, 0.000, 0.000, 0.000, 0.000, 0.002, 0.031], NLL: 11.318 vs kernel(+)11.392 euclid(+)11.363 global(+)11.846 | win%: 56/49/68
+scaler=standard, tau=2.500, reg=0.00/softmax => ω=[0.000, 0.008, 0.000, 0.000, 0.000, 0.306, 0.208, 0.476, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000], NLL: 11.413 vs kernel(+)11.421 euclid(-)11.363 global(+)11.846 | win%: 53/46/71
+scaler=standard, tau=5.000, reg=0.00/softmax => ω=[0.000, 0.030, 0.000, 0.000, 0.000, 0.232, 0.045, 0.690, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000], NLL: 11.434 vs kernel(-)11.431 euclid(-)11.363 global(+)11.846 | win%: 52/44/69
+scaler=standard, tau=7.500, reg=0.00/softmax => ω=[0.000, 0.033, 0.000, 0.000, 0.000, 0.127, 0.021, 0.816, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000], NLL: 11.446 vs kernel(-)11.434 euclid(-)11.363 global(+)11.846 | win%: 51/44/68
+scaler=standard, tau=10.000, reg=0.00/softmax => ω=[0.000, 0.042, 0.000, 0.000, 0.000, 0.011, 0.017, 0.928, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000], NLL: 11.488 vs kernel(-)11.435 euclid(-)11.363 global(+)11.846 | win%: 47/41/66
+scaler=standard, tau=15.000, reg=0.00/softmax => ω=[0.000, 0.048, 0.000, 0.000, 0.000, 0.002, 0.013, 0.936, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000], NLL: 11.549 vs kernel(-)11.437 euclid(-)11.363 global(+)11.846 | win%: 45/39/64
+scaler=standard, tau=20.000, reg=0.00/softmax => ω=[0.000, 0.055, 0.000, 0.000, 0.000, 0.001, 0.011, 0.931, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000], NLL: 11.560 vs kernel(-)11.437 euclid(-)11.363 global(+)11.846 | win%: 45/39/64
+
+Best configuration (selected on VALIDATION set):
+  scaler_type=standard, tau=0.1, omega_l2_reg=0.0, constraint=softmax
+  Learned omega: [0.05551286 0.00462163 0.16572291 0.06270461 0.03618507 0.16153847
+ 0.09402123 0.04628903 0.04568437 0.06695817 0.0409849  0.16841382
+ 0.0128301  0.00270557 0.01993792 0.01588932]
+  Validation NLL:
+    Learned:       11.0148
+    Uniform(ω=1/16): 11.5115
+    Euclidean kNN: 11.3629
+    Global:        11.8461
+
+--- Final Evaluation on TEST set (unbiased) ---
+  Test NLL (unbiased):
+    Learned:       11.0378
+    Uniform(ω=1/16): 11.1606
+    Euclidean kNN: 11.4246
+    Global:        11.8960
+  Test Improvement (positive = learned is better):
+    vs Uniform(ω=1/16): 0.1228
+    vs Euclidean kNN: 0.3868
+    vs Global:        0.8582
+Saved sweep results: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/sweep_results.csv
+Saved best omega: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/best_omega.npy
+Saved best config summary: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/best_config_summary.json
+
+Generating visualizations...
+✓ Saved NLL vs tau plot to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/nll_vs_tau.png
+✓ Saved PDF to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/nll_vs_tau.pdf
+Saved: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/omega_bar_chart.png
+Saved: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/kernel_distance_projection_2d.png
+Visualizations complete!
+
+All outputs saved to: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals
+
+Done!
+=== Step 3/4: sweep_knn_k_values (residuals) ===
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_knn_k_values.py:50: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+
+================================================================================
+K-NN COVARIANCE: k-VALUE SWEEP
+================================================================================
+k values: [32, 64, 128, 256, 512, 1024, 2048]
+Dimensions for ellipse: (0, 1)
+Ellipsoid radius (rho): 2.0
+================================================================================
+
+Loading data...
+Training set: 2211 samples
+Evaluation set: 738 samples
+Target: residuals (actual - ensemble mean forecast)
+Features: ['SYS_MEAN', 'SYS_STD', 'WIND_122_MEAN', 'WIND_309_MEAN', 'WIND_317_MEAN', 'WIND_122_STD', 'WIND_309_STD', 'WIND_317_STD', 'HOUR_SIN', 'HOUR_COS', 'DOW_SIN', 'DOW_COS', 'SYS_MEAN_DELTA_3H', 'SYS_MEAN_DELTA_1H', 'SYS_STD_ROLLING_6H', 'FORECAST_SPREAD']
+Targets: ['122_WIND_1', '309_WIND_1', '317_WIND_1']
+
+Sweeping k values:
+  k=32... NLL = 11.4572
+  k=64... NLL = 11.6950
+  k=128... NLL = 11.8943
+  k=256... NLL = 12.0746
+  k=512... NLL = 12.2834
+  k=1024... NLL = 12.6338
+  k=2048... NLL = 13.1950
+
+Output directory: data/viz_artifacts/knn_k_sweep_residuals
+
+Generating visualizations...
+
+✓ Saved NLL plot to data/viz_artifacts/knn_k_sweep_residuals/knn_nll_vs_k.png
+✓ Saved PDF to data/viz_artifacts/knn_k_sweep_residuals/knn_nll_vs_k.pdf
+✓ Saved ellipse size plot to data/viz_artifacts/knn_k_sweep_residuals/knn_ellipse_size_vs_k.png
+✓ Saved PDF to data/viz_artifacts/knn_k_sweep_residuals/knn_ellipse_size_vs_k.pdf
+✓ Saved ellipse grid to data/viz_artifacts/knn_k_sweep_residuals/knn_ellipses_by_k.png
+✓ Saved overlay plot to data/viz_artifacts/knn_k_sweep_residuals/knn_ellipse_overlay_sample0.png
+✓ Saved PDF to data/viz_artifacts/knn_k_sweep_residuals/knn_ellipse_overlay_sample0.pdf
+✓ Saved 3D ellipsoid overlay to data/viz_artifacts/knn_k_sweep_residuals/knn_3d_ellipsoid_overlay_sample0.png
+✓ Saved PDF to data/viz_artifacts/knn_k_sweep_residuals/knn_3d_ellipsoid_overlay_sample0.pdf
+✓ Saved summary to data/viz_artifacts/knn_k_sweep_residuals/knn_k_sweep_summary.csv
+
+================================================================================
+SUMMARY
+================================================================================
+   k       nll
+  32 11.457176
+  64 11.695022
+ 128 11.894265
+ 256 12.074558
+ 512 12.283357
+1024 12.633844
+2048 13.194966
+
+Best k-NN: k=32 (NLL = 11.4572)
+================================================================================
+
+✓ k-NN k-value sweep complete!
+
+Outputs saved to: data/viz_artifacts/knn_k_sweep_residuals/
+  - knn_nll_vs_k.png/pdf (with learned omega comparison)
+  - knn_ellipse_size_vs_k.png/pdf
+  - knn_ellipses_by_k.png
+  - knn_ellipse_overlay_sample*.png/pdf (with learned omega ellipse)
+  - knn_3d_ellipsoid_overlay_sample*.png/pdf (3D wind farm ellipsoids)
+  - knn_k_sweep_summary.csv
+
+=== Step 4/4: generate_paper_figures (USE_RESIDUALS=True) ===
+================================================================================
+PAPER FIGURE GENERATION
+================================================================================
+Output directory: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals
+================================================================================
+
+GENERATING FIGURES
+----------------------------------------
+
+[1/15] Kernel distance comparison (Learned vs k-NN)...
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig1_kernel_distance.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig1_kernel_distance.png
+
+[2/15] 3D ellipsoid comparison (Learned, k-NN, Global)...
+  k=16... NLL = 11.1774
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig2_ellipsoid_3d.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig2_ellipsoid_3d.png
+
+[2e/15] 3D ellipsoid comparison (extreme hour)...
+  k=16... NLL = 11.1774
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig2_ellipsoid_3d_extreme.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig2_ellipsoid_3d_extreme.png
+
+[3/15] NLL vs k sweep...
+  Multi-split data not found at /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/knn_k_sweep_residuals/multi_split_k_stats.csv, using single-split fallback
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig3_nll_vs_k.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig3_nll_vs_k.png
+
+[4/15] NLL vs tau sweep...
+  Multi-seed data: 11 tau values
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig4_nll_vs_tau.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig4_nll_vs_tau.png
+
+[3b+4b] Hyperparameter sweeps with baselines (2-panel)...
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig3b_4b_hyperparameter_sweeps.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig3b_4b_hyperparameter_sweeps.png
+
+[6b/15] Global conformal calibration (no tolerance)...
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig6b_calibration_clean.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig6b_calibration_clean.png
+
+[6c/15] Global conformal calibration (points only)...
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig6c_calibration_points.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig6c_calibration_points.png
+
+[7/15] Global conformal correction vs alpha...
+    α=0.80: q_hat=0.408
+    α=0.85: q_hat=0.538
+    α=0.90: q_hat=0.638
+    α=0.95: q_hat=0.798
+    α=0.99: q_hat=1.820
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig7_corrections.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig7_corrections.png
+
+[7b/15] Normalized lower bound vs alpha...
+    α=0.80: 8.947 std below mean
+    α=0.85: 9.392 std below mean
+    α=0.90: 9.878 std below mean
+    α=0.95: 10.629 std below mean
+    α=0.99: 13.192 std below mean
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig7b_normalized_lower_bound.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig7b_normalized_lower_bound.png
+
+[7c/15] Lower bound decomposition (stacked bar)...
+    α=0.80: base=8.293, conformal=0.408, total=8.701
+    α=0.85: base=8.529, conformal=0.538, total=9.067
+    α=0.90: base=8.855, conformal=0.638, total=9.493
+    α=0.95: base=9.349, conformal=0.798, total=10.147
+    α=0.99: base=10.273, conformal=1.820, total=12.093
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig7c_lb_decomposition.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig7c_lb_decomposition.png
+
+[8/15] 2D ellipse grid (k=16, 512, Global)...
+  k=16... NLL = 10.9776
+  k=512... NLL = 11.5893
+  k=2211... NLL = 11.8934
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig8_ellipse_grid.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig8_ellipse_grid.png
+
+[8e/15] 2D ellipse grid (extreme hours)...
+  k=16... NLL = 10.9776
+  k=512... NLL = 11.5893
+  k=2211... NLL = 11.8934
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig8_ellipse_grid_extreme.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig8_ellipse_grid_extreme.png
+
+[10/15] 2D ellipse overlay...
+  k=16... NLL = 10.9776
+  k=512... NLL = 11.5893
+  k=2211... NLL = 11.8934
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig10_ellipse_overlay.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig10_ellipse_overlay.png
+
+[10e/15] 2D ellipse overlay (extreme hour)...
+  k=16... NLL = 10.9776
+  k=512... NLL = 11.5893
+  k=2211... NLL = 11.8934
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig10_ellipse_overlay_extreme.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig10_ellipse_overlay_extreme.png
+
+[11/15] Tau sweep (unconstrained, no reg, 16D)...
+  Warning: no rows with omega_constraint=none, omega_l2_reg=0
+
+[NLL-2D] NLL heatmap in feature space (focused_2d)...
+  Error: 'focused_2d_residuals'
+
+[NLL-16D] NLL heatmap in feature space (high_dim_16d)...
+  Error: 'high_dim_16d_residuals'
+
+[ΔNLL-16D] ΔNLL surface (high_dim_16d)...
+  Error: 'high_dim_16d_residuals'
+
+----------------------------------------
+GENERATING LATEX TABLES
+----------------------------------------
+
+[1/3] NLL vs tau table...
+  Saved LaTeX table: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/tables/tab_nll_vs_tau.tex
+
+[2/3] NLL vs k table...
+  Saved LaTeX table: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/tables/tab_nll_vs_k.tex
+
+[3/3] Omega weights table...
+  Saved LaTeX table: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/tables/tab_omega_weights.tex
+
+[4/4] NLL summary table (learned vs k-NN vs global)...
+  Learned ω (τ=0.07): 10.916
+  k-NN (k=16):        11.363
+  Global:              11.846
+  Saved LaTeX table: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/tables/tab_nll_summary.tex
+
+Saved metadata: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figure_metadata.json
+
+================================================================================
+GENERATION COMPLETE
+================================================================================
+
+Figures generated: 16
+  - fig1_kernel_distance
+  - fig2_ellipsoid_3d
+  - fig2_ellipsoid_3d_extreme
+  - fig3_nll_vs_k
+  - fig4_nll_vs_tau
+  - fig3b_4b_hyperparameter_sweeps
+  - fig6b_calibration_clean
+  - fig6c_calibration_points
+  - fig7_corrections
+  - fig7b_normalized_lower_bound
+  - fig7c_lb_decomposition
+  - fig8_ellipse_grid
+  - fig8_ellipse_grid_extreme
+  - fig10_ellipse_overlay
+  - fig10_ellipse_overlay_extreme
+  - fig11_tau_sweep_unconstrained
+
+Tables generated: 4
+  - tab_nll_vs_tau
+  - tab_nll_vs_k
+  - tab_omega_weights
+  - tab_nll_summary
+
+Output directory: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals
+  figures/
+  tables/
+  figure_metadata.json
+=== Done! Outputs in data/viz_artifacts/paper_final_residuals/ ===

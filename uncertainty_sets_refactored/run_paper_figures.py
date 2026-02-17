@@ -41,9 +41,9 @@ if __name__ == "__main__":
     print("\nGenerated files:")
     for name, path in paths.items():
         if path.exists():
-            print(f"  ✓ {name}: {path}")
+            print(f"  (ok) {name}: {path}")
         else:
-            print(f"  ✗ {name}: {path} (NOT FOUND)")
+            print(f"  (x) {name}: {path} (NOT FOUND)")
 
     print("\n" + "=" * 80)
     print("NEXT STEPS")

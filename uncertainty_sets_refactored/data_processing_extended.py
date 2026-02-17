@@ -317,7 +317,7 @@ def build_XY_high_dim_8d(
     # Rename per-unit columns to clean names (dynamic for any number of farms)
     clean_names = ["SYS_MEAN", "SYS_STD"]
     for col in feat_per_unit.columns:
-        # U_122_WIND_1_MEAN → WIND_122_MEAN, U_122_WIND_1_STD → WIND_122_STD
+        # U_122_WIND_1_MEAN -> WIND_122_MEAN, U_122_WIND_1_STD -> WIND_122_STD
         parts = col.split("_", 1)  # ["U", "122_WIND_1_MEAN"]
         suffix = parts[1] if len(parts) > 1 else col
         if suffix.endswith("_MEAN"):
@@ -430,7 +430,7 @@ def build_XY_high_dim_16d(
     # feat_per_unit contributes [U_<id>_MEAN, U_<id>_STD, ...] for each resource
     clean_names = ["SYS_MEAN", "SYS_STD"]
     for col in feat_per_unit.columns:
-        # U_122_WIND_1_MEAN → WIND_122_MEAN, U_122_WIND_1_STD → WIND_122_STD
+        # U_122_WIND_1_MEAN -> WIND_122_MEAN, U_122_WIND_1_STD -> WIND_122_STD
         parts = col.split("_", 1)  # ["U", "122_WIND_1_MEAN"]
         suffix = parts[1] if len(parts) > 1 else col
         if suffix.endswith("_MEAN"):

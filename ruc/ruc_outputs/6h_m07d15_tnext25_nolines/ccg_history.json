@@ -1,0 +1,16 @@
+{
+  "iterations": 1,
+  "gap_history": [
+    7.796461706128941e-12
+  ],
+  "robust_sufficient": true,
+  "n_scenarios": 0,
+  "timings": {
+    "phase1": [
+      0.3851318359375
+    ],
+    "phase2": [
+      0.19659686088562012
+    ]
+  }
+}

@@ -31,7 +31,7 @@ def test_feature_sets():
     print(f"   Expected: ['SYS_MEAN', 'SYS_STD', 'HOUR_SIN']")
     assert X.shape[1] == 3, "Expected 3 features"
     assert x_cols == ["SYS_MEAN", "SYS_STD", "HOUR_SIN"], "Unexpected feature names"
-    print("   ✓ PASS\n")
+    print("   (ok) PASS\n")
 
     # Test 2: Per-resource 4D
     print("2. Per-resource 4D (3 wind farms + HOUR_SIN)")
@@ -42,7 +42,7 @@ def test_feature_sets():
     print(f"   Expected: 3 wind farm means + HOUR_SIN")
     assert X.shape[1] == 4, "Expected 4 features"
     assert all("_MEAN" in c or c == "HOUR_SIN" for c in x_cols), "Unexpected feature pattern"
-    print("   ✓ PASS\n")
+    print("   (ok) PASS\n")
 
     # Test 3: Per-resource 3D (without hour)
     print("3. Per-resource 3D (3 wind farms, no hour)")
@@ -51,7 +51,7 @@ def test_feature_sets():
     print(f"   Features: {x_cols}")
     assert X.shape[1] == 3, "Expected 3 features"
     assert "HOUR_SIN" not in x_cols, "HOUR_SIN should not be present"
-    print("   ✓ PASS\n")
+    print("   (ok) PASS\n")
 
     # Test 4: Unscaled 2D
     print("4. Unscaled 2D (SYS_MEAN_MW, SYS_STD_MW)")
@@ -64,10 +64,10 @@ def test_feature_sets():
     print(f"     {x_cols[1]}: [{X[:, 1].min():.1f}, {X[:, 1].max():.1f}]")
     assert X.shape[1] == 2, "Expected 2 features"
     assert X[:, 0].mean() > 100, "SYS_MEAN should be in MW scale (not standardized)"
-    print("   ✓ PASS\n")
+    print("   (ok) PASS\n")
 
     print("=" * 60)
-    print("All feature set tests passed! ✓")
+    print("All feature set tests passed! (ok)")
     print("=" * 60)
 
 

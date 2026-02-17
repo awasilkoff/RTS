@@ -231,7 +231,7 @@ def generate_improved_paper_figures(
     print("=" * 80)
     print("\nGenerated figures:")
     for name, path in paths.items():
-        status = "✓" if path.exists() else "✗"
+        status = "(ok)" if path.exists() else "(x)"
         print(f"  {status} {name}: {path}")
 
     # Print improvement summary

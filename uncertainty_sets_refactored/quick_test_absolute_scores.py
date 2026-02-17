@@ -92,15 +92,15 @@ def quick_comparison(alpha_target: float = 0.95, n_bins: int = 5):
 
     if gap_abs < gap_scaled:
         improvement = gap_scaled - gap_abs
-        print(f"  → Absolute is BETTER by {improvement:.3f} ✓")
+        print(f"  -> Absolute is BETTER by {improvement:.3f} (ok)")
         print(f"\n  INSIGHT: Scaling by ens_std is HURTING coverage!")
         print(f"           Consider using absolute deviation instead.")
     elif gap_scaled < gap_abs:
         improvement = gap_abs - gap_scaled
-        print(f"  → Scaled is BETTER by {improvement:.3f}")
+        print(f"  -> Scaled is BETTER by {improvement:.3f}")
         print(f"\n  INSIGHT: Scaling by ens_std is helping.")
     else:
-        print(f"  → No significant difference")
+        print(f"  -> No significant difference")
         print(f"\n  INSIGHT: Scaling makes minimal impact.")
 
     print(f"\nError Metrics:")
@@ -108,9 +108,9 @@ def quick_comparison(alpha_target: float = 0.95, n_bins: int = 5):
     print(f"  Scaled RMSE:   {metrics_scaled['rmse']:.2f} MW")
 
     if metrics_abs['rmse'] < metrics_scaled['rmse']:
-        print(f"  → Absolute has lower error ✓")
+        print(f"  -> Absolute has lower error (ok)")
     elif metrics_scaled['rmse'] < metrics_abs['rmse']:
-        print(f"  → Scaled has lower error")
+        print(f"  -> Scaled has lower error")
 
     print(f"\nConservativeness:")
     over_abs = metrics_abs['coverage'] - alpha_target
@@ -119,9 +119,9 @@ def quick_comparison(alpha_target: float = 0.95, n_bins: int = 5):
     print(f"  Scaled over-coverage:   {over_scaled:+.3f}")
 
     if over_abs < over_scaled:
-        print(f"  → Absolute is LESS conservative ✓")
+        print(f"  -> Absolute is LESS conservative (ok)")
     elif over_scaled < over_abs:
-        print(f"  → Scaled is LESS conservative")
+        print(f"  -> Scaled is LESS conservative")
 
     print("\n" + "="*70 + "\n")
 

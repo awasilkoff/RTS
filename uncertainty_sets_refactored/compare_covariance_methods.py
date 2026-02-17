@@ -267,11 +267,11 @@ def plot_comparison_bar_chart(
 
     output_path = output_dir / "comparison_bar_chart.png"
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"✓ Saved comparison bar chart to {output_path}")
+    print(f"(ok) Saved comparison bar chart to {output_path}")
 
     output_path_pdf = output_dir / "comparison_bar_chart.pdf"
     plt.savefig(output_path_pdf, dpi=300, bbox_inches="tight")
-    print(f"✓ Saved PDF to {output_path_pdf}")
+    print(f"(ok) Saved PDF to {output_path_pdf}")
 
     plt.close()
 
@@ -386,11 +386,11 @@ def plot_sweep_curves(
 
     output_path = output_dir / "hyperparameter_sweeps.png"
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"✓ Saved hyperparameter sweeps to {output_path}")
+    print(f"(ok) Saved hyperparameter sweeps to {output_path}")
 
     output_path_pdf = output_dir / "hyperparameter_sweeps.pdf"
     plt.savefig(output_path_pdf, dpi=300, bbox_inches="tight")
-    print(f"✓ Saved PDF to {output_path_pdf}")
+    print(f"(ok) Saved PDF to {output_path_pdf}")
 
     plt.close()
 
@@ -435,7 +435,7 @@ def plot_omega_bar_chart(
 
     output_path = output_dir / "omega_bar_chart.png"
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"✓ Saved omega bar chart to {output_path}")
+    print(f"(ok) Saved omega bar chart to {output_path}")
 
     plt.close()
 
@@ -549,11 +549,11 @@ def run_comparison(
 
     with open(output_dir / "comparison_summary.json", "w") as f:
         json.dump(summary, f, indent=2)
-    print(f"✓ Saved summary to {output_dir / 'comparison_summary.json'}")
+    print(f"(ok) Saved summary to {output_dir / 'comparison_summary.json'}")
 
     # Save omega
     np.save(output_dir / "best_omega.npy", best_omega)
-    print(f"✓ Saved best omega to {output_dir / 'best_omega.npy'}")
+    print(f"(ok) Saved best omega to {output_dir / 'best_omega.npy'}")
 
     # Print final summary
     print("\n" + "=" * 80)
@@ -561,10 +561,10 @@ def run_comparison(
     print("=" * 80)
     print(f"Global covariance:  NLL = {global_nll:.4f}")
     print(
-        f"Best k-NN (k={best_k}):   NLL = {best_knn_nll:.4f}  (↓{global_nll - best_knn_nll:.4f} vs global)"
+        f"Best k-NN (k={best_k}):   NLL = {best_knn_nll:.4f}  (v{global_nll - best_knn_nll:.4f} vs global)"
     )
     print(
-        f"Best learned ω (τ={best_tau}): NLL = {best_omega_nll:.4f}  (↓{global_nll - best_omega_nll:.4f} vs global)"
+        f"Best learned ω (τ={best_tau}): NLL = {best_omega_nll:.4f}  (v{global_nll - best_omega_nll:.4f} vs global)"
     )
     print(
         f"\nLearned ω improvement over k-NN: {best_knn_nll - best_omega_nll:.4f} ({100*(best_knn_nll - best_omega_nll)/best_knn_nll:.1f}%)"

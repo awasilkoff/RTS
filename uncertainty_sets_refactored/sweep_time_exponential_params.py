@@ -136,7 +136,7 @@ def sweep_time_exponential_params(
                     print(f"Coverage: {metrics['coverage']:.3f} (gap: {gap:.3f})")
 
                 except Exception as e:
-                    print(f"✗ Failed: {e}")
+                    print(f"(x) Failed: {e}")
 
             print()
 
@@ -146,7 +146,7 @@ def sweep_time_exponential_params(
     # Save results
     results_path = output_dir / 'sweep_results.csv'
     df_results.to_csv(results_path, index=False)
-    print(f"\n✓ Saved results to {results_path}")
+    print(f"\n(ok) Saved results to {results_path}")
 
     # Generate visualizations
     plot_sweep_results(df_results, output_dir)
@@ -249,11 +249,11 @@ def plot_sweep_results(df_results: pd.DataFrame, output_dir: Path):
     # Save
     output_path = output_dir / 'time_exponential_param_sweep.png'
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
-    print(f"✓ Saved sweep visualization to {output_path}")
+    print(f"(ok) Saved sweep visualization to {output_path}")
 
     output_path_pdf = output_dir / 'time_exponential_param_sweep.pdf'
     plt.savefig(output_path_pdf, dpi=300, bbox_inches='tight')
-    print(f"✓ Saved PDF to {output_path_pdf}")
+    print(f"(ok) Saved PDF to {output_path_pdf}")
 
     plt.close()
 
@@ -322,11 +322,11 @@ def plot_heatmaps(df_results: pd.DataFrame, output_dir: Path):
     # Save
     output_path = output_dir / 'time_exponential_heatmap.png'
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
-    print(f"✓ Saved heatmap to {output_path}")
+    print(f"(ok) Saved heatmap to {output_path}")
 
     output_path_pdf = output_dir / 'time_exponential_heatmap.pdf'
     plt.savefig(output_path_pdf, dpi=300, bbox_inches='tight')
-    print(f"✓ Saved PDF to {output_path_pdf}")
+    print(f"(ok) Saved PDF to {output_path_pdf}")
 
     plt.close()
 
@@ -385,4 +385,4 @@ if __name__ == "__main__":
         random_seed=42,
     )
 
-    print("\n✓ Time-exponential parameter sweep complete!")
+    print("\n(ok) Time-exponential parameter sweep complete!")

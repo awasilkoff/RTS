@@ -6,7 +6,7 @@ The problem: When using y_actual binning, the highest actual bin often has:
 - All under-predictions (y_pred < y)
 - Therefore all r = max(0, (y_pred - y)/scale) = 0
 - Therefore q_hat = quantile([0, 0, 0, ...], 0.95) = 0
-- Therefore NO correction applied → coverage failure
+- Therefore NO correction applied -> coverage failure
 
 The fix: Apply a minimum q_hat floor:
 - q_hat_by_bin[b] = max(q_hat_bin, global_q_hat * min_q_hat_ratio)
@@ -93,7 +93,7 @@ def test_zero_correction_without_fix():
         print(f"\n⚠️  WARNING: Bins with near-zero q_hat: {zero_bins}")
         print("   This will cause coverage failures in those bins!")
     else:
-        print("\n✓ No zero q_hats (problem may not manifest with this data)")
+        print("\n(ok) No zero q_hats (problem may not manifest with this data)")
 
     # Check coverage by actual bin
     df_test["y_bin"] = pd.cut(df_test["y"], bins=5)
@@ -103,7 +103,7 @@ def test_zero_correction_without_fix():
 
     print(f"\nCoverage by actual bin (without fix):")
     for bin_interval, cov in coverage_by_bin.items():
-        status = "✓" if cov >= 0.90 else "✗"
+        status = "(ok)" if cov >= 0.90 else "(x)"
         print(f"  {status} {bin_interval}: {cov:.3f}")
 
     # Overall coverage
@@ -147,10 +147,10 @@ def test_zero_correction_with_fix():
     # Check if any bin has zero or near-zero q_hat
     zero_bins = [i for i, q in enumerate(q_hats) if q < 0.01]
     if zero_bins:
-        print(f"\n✗ ERROR: Bins with near-zero q_hat: {zero_bins}")
+        print(f"\n(x) ERROR: Bins with near-zero q_hat: {zero_bins}")
         print("   Fix did not work!")
     else:
-        print(f"\n✓ All bins have q_hat ≥ minimum floor")
+        print(f"\n(ok) All bins have q_hat ≥ minimum floor")
         print("   Fix is working!")
 
     # Check that all q_hats are at least the minimum floor
@@ -159,7 +159,7 @@ def test_zero_correction_with_fix():
     if below_floor:
         print(f"\n⚠️  WARNING: Bins below floor: {below_floor}")
     else:
-        print(f"✓ All bins at or above floor")
+        print(f"(ok) All bins at or above floor")
 
     # Check coverage by actual bin
     df_test["y_bin"] = pd.cut(df_test["y"], bins=5)
@@ -169,7 +169,7 @@ def test_zero_correction_with_fix():
 
     print(f"\nCoverage by actual bin (with fix):")
     for bin_interval, cov in coverage_by_bin.items():
-        status = "✓" if cov >= 0.90 else "✗"
+        status = "(ok)" if cov >= 0.90 else "(x)"
         print(f"  {status} {bin_interval}: {cov:.3f}")
 
     # Overall coverage
@@ -210,13 +210,13 @@ def test_comparison():
 
     # Check if fix improves coverage
     if results_with['overall_coverage'] >= results_without['overall_coverage']:
-        print("\n✓ Fix improves or maintains coverage")
+        print("\n(ok) Fix improves or maintains coverage")
     else:
         print("\n⚠️  Fix reduces coverage (unexpected)")
 
     # Check if fix eliminates zero bins
     if len(results_with['zero_bins']) < len(results_without['zero_bins']):
-        print("✓ Fix eliminates or reduces zero q_hat bins")
+        print("(ok) Fix eliminates or reduces zero q_hat bins")
     else:
         print("⚠️  Fix does not eliminate zero q_hat bins (may not be present in data)")
 

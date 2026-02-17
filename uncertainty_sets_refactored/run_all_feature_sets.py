@@ -87,11 +87,11 @@ def run_feature_set(
     try:
         result = subprocess.run(cmd, check=True, text=True)
         print()
-        print(f"✓ Completed: {feature_set}")
+        print(f"(ok) Completed: {feature_set}")
         return True
     except subprocess.CalledProcessError as e:
         print()
-        print(f"✗ Failed: {feature_set}")
+        print(f"(x) Failed: {feature_set}")
         print(f"Error: {e}")
         return False
 

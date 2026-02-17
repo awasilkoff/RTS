@@ -1097,7 +1097,7 @@ def solve_ruc_ccg(
     """
     Solve the LD-RUC via column-and-constraint generation.
 
-    Phase 1 (deterministic gated MIP) → Phase 2 (robust SOCP) → iterate.
+    Phase 1 (deterministic gated MIP) -> Phase 2 (robust SOCP) -> iterate.
 
     Parameters
     ----------

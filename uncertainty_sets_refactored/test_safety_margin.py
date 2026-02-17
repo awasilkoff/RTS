@@ -64,7 +64,7 @@ def test_safety_margins():
 
             coverage = metrics["coverage"]
             gap = abs(coverage - alpha)
-            status = "✓" if gap < 0.05 else "⚠"
+            status = "(ok)" if gap < 0.05 else "⚠"
 
             results.append({
                 "alpha": alpha,
@@ -96,8 +96,8 @@ def test_safety_margins():
     print("  • safety_margin=0.02 (2% buffer): Moderate (RECOMMENDED)")
     print("  • safety_margin=0.03 (3% buffer): Conservative")
     print("\nTrade-off:")
-    print("  ↑ Higher safety margin → ✓ Better coverage at low α, ✗ Wider bounds")
-    print("  ↓ Lower safety margin  → ✓ Tighter bounds, ✗ More coverage failures")
+    print("  ^ Higher safety margin -> (ok) Better coverage at low α, (x) Wider bounds")
+    print("  v Lower safety margin  -> (ok) Tighter bounds, (x) More coverage failures")
     print("\nFor paper: Use safety_margin=0.02 as a reasonable middle ground")
 
 

@@ -77,24 +77,24 @@ def test_binning_strategies():
             results[binning] = {
                 "coverage": coverage,
                 "gap": gap,
-                "status": "✓" if gap < 0.05 else "⚠",
+                "status": "(ok)" if gap < 0.05 else "⚠",
             }
 
             print(f"    {results[binning]['status']} Coverage: {coverage:.4f} (gap: {gap:.4f})")
 
         except Exception as e:
-            print(f"    ✗ ERROR: {e}")
-            results[binning] = {"status": "✗", "error": str(e)}
+            print(f"    (x) ERROR: {e}")
+            results[binning] = {"status": "(x)", "error": str(e)}
 
     # Summary
     print("\n" + "=" * 70)
     print("SUMMARY")
     print("=" * 70)
 
-    all_passed = all(r.get("status") == "✓" for r in results.values())
+    all_passed = all(r.get("status") == "(ok)" for r in results.values())
 
     if all_passed:
-        print("\n✓ All binning strategies work correctly!")
+        print("\n(ok) All binning strategies work correctly!")
         print("\nCoverage comparison:")
         for binning, result in results.items():
             if "coverage" in result:

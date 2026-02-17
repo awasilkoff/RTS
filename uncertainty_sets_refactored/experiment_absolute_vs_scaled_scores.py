@@ -277,7 +277,7 @@ def run_absolute_vs_scaled_experiments(
                     "margin_mw_mean": margin_stats["margin_mw_mean"],
                     "margin_normalized_mean": margin_stats[
                         "margin_normalized_mean"
-                    ],  # ← KEY METRIC
+                    ],  # <- KEY METRIC
                     "margin_normalized_std": margin_stats["margin_normalized_std"],
                 }
             )
@@ -291,7 +291,7 @@ def run_absolute_vs_scaled_experiments(
             )
             print(f"    Progress: {current}/{total_configs}\n")
         except Exception as e:
-            print(f"    ✗ Failed: {e}\n")
+            print(f"    (x) Failed: {e}\n")
 
         # =====================================================================
         # 2. BINNED + SCALED
@@ -326,7 +326,7 @@ def run_absolute_vs_scaled_experiments(
                     "margin_mw_mean": margin_stats["margin_mw_mean"],
                     "margin_normalized_mean": margin_stats[
                         "margin_normalized_mean"
-                    ],  # ← KEY METRIC
+                    ],  # <- KEY METRIC
                     "margin_normalized_std": margin_stats["margin_normalized_std"],
                 }
             )
@@ -340,7 +340,7 @@ def run_absolute_vs_scaled_experiments(
             )
             print(f"    Progress: {current}/{total_configs}\n")
         except Exception as e:
-            print(f"    ✗ Failed: {e}\n")
+            print(f"    (x) Failed: {e}\n")
 
         # =====================================================================
         # 3. WEIGHTED + ABSOLUTE (for each tau)
@@ -384,7 +384,7 @@ def run_absolute_vs_scaled_experiments(
                 )
                 print(f"      Progress: {current}/{total_configs}")
             except Exception as e:
-                print(f"      ✗ Failed: {e}")
+                print(f"      (x) Failed: {e}")
         print()
 
         # =====================================================================
@@ -437,7 +437,7 @@ def run_absolute_vs_scaled_experiments(
                 )
                 print(f"      Progress: {current}/{total_configs}")
             except Exception as e:
-                print(f"      ✗ Failed: {e}")
+                print(f"      (x) Failed: {e}")
         print()
 
     # Convert to DataFrame
@@ -448,7 +448,7 @@ def run_absolute_vs_scaled_experiments(
     output_dir.mkdir(exist_ok=True)
     results_path = output_dir / "absolute_vs_scaled_experiments.csv"
     df_results.to_csv(results_path, index=False)
-    print(f"\n✓ Saved results to {results_path}")
+    print(f"\n(ok) Saved results to {results_path}")
 
     # Generate visualizations
     plot_absolute_vs_scaled(df_results, output_dir)
@@ -763,7 +763,7 @@ def plot_absolute_vs_scaled(df_results: pd.DataFrame, output_dir: Path):
     # Save
     output_path = output_dir / "absolute_vs_scaled_comparison.png"
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"✓ Saved visualization to {output_path}")
+    print(f"(ok) Saved visualization to {output_path}")
 
     plt.close()
 
@@ -794,7 +794,7 @@ def print_experiment_summary(df_results: pd.DataFrame):
             )
             print(f"    RMSE:            {row['rmse']:.2f} MW")
             print(f"    Margin:          {row['margin_mw_mean']:.2f} MW")
-            print(f"    Margin (norm):   {row['margin_normalized_mean']:.2f}σ  ← KEY")
+            print(f"    Margin (norm):   {row['margin_normalized_mean']:.2f}σ  <- KEY")
 
         # Binned scaled
         df_bs = df_results[
@@ -810,7 +810,7 @@ def print_experiment_summary(df_results: pd.DataFrame):
             )
             print(f"    RMSE:            {row['rmse']:.2f} MW")
             print(f"    Margin:          {row['margin_mw_mean']:.2f} MW")
-            print(f"    Margin (norm):   {row['margin_normalized_mean']:.2f}σ  ← KEY")
+            print(f"    Margin (norm):   {row['margin_normalized_mean']:.2f}σ  <- KEY")
 
         # Weighted absolute (best)
         df_wa = df_results[
@@ -826,7 +826,7 @@ def print_experiment_summary(df_results: pd.DataFrame):
             )
             print(f"    RMSE:            {best['rmse']:.2f} MW")
             print(f"    Margin:          {best['margin_mw_mean']:.2f} MW")
-            print(f"    Margin (norm):   {best['margin_normalized_mean']:.2f}σ  ← KEY")
+            print(f"    Margin (norm):   {best['margin_normalized_mean']:.2f}σ  <- KEY")
 
         # Weighted scaled (best)
         df_ws = df_results[
@@ -842,7 +842,7 @@ def print_experiment_summary(df_results: pd.DataFrame):
             )
             print(f"    RMSE:            {best['rmse']:.2f} MW")
             print(f"    Margin:          {best['margin_mw_mean']:.2f} MW")
-            print(f"    Margin (norm):   {best['margin_normalized_mean']:.2f}σ  ← KEY")
+            print(f"    Margin (norm):   {best['margin_normalized_mean']:.2f}σ  <- KEY")
 
         # Analysis
         print(f"\n  Analysis:")
@@ -864,7 +864,7 @@ def print_experiment_summary(df_results: pd.DataFrame):
                 )
             else:
                 print(
-                    f"      Coverage: Absolute better (gap reduced by {abs(gap_diff):.3f}) ✓"
+                    f"      Coverage: Absolute better (gap reduced by {abs(gap_diff):.3f}) (ok)"
                 )
 
             print(
@@ -873,11 +873,11 @@ def print_experiment_summary(df_results: pd.DataFrame):
             )
             if margin_diff > 0:
                 print(
-                    f"      → Scaled uses {abs(margin_diff):.2f}σ LESS margin (less conservative) ✓"
+                    f"      -> Scaled uses {abs(margin_diff):.2f}σ LESS margin (less conservative) (ok)"
                 )
             else:
                 print(
-                    f"      → Absolute uses {abs(margin_diff):.2f}σ LESS margin (less conservative) ✓"
+                    f"      -> Absolute uses {abs(margin_diff):.2f}σ LESS margin (less conservative) (ok)"
                 )
 
         # Compare weighted: absolute vs scaled
@@ -899,7 +899,7 @@ def print_experiment_summary(df_results: pd.DataFrame):
                 )
             else:
                 print(
-                    f"      Coverage: Absolute better (gap reduced by {abs(gap_diff):.3f}) ✓"
+                    f"      Coverage: Absolute better (gap reduced by {abs(gap_diff):.3f}) (ok)"
                 )
 
             print(
@@ -908,11 +908,11 @@ def print_experiment_summary(df_results: pd.DataFrame):
             )
             if margin_diff > 0:
                 print(
-                    f"      → Scaled uses {abs(margin_diff):.2f}σ LESS margin (less conservative) ✓"
+                    f"      -> Scaled uses {abs(margin_diff):.2f}σ LESS margin (less conservative) (ok)"
                 )
             else:
                 print(
-                    f"      → Absolute uses {abs(margin_diff):.2f}σ LESS margin (less conservative) ✓"
+                    f"      -> Absolute uses {abs(margin_diff):.2f}σ LESS margin (less conservative) (ok)"
                 )
 
         print()
@@ -936,4 +936,4 @@ if __name__ == "__main__":
         omega_path="data/viz_artifacts/focused_2d/best_omega.npy",
     )
 
-    print("\n✓ Experiments complete!")
+    print("\n(ok) Experiments complete!")

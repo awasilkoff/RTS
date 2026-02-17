@@ -236,7 +236,7 @@ def find_and_plot_rts_to_spp_constellation(
         }
     )
 
-    print("\n=== RTS → SPP Mapping ===")
+    print("\n=== RTS -> SPP Mapping ===")
     print(mapping_df.to_string(index=False))
 
     # Print summary

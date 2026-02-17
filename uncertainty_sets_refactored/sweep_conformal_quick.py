@@ -22,7 +22,7 @@ if __name__ == "__main__":
     print("  • Number of bins: 1, 3, 10")
     print("  • Bin strategies: equal_width, quantile")
     print("  • Safety margins: 0.0, 0.01, 0.02")
-    print("\nTotal: 4 alphas × 2 binning × 3 n_bins × 2 bin_strat × 3 safety = 144 configs")
+    print("\nTotal: 4 alphas x 2 binning x 3 n_bins x 2 bin_strat x 3 safety = 144 configs")
     print("Estimated time: ~5 minutes")
     print("=" * 80 + "\n")
 

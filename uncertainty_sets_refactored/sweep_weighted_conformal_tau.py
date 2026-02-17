@@ -126,7 +126,7 @@ def sweep_tau_values(
             print()
 
         except Exception as e:
-            print(f"  ✗ Failed with error: {e}\n")
+            print(f"  (x) Failed with error: {e}\n")
             continue
 
     # Convert to DataFrame
@@ -137,7 +137,7 @@ def sweep_tau_values(
     output_dir.mkdir(exist_ok=True)
     output_csv = output_dir / 'weighted_conformal_tau_sweep.csv'
     df_results.to_csv(output_csv, index=False)
-    print(f"✓ Saved results to {output_csv}\n")
+    print(f"(ok) Saved results to {output_csv}\n")
 
     # Find best tau
     best_idx = df_results['gap'].idxmin()
@@ -206,7 +206,7 @@ def plot_tau_sweep(df_results: pd.DataFrame, alpha_target: float, output_dir: Pa
     # Save plot
     output_png = output_dir / 'weighted_conformal_tau_sweep.png'
     plt.savefig(output_png, dpi=150, bbox_inches='tight')
-    print(f"✓ Saved plot to {output_png}")
+    print(f"(ok) Saved plot to {output_png}")
 
     plt.close()
 
@@ -219,4 +219,4 @@ if __name__ == '__main__':
         alpha_target=0.95,
     )
 
-    print("\n✓ Tau sweep complete!")
+    print("\n(ok) Tau sweep complete!")

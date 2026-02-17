@@ -1,0 +1,23 @@
+{
+  "dam_objective": 99704.11895568059,
+  "phase1_objective": 0.0,
+  "dam_unit_hours": 528.0,
+  "ruc_unit_hours": 528.0,
+  "extra_unit_hours": 0.0,
+  "ccg_iterations": 1,
+  "robust_sufficient": true,
+  "final_gap_mw": 7.796461706128941e-12,
+  "n_gated_decisions": 438,
+  "config": {
+    "t_next": 25,
+    "notification_scale": 1.0,
+    "max_ccg_iterations": 5,
+    "ccg_gap_tolerance": 1.0,
+    "enforce_lines": false,
+    "rho_lines_frac": null,
+    "day2_interval_hours": 1,
+    "day1_only_robust": false,
+    "horizon_hours": 6,
+    "wall_time": 3.7067251205444336
+  }
+}

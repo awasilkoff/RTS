@@ -83,11 +83,11 @@ print("="*70)
 
 avg_std = all_std.mean()
 if avg_std > 20:
-    print(f"✓ PASS: Sigma appears to use SCALED data (avg std = {avg_std:.1f} MW)")
+    print(f"(ok) PASS: Sigma appears to use SCALED data (avg std = {avg_std:.1f} MW)")
     print("  Expected range for scaled data: 30-200 MW")
     print("  This is consistent with RTS-scaled wind uncertainty.")
 else:
-    print(f"✗ FAIL: Sigma appears to use UNSCALED data (avg std = {avg_std:.1f} MW)")
+    print(f"(x) FAIL: Sigma appears to use UNSCALED data (avg std = {avg_std:.1f} MW)")
     print("  Unscaled data would have std dev ~2-10 MW")
     print("  You may need to regenerate with --data-version v2")
 

@@ -143,11 +143,11 @@ def build_dam_model(
 
     for i in range(I):
         for t in range(T):
-            obj.addTerms(C_NL[i] * dt[t], u[i, t])      # no-load: $/hr × hours
+            obj.addTerms(C_NL[i] * dt[t], u[i, t])      # no-load: $/hr x hours
             obj.addTerms(C_SU[i], v[i, t])                # startup: one-time
             obj.addTerms(C_SD[i], w[i, t])                # shutdown: one-time
             for b in range(B):
-                obj.addTerms(block_cost[i, b] * dt[t], p_block[i, t, b])  # energy: $/MWh × MW × hours
+                obj.addTerms(block_cost[i, b] * dt[t], p_block[i, t, b])  # energy: $/MWh x MW x hours
 
     for t in range(T):
         obj.addTerms(M_p * dt[t], s_p[t])

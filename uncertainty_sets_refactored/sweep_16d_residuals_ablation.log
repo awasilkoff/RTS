@@ -1,0 +1,117 @@
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_and_viz_feature_set.py:71: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_and_viz_feature_set.py:71: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+
+*** Using RESIDUALS as target (ACTUAL - MEAN_FORECAST) ***
+
+Created artifact directory: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals
+  - Config: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/feature_config.json
+  - README: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/README.md
+================================================================================
+Running sweep for feature set: high_dim_16d
+================================================================================
+Feature set: high_dim_16d
+  Description: 16D comprehensive (8D base + temporal + ramp + spread)
+  Data shape: X=(2949, 16), Y=(2949, 3)
+  Features: ['SYS_MEAN', 'SYS_STD', 'WIND_122_MEAN', 'WIND_309_MEAN', 'WIND_317_MEAN', 'WIND_122_STD', 'WIND_309_STD', 'WIND_317_STD', 'HOUR_SIN', 'HOUR_COS', 'DOW_SIN', 'DOW_COS', 'SYS_MEAN_DELTA_3H', 'SYS_MEAN_DELTA_1H', 'SYS_STD_ROLLING_6H', 'FORECAST_SPREAD']
+  Targets: ['122_WIND_1', '309_WIND_1', '317_WIND_1']
+
+Train: 1474, Val: 737, Test: 738
+Split: Random 50%/25%/25% (seed=42)
+  - Val used for hyperparameter selection
+  - Test used ONCE for final unbiased evaluation
+
+scaler=standard, tau=0.010, reg=0.00/softmax => ω=[0.497, 0.002, 0.017, 0.192, 0.152, 0.000, 0.000, 0.000, 0.001, 0.001, 0.000, 0.000, 0.001, 0.001, 0.000, 0.134], NLL: 11.873 vs kernel(+)21057.278 euclid(-)11.177 global(-)11.846 | win%: 88/40/66
+scaler=standard, tau=0.010, reg=0.00 => ω=[0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.656], NLL: 25.209 vs kernel(+)124374.115 euclid(-)11.177 global(-)11.846 | win%: 100/44/58
+scaler=standard, tau=0.010, reg=0.01 => ω=[0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010], NLL: 33.916 vs kernel(+)124374.115 euclid(-)11.177 global(-)11.846 | win%: 100/56/73
+scaler=standard, tau=0.010, reg=0.10 => ω=[0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010], NLL: 33.916 vs kernel(+)124374.115 euclid(-)11.177 global(-)11.846 | win%: 100/56/73
+scaler=standard, tau=0.010, reg=1.00 => ω=[0.429, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010], NLL: 26.485 vs kernel(+)124374.115 euclid(-)11.177 global(-)11.846 | win%: 100/49/63
+scaler=standard, tau=0.050, reg=0.00/softmax => ω=[0.174, 0.025, 0.005, 0.136, 0.179, 0.039, 0.032, 0.010, 0.018, 0.011, 0.014, 0.074, 0.007, 0.003, 0.104, 0.167], NLL: 11.220 vs kernel(+)110.378 euclid(-)11.177 global(+)11.846 | win%: 45/52/74
+scaler=standard, tau=0.050, reg=0.00 => ω=[0.010, 0.010, 0.027, 0.034, 0.323, 0.049, 0.021, 0.010, 0.021, 0.013, 0.022, 0.073, 0.010, 0.010, 0.105, 0.022], NLL: 11.291 vs kernel(+)80259.356 euclid(-)11.177 global(+)11.846 | win%: 98/52/75
+scaler=standard, tau=0.050, reg=0.01 => ω=[0.010, 0.010, 0.020, 0.027, 0.326, 0.048, 0.020, 0.010, 0.023, 0.012, 0.014, 0.074, 0.010, 0.010, 0.099, 0.042], NLL: 11.206 vs kernel(+)80259.356 euclid(-)11.177 global(+)11.846 | win%: 98/51/74
+scaler=standard, tau=0.050, reg=0.10 => ω=[0.103, 0.010, 0.021, 0.046, 0.262, 0.042, 0.016, 0.010, 0.024, 0.010, 0.011, 0.078, 0.010, 0.010, 0.114, 0.074], NLL: 11.198 vs kernel(+)80259.356 euclid(-)11.177 global(+)11.846 | win%: 98/52/74
+scaler=standard, tau=0.050, reg=1.00 => ω=[0.848, 0.010, 0.010, 0.612, 0.756, 0.011, 0.010, 0.010, 0.518, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.787], NLL: 11.698 vs kernel(+)80259.356 euclid(-)11.177 global(+)11.846 | win%: 98/42/68
+scaler=standard, tau=0.100, reg=0.00/softmax => ω=[0.056, 0.005, 0.166, 0.063, 0.036, 0.162, 0.094, 0.046, 0.046, 0.067, 0.041, 0.168, 0.013, 0.003, 0.020, 0.016], NLL: 11.168 vs kernel(+)11.643 euclid(+)11.177 global(+)11.846 | win%: 51/53/77
+scaler=standard, tau=0.100, reg=0.00 => ω=[0.010, 0.010, 0.252, 0.146, 0.098, 0.126, 0.010, 0.010, 0.071, 0.037, 0.029, 0.166, 0.010, 0.010, 0.057, 0.233], NLL: 11.220 vs kernel(+)50569.150 euclid(-)11.177 global(+)11.846 | win%: 94/52/75
+scaler=standard, tau=0.100, reg=0.01 => ω=[0.010, 0.010, 0.252, 0.164, 0.171, 0.121, 0.010, 0.010, 0.071, 0.037, 0.028, 0.169, 0.010, 0.010, 0.058, 0.188], NLL: 11.228 vs kernel(+)50569.150 euclid(-)11.177 global(+)11.846 | win%: 94/52/75
+scaler=standard, tau=0.100, reg=0.10 => ω=[0.552, 0.010, 0.074, 0.472, 0.618, 0.059, 0.025, 0.010, 0.042, 0.020, 0.015, 0.169, 0.011, 0.010, 0.240, 0.539], NLL: 11.298 vs kernel(+)50569.150 euclid(-)11.177 global(+)11.846 | win%: 94/51/73
+scaler=standard, tau=0.100, reg=1.00 => ω=[0.912, 0.010, 0.075, 0.853, 0.903, 0.052, 0.010, 0.010, 0.033, 0.011, 0.010, 0.250, 0.010, 0.010, 0.419, 0.867], NLL: 11.721 vs kernel(+)50569.150 euclid(-)11.177 global(+)11.846 | win%: 94/48/71
+scaler=standard, tau=0.250, reg=0.00/softmax => ω=[0.002, 0.000, 0.073, 0.061, 0.004, 0.192, 0.062, 0.102, 0.090, 0.055, 0.087, 0.114, 0.046, 0.001, 0.063, 0.051], NLL: 11.129 vs kernel(+)11.161 euclid(+)11.177 global(+)11.846 | win%: 54/44/76
+scaler=standard, tau=0.250, reg=0.00 => ω=[0.309, 0.010, 0.542, 0.284, 0.010, 0.399, 0.191, 0.115, 0.113, 0.171, 0.088, 0.463, 0.021, 0.010, 0.058, 0.010], NLL: 11.419 vs kernel(+)8330.792 euclid(-)11.177 global(+)11.846 | win%: 80/54/76
+scaler=standard, tau=0.250, reg=0.01 => ω=[0.345, 0.010, 0.561, 0.303, 0.010, 0.396, 0.184, 0.115, 0.113, 0.173, 0.085, 0.469, 0.018, 0.010, 0.060, 0.010], NLL: 11.424 vs kernel(+)8330.792 euclid(-)11.177 global(+)11.846 | win%: 80/54/75
+scaler=standard, tau=0.250, reg=0.10 => ω=[0.782, 0.010, 0.198, 0.701, 0.834, 0.207, 0.149, 0.010, 0.104, 0.065, 0.049, 0.454, 0.032, 0.010, 0.641, 0.798], NLL: 11.282 vs kernel(+)8330.792 euclid(-)11.177 global(+)11.846 | win%: 80/51/74
+scaler=standard, tau=0.250, reg=1.00 => ω=[0.911, 0.593, 0.176, 0.849, 0.868, 0.220, 0.473, 0.443, 0.034, 0.010, 0.034, 0.567, 0.034, 0.010, 0.407, 0.786], NLL: 11.542 vs kernel(+)8330.792 euclid(-)11.177 global(+)11.846 | win%: 81/51/72
+scaler=standard, tau=0.500, reg=0.00/softmax => ω=[0.028, 0.013, 0.025, 0.017, 0.060, 0.246, 0.106, 0.219, 0.085, 0.005, 0.047, 0.067, 0.005, 0.005, 0.021, 0.051], NLL: 11.371 vs kernel(-)11.231 euclid(-)11.177 global(+)11.846 | win%: 52/40/71
+scaler=standard, tau=0.500, reg=0.00 => ω=[0.661, 0.010, 0.928, 0.472, 0.018, 0.788, 0.486, 0.239, 0.232, 0.337, 0.164, 0.976, 0.051, 0.010, 0.122, 0.010], NLL: 11.342 vs kernel(+)407.453 euclid(-)11.177 global(+)11.846 | win%: 60/54/75
+scaler=standard, tau=0.500, reg=0.01 => ω=[0.555, 0.010, 0.899, 0.561, 0.251, 0.779, 0.470, 0.250, 0.227, 0.359, 0.159, 0.921, 0.039, 0.010, 0.123, 0.010], NLL: 11.348 vs kernel(+)407.453 euclid(-)11.177 global(+)11.846 | win%: 60/53/75
+scaler=standard, tau=0.500, reg=0.10 => ω=[0.936, 0.224, 0.663, 0.864, 0.954, 0.600, 0.294, 0.450, 0.148, 0.267, 0.159, 0.707, 0.010, 0.010, 0.319, 0.917], NLL: 11.189 vs kernel(+)407.453 euclid(-)11.177 global(+)11.846 | win%: 59/55/75
+scaler=standard, tau=0.500, reg=1.00 => ω=[0.912, 0.736, 0.673, 0.895, 0.876, 0.512, 0.665, 0.659, 0.082, 0.353, 0.722, 0.776, 0.015, 0.010, 0.357, 0.831], NLL: 12.121 vs kernel(+)407.453 euclid(-)11.177 global(-)11.846 | win%: 61/53/75
+scaler=standard, tau=1.000, reg=0.00/softmax => ω=[0.002, 0.004, 0.000, 0.001, 0.112, 0.268, 0.175, 0.365, 0.038, 0.000, 0.000, 0.000, 0.000, 0.000, 0.002, 0.031], NLL: 11.376 vs kernel(-)11.272 euclid(-)11.177 global(+)11.846 | win%: 46/36/69
+scaler=standard, tau=1.000, reg=0.00 => ω=[1.478, 0.010, 0.899, 0.550, 0.572, 1.655, 1.388, 0.444, 0.460, 0.702, 0.304, 1.852, 0.119, 0.010, 0.251, 0.010], NLL: 11.211 vs kernel(+)33.916 euclid(-)11.177 global(+)11.846 | win%: 43/53/75
+scaler=standard, tau=1.000, reg=0.01 => ω=[1.106, 0.024, 0.601, 1.006, 0.970, 1.527, 1.242, 0.620, 0.421, 0.703, 0.346, 1.408, 0.080, 0.010, 0.312, 0.478], NLL: 11.187 vs kernel(+)33.916 euclid(-)11.177 global(+)11.846 | win%: 43/53/76
+scaler=standard, tau=1.000, reg=0.10 => ω=[0.999, 0.834, 0.466, 0.996, 0.994, 1.106, 0.964, 0.835, 0.357, 0.680, 0.556, 1.037, 0.128, 0.010, 0.507, 0.918], NLL: 11.134 vs kernel(+)33.916 euclid(+)11.177 global(+)11.846 | win%: 43/54/77
+scaler=standard, tau=1.000, reg=1.00 => ω=[1.010, 0.879, 0.342, 0.969, 1.001, 0.759, 0.968, 0.799, 0.624, 0.696, 0.769, 0.838, 0.574, 0.191, 0.674, 0.983], NLL: 11.463 vs kernel(+)33.916 euclid(-)11.177 global(+)11.846 | win%: 40/53/74
+scaler=standard, tau=2.500, reg=0.00/softmax => ω=[0.000, 0.008, 0.000, 0.000, 0.000, 0.306, 0.208, 0.476, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000], NLL: 11.581 vs kernel(-)11.298 euclid(-)11.177 global(+)11.846 | win%: 43/36/64
+scaler=standard, tau=2.500, reg=0.00 => ω=[2.653, 0.010, 6.110, 3.401, 0.010, 4.135, 1.526, 1.304, 1.131, 1.721, 1.005, 4.345, 0.171, 0.010, 0.694, 0.010], NLL: 11.452 vs kernel(-)11.119 euclid(-)11.177 global(+)11.846 | win%: 60/53/76
+scaler=standard, tau=2.500, reg=0.01 => ω=[1.394, 0.794, 2.242, 1.560, 1.281, 2.783, 1.776, 1.249, 1.129, 1.679, 1.444, 2.432, 0.305, 0.010, 0.799, 1.141], NLL: 11.156 vs kernel(-)11.119 euclid(+)11.177 global(+)11.846 | win%: 61/53/77
+scaler=standard, tau=2.500, reg=0.10 => ω=[1.094, 1.058, 1.097, 1.097, 1.090, 1.435, 1.202, 1.070, 1.039, 1.091, 1.195, 1.363, 1.080, 0.653, 0.950, 1.075], NLL: 11.093 vs kernel(+)11.119 euclid(+)11.177 global(+)11.846 | win%: 64/49/75
+scaler=standard, tau=2.500, reg=1.00 => ω=[1.015, 1.012, 1.021, 1.016, 1.012, 1.057, 1.025, 1.015, 0.992, 1.013, 1.030, 1.053, 1.021, 0.952, 0.974, 1.010], NLL: 11.116 vs kernel(+)11.119 euclid(+)11.177 global(+)11.846 | win%: 67/47/74
+scaler=standard, tau=5.000, reg=0.00/softmax => ω=[0.000, 0.030, 0.000, 0.000, 0.000, 0.232, 0.045, 0.690, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000], NLL: 11.631 vs kernel(-)11.306 euclid(-)11.177 global(+)11.846 | win%: 43/35/65
+scaler=standard, tau=5.000, reg=0.00 => ω=[4.687, 0.010, 8.180, 5.689, 2.589, 8.061, 4.968, 2.606, 2.300, 3.635, 1.706, 8.275, 0.425, 0.010, 1.249, 0.010], NLL: 11.339 vs kernel(-)11.187 euclid(-)11.177 global(+)11.846 | win%: 68/53/75
+scaler=standard, tau=5.000, reg=0.01 => ω=[1.654, 1.635, 2.218, 1.749, 1.641, 3.297, 2.155, 1.881, 2.065, 2.028, 2.357, 2.827, 1.893, 0.696, 1.671, 1.638], NLL: 11.105 vs kernel(+)11.187 euclid(+)11.177 global(+)11.846 | win%: 70/48/75
+scaler=standard, tau=5.000, reg=0.10 => ω=[1.095, 1.135, 1.202, 1.102, 1.097, 1.392, 1.148, 1.186, 1.230, 1.167, 1.242, 1.301, 1.121, 1.064, 1.172, 1.100], NLL: 11.148 vs kernel(+)11.187 euclid(+)11.177 global(+)11.846 | win%: 65/40/73
+scaler=standard, tau=5.000, reg=1.00 => ω=[1.011, 1.015, 1.019, 1.011, 1.011, 1.045, 1.015, 1.021, 1.025, 1.014, 1.026, 1.029, 1.012, 1.009, 1.018, 1.011], NLL: 11.185 vs kernel(+)11.187 euclid(-)11.177 global(+)11.846 | win%: 72/38/73
+scaler=standard, tau=7.500, reg=0.00/softmax => ω=[0.000, 0.033, 0.000, 0.000, 0.000, 0.127, 0.021, 0.816, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000], NLL: 11.768 vs kernel(-)11.309 euclid(-)11.177 global(+)11.846 | win%: 42/35/64
+scaler=standard, tau=7.500, reg=0.00 => ω=[7.313, 0.010, 10.571, 8.958, 5.728, 11.005, 7.641, 4.447, 3.397, 5.718, 2.662, 10.664, 0.435, 0.010, 1.905, 1.718], NLL: 11.187 vs kernel(+)11.226 euclid(-)11.177 global(+)11.846 | win%: 70/53/76
+scaler=standard, tau=7.500, reg=0.01 => ω=[1.662, 1.845, 2.283, 1.750, 1.671, 3.157, 1.998, 2.115, 2.346, 2.118, 2.488, 2.801, 1.919, 1.348, 2.009, 1.702], NLL: 11.116 vs kernel(+)11.226 euclid(+)11.177 global(+)11.846 | win%: 67/44/75
+scaler=standard, tau=7.500, reg=0.10 => ω=[1.087, 1.154, 1.136, 1.082, 1.095, 1.326, 1.139, 1.197, 1.150, 1.101, 1.150, 1.159, 1.090, 1.076, 1.148, 1.095], NLL: 11.194 vs kernel(+)11.226 euclid(-)11.177 global(+)11.846 | win%: 67/35/71
+scaler=standard, tau=7.500, reg=1.00 => ω=[1.012, 1.017, 1.015, 1.011, 1.012, 1.035, 1.016, 1.021, 1.015, 1.011, 1.014, 1.015, 1.010, 1.008, 1.016, 1.012], NLL: 11.226 vs kernel(-)11.226 euclid(-)11.177 global(+)11.846 | win%: 74/33/71
+scaler=standard, tau=10.000, reg=0.00/softmax => ω=[0.000, 0.042, 0.000, 0.000, 0.000, 0.011, 0.017, 0.928, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000], NLL: 11.656 vs kernel(-)11.311 euclid(-)11.177 global(+)11.846 | win%: 43/35/63
+scaler=standard, tau=10.000, reg=0.00 => ω=[9.004, 1.364, 12.713, 10.641, 7.644, 13.036, 9.592, 5.979, 4.466, 8.055, 4.061, 12.750, 0.432, 0.010, 2.569, 4.826], NLL: 11.183 vs kernel(+)11.247 euclid(-)11.177 global(+)11.846 | win%: 71/54/76
+scaler=standard, tau=10.000, reg=0.01 => ω=[1.606, 1.905, 2.043, 1.612, 1.647, 2.919, 1.944, 2.098, 2.208, 1.857, 2.246, 2.402, 1.705, 1.472, 2.040, 1.655], NLL: 11.156 vs kernel(+)11.247 euclid(+)11.177 global(+)11.846 | win%: 64/39/73
+scaler=standard, tau=10.000, reg=0.10 => ω=[1.088, 1.159, 1.104, 1.087, 1.093, 1.262, 1.144, 1.197, 1.111, 1.066, 1.096, 1.104, 1.067, 1.064, 1.139, 1.093], NLL: 11.225 vs kernel(+)11.247 euclid(-)11.177 global(+)11.846 | win%: 67/33/71
+scaler=standard, tau=10.000, reg=1.00 => ω=[1.009, 1.020, 1.010, 1.008, 1.009, 1.029, 1.018, 1.023, 1.010, 1.006, 1.008, 1.008, 1.006, 1.006, 1.017, 1.009], NLL: 11.252 vs kernel(-)11.247 euclid(-)11.177 global(+)11.846 | win%: 73/32/71
+scaler=standard, tau=20.000, reg=0.00/softmax => ω=[0.000, 0.055, 0.000, 0.000, 0.000, 0.001, 0.011, 0.931, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000], NLL: 11.728 vs kernel(-)11.313 euclid(-)11.177 global(+)11.846 | win%: 38/32/60
+scaler=standard, tau=20.000, reg=0.00 => ω=[12.675, 7.648, 16.247, 13.607, 11.969, 17.172, 13.866, 8.556, 9.169, 13.748, 14.084, 19.326, 2.499, 0.010, 6.898, 10.866], NLL: 11.151 vs kernel(+)11.280 euclid(+)11.177 global(+)11.846 | win%: 71/53/76
+scaler=standard, tau=20.000, reg=0.01 => ω=[1.522, 1.985, 1.516, 1.483, 1.560, 2.293, 1.944, 2.102, 1.557, 1.293, 1.390, 1.407, 1.326, 1.313, 1.885, 1.558], NLL: 11.234 vs kernel(+)11.280 euclid(-)11.177 global(+)11.846 | win%: 59/34/69
+scaler=standard, tau=20.000, reg=0.10 => ω=[1.063, 1.147, 1.047, 1.052, 1.070, 1.190, 1.133, 1.171, 1.052, 1.024, 1.028, 1.025, 1.027, 1.026, 1.114, 1.070], NLL: 11.262 vs kernel(+)11.280 euclid(-)11.177 global(+)11.846 | win%: 66/31/70
+scaler=standard, tau=20.000, reg=1.00 => ω=[1.005, 1.017, 1.004, 1.005, 1.006, 1.018, 1.016, 1.018, 1.005, 1.002, 1.003, 1.002, 1.003, 1.002, 1.014, 1.006], NLL: 11.285 vs kernel(-)11.280 euclid(-)11.177 global(+)11.846 | win%: 71/29/69
+
+  Divergence filter: excluding 4 config(s) with val_nll > 23.7 (2x global baseline 11.8). Diverged taus: [0.01]
+
+Best configuration (selected on VALIDATION set):
+  scaler_type=standard, tau=2.5, omega_l2_reg=0.1, constraint=none
+  Learned omega: [1.09412837 1.05781996 1.09735167 1.0971874  1.089854   1.43523169
+ 1.20176136 1.07004786 1.0387423  1.09064162 1.19468999 1.36273515
+ 1.0800128  0.65305483 0.94970715 1.07496452]
+  Validation NLL:
+    Learned:       11.0928
+    Kernel(ω=1): 11.1193
+    Euclidean kNN: 11.1774
+    Global:        11.8461
+
+--- Final Evaluation on TEST set (unbiased) ---
+  Test NLL (unbiased):
+    Learned:       11.1882
+    Kernel(ω=1): 11.2025
+    Euclidean kNN: 11.3079
+    Global:        11.8960
+  Test Improvement (positive = learned is better):
+    vs Kernel(ω=1): 0.0143
+    vs Euclidean kNN: 0.1197
+    vs Global:        0.7077
+Saved sweep results: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/sweep_results.csv
+Saved best omega: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/best_omega.npy
+Saved best config summary: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/best_config_summary.json
+
+Generating visualizations...
+✓ Saved NLL vs tau plot to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/nll_vs_tau.png
+✓ Saved PDF to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/nll_vs_tau.pdf
+Saved: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/omega_bar_chart.png
+Saved: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/kernel_distance_projection_2d.png
+Visualizations complete!
+
+All outputs saved to: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals
+
+Done!

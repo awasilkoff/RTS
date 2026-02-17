@@ -804,11 +804,11 @@ def plot_nll_vs_tau(
     # Save
     output_path = artifact_dir / "nll_vs_tau.png"
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"✓ Saved NLL vs tau plot to {output_path}")
+    print(f"(ok) Saved NLL vs tau plot to {output_path}")
 
     output_path_pdf = artifact_dir / "nll_vs_tau.pdf"
     plt.savefig(output_path_pdf, dpi=300, bbox_inches="tight")
-    print(f"✓ Saved PDF to {output_path_pdf}")
+    print(f"(ok) Saved PDF to {output_path_pdf}")
 
     plt.close()
 

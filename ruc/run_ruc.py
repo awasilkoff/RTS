@@ -173,7 +173,7 @@ def run_ruc(
     wind_std_fraction: float = 0.15,
 ) -> Dict[str, Any]:
     """
-    Full LD-RUC pipeline: DAM → gating → CCG (Phase 1 + Phase 2).
+    Full LD-RUC pipeline: DAM -> gating -> CCG (Phase 1 + Phase 2).
 
     Returns dict with all results, models, and metadata.
     """

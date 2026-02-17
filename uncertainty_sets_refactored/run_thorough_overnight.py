@@ -9,10 +9,10 @@ Expanded grid for publication-quality results:
 - omega_constraint options (none, softmax, simplex, normalize)
 
 Grid size per feature set:
-  - With omega_constraint=none: 7 × 5 × 3 = 105 configs
-  - With omega_constraint=softmax/simplex/normalize: 7 × 1 × 3 = 21 configs
+  - With omega_constraint=none: 7 x 5 x 3 = 105 configs
+  - With omega_constraint=softmax/simplex/normalize: 7 x 1 x 3 = 21 configs
 
-Expected runtime: ~3-5 hours for default grid (2 feature sets × 105 configs)
+Expected runtime: ~3-5 hours for default grid (2 feature sets x 105 configs)
 
 Usage:
     # Run focused_2d and high_dim_8d (new feature sets)
@@ -167,10 +167,10 @@ def main():
     print(f"  Scaler types ({n_scalers}): {args.scaler_types}")
     print()
     print(
-        f"Grid size: {n_taus} taus × {n_scalers} scalers × {n_constraint_reg_combos} (constraint,reg) = {n_configs_per_fs} configs per feature set"
+        f"Grid size: {n_taus} taus x {n_scalers} scalers x {n_constraint_reg_combos} (constraint,reg) = {n_configs_per_fs} configs per feature set"
     )
     print(
-        f"Total configs: {len(feature_sets)} feature sets × {n_configs_per_fs} = {n_total_configs}"
+        f"Total configs: {len(feature_sets)} feature sets x {n_configs_per_fs} = {n_total_configs}"
     )
     print()
     print(f"Estimated runtime: {estimated_time}")

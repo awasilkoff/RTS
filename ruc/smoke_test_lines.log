@@ -1,0 +1,243 @@
+======================================================================
+STEP 1: DETERMINISTIC DAY-AHEAD UC
+======================================================================
+Building DAMData from RTS-GMLC...
+  Using SPP ensemble mean for wind Pmax: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/forecasts_filtered_rts4_constellation_v2.parquet
+  Done. Data shapes:
+    n_gens   = 154
+    n_buses  = 73
+    n_lines  = 120
+    n_periods= 6
+
+Building Gurobi DAM UC model...
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2739141
+Academic license 2739141 - for non-commercial use only - registered to wa___@bu.edu
+Warning for adding constraints: zero or small (< 1e-13) coefficients, ignored
+Set parameter OutputFlag to value 1
+  Model built. Starting optimization...
+Gurobi Optimizer version 13.0.0 build v13.0.0rc1 (mac64[x86] - Darwin 21.6.0 21H1320)
+
+CPU model: Intel(R) Core(TM) i5-6267U CPU @ 2.90GHz
+Thread count: 2 physical cores, 4 logical processors, using up to 4 threads
+
+Academic license 2739141 - for non-commercial use only - registered to wa___@bu.edu
+Optimize a model with 9542 rows, 6474 columns and 239872 nonzeros (Min)
+Model fingerprint: 0x897e5e63
+Model has 2178 linear objective coefficients
+Variable types: 3702 continuous, 2772 integer (2772 binary)
+Coefficient statistics:
+  Matrix range     [1e-06, 8e+02]
+  Objective range  [1e+01, 2e+04]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 4e+03]
+Found heuristic solution: objective 2.377711e+08
+Presolve removed 5713 rows and 4469 columns
+Presolve time: 2.38s
+Presolved: 3829 rows, 2005 columns, 22297 nonzeros
+Variable types: 1931 continuous, 74 integer (74 binary)
+
+Root relaxation: objective 1.296490e+05, 1564 iterations, 0.14 seconds (0.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 129649.032    0    2 2.3777e+08 129649.032   100%     -    2s
+H    0     0                    132803.27102 129649.032  2.38%     -    2s
+H    0     0                    129997.16745 129649.032  0.27%     -    2s
+     0     0 129932.827    0    3 129997.167 129932.827  0.05%     -    3s
+     0     0 129932.827    0    3 129997.167 129932.827  0.05%     -    3s
+     0     0 129932.827    0    3 129997.167 129932.827  0.05%     -    3s
+     0     0          -    0      129997.167 129986.548  0.01%     -    3s
+
+Cutting planes:
+  Learned: 1
+  Gomory: 2
+  MIR: 1
+
+Explored 1 nodes (1880 simplex iterations) in 3.25 seconds (0.46 work units)
+Thread count was 4 (of 4 available processors)
+
+Solution count 3: 129997 132803 2.37771e+08 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 1.299971674489e+05, best bound 1.299865476653e+05, gap 0.0082%
+
+=== DAM UC Summary ===
+Objective value: 129,997.17
+Number of generators: 154
+Number of buses:      73
+Number of lines:      120
+Number of periods:    6
+Total generation (MWh across horizon): 23,777.11
+Total load (MWh across horizon):       23,777.11
+Units committed at least once: 90
+
+Extracting DAM commitments...
+  Total DAM unit-hours: 540
+  Total DAM startups:   61
+
+======================================================================
+STEP 2: UNCERTAINTY SETS
+======================================================================
+
+Loading time-varying uncertainty from uncertainty_sets_refactored/data/uncertainty_sets_rts4/sigma_rho.npz...
+  Sigma shape: (6, 4, 4)
+  rho range: [0.609, 0.943]
+
+======================================================================
+STEP 3: NOTIFICATION TIMES & GATING SETS
+======================================================================
+
+Notification times (scale=1.00):
+  101_CT_1         L_SU =   2.0 h
+  101_CT_2         L_SU =   2.0 h
+  101_STEAM_3      L_SU =  16.0 h
+  101_STEAM_4      L_SU =  16.0 h
+  102_CT_1         L_SU =   2.0 h
+  102_CT_2         L_SU =   2.0 h
+  102_STEAM_3      L_SU =  16.0 h
+  102_STEAM_4      L_SU =  16.0 h
+  107_CC_1         L_SU =   8.0 h
+  113_CT_1         L_SU =   2.0 h
+  113_CT_2         L_SU =   2.0 h
+  113_CT_3         L_SU =   2.0 h
+  113_CT_4         L_SU =   2.0 h
+  115_STEAM_1      L_SU =  16.0 h
+  115_STEAM_2      L_SU =  16.0 h
+  115_STEAM_3      L_SU =  48.0 h
+  116_STEAM_1      L_SU =  48.0 h
+  118_CC_1         L_SU =   8.0 h
+  121_NUCLEAR_1    L_SU =  48.0 h
+  123_CT_1         L_SU =   2.0 h
+  123_CT_4         L_SU =   2.0 h
+  123_CT_5         L_SU =   2.0 h
+  123_STEAM_2      L_SU =  48.0 h
+  123_STEAM_3      L_SU =  48.0 h
+  201_CT_1         L_SU =   2.0 h
+  201_CT_2         L_SU =   2.0 h
+  201_STEAM_3      L_SU =  16.0 h
+  202_CT_1         L_SU =   2.0 h
+  202_CT_2         L_SU =   2.0 h
+  202_STEAM_3      L_SU =  16.0 h
+  202_STEAM_4      L_SU =  16.0 h
+  207_CT_1         L_SU =   2.0 h
+  207_CT_2         L_SU =   2.0 h
+  213_CC_3         L_SU =   8.0 h
+  213_CT_1         L_SU =   2.0 h
+  213_CT_2         L_SU =   2.0 h
+  215_CT_4         L_SU =   2.0 h
+  215_CT_5         L_SU =   2.0 h
+  216_STEAM_1      L_SU =  48.0 h
+  218_CC_1         L_SU =   8.0 h
+  221_CC_1         L_SU =   8.0 h
+  223_CT_4         L_SU =   2.0 h
+  223_CT_5         L_SU =   2.0 h
+  223_CT_6         L_SU =   2.0 h
+  223_STEAM_1      L_SU =  48.0 h
+  223_STEAM_2      L_SU =  48.0 h
+  223_STEAM_3      L_SU =  48.0 h
+  301_CT_1         L_SU =   2.0 h
+  301_CT_2         L_SU =   2.0 h
+  301_CT_3         L_SU =   2.0 h
+  301_CT_4         L_SU =   2.0 h
+  302_CT_1         L_SU =   2.0 h
+  302_CT_2         L_SU =   2.0 h
+  302_CT_3         L_SU =   2.0 h
+  302_CT_4         L_SU =   2.0 h
+  307_CT_1         L_SU =   2.0 h
+  307_CT_2         L_SU =   2.0 h
+  313_CC_1         L_SU =   8.0 h
+  315_CT_6         L_SU =   2.0 h
+  315_CT_7         L_SU =   2.0 h
+  315_CT_8         L_SU =   2.0 h
+  315_STEAM_1      L_SU =  16.0 h
+  315_STEAM_2      L_SU =  16.0 h
+  315_STEAM_3      L_SU =  16.0 h
+  315_STEAM_4      L_SU =  16.0 h
+  315_STEAM_5      L_SU =  16.0 h
+  316_STEAM_1      L_SU =  48.0 h
+  318_CC_1         L_SU =   8.0 h
+  321_CC_1         L_SU =   8.0 h
+  322_CT_5         L_SU =   2.0 h
+  322_CT_6         L_SU =   2.0 h
+  323_CC_1         L_SU =   8.0 h
+  323_CC_2         L_SU =   8.0 h
+
+Gating summary (t_next=25):
+  Total gated (i,t) pairs:   438
+  Thermal gated (i,t) pairs: 438 / 444 (98.6%)
+
+======================================================================
+STEP 4: LD-RUC CCG SOLVE
+======================================================================
+
+======================================================================
+LD-RUC CCG LOOP
+======================================================================
+
+--- CCG Iteration 1/3 ---
+  Phase 1: Building model (0 scenarios)...
+Warning for adding constraints: zero or small (< 1e-13) coefficients, ignored
+Set parameter OutputFlag to value 1
+Set parameter MIPGap to value 0.005
+  Phase 1: Solving...
+Gurobi Optimizer version 13.0.0 build v13.0.0rc1 (mac64[x86] - Darwin 21.6.0 21H1320)
+
+CPU model: Intel(R) Core(TM) i5-6267U CPU @ 2.90GHz
+Thread count: 2 physical cores, 4 logical processors, using up to 4 threads
+
+Non-default parameters:
+MIPGap  0.005
+
+Academic license 2739141 - for non-commercial use only - registered to wa___@bu.edu
+Optimize a model with 11390 rows, 7398 columns and 242644 nonzeros (Min)
+Model fingerprint: 0x7da4bdfb
+Model has 876 linear objective coefficients
+Variable types: 4626 continuous, 2772 integer (2772 binary)
+Coefficient statistics:
+  Matrix range     [1e-06, 8e+02]
+  Objective range  [5e+01, 2e+04]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 4e+03]
+Presolve removed 8064 rows and 5684 columns
+Presolve time: 1.19s
+Presolved: 3326 rows, 1714 columns, 20588 nonzeros
+Variable types: 1650 continuous, 64 integer (64 binary)
+
+Root relaxation: objective 1.966782e-11, 817 iterations, 0.11 seconds (0.02 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+*    0     0               0       0.0000000    0.00000  0.00%     -    1s
+
+Explored 1 nodes (817 simplex iterations) in 1.65 seconds (0.32 work units)
+Thread count was 4 (of 4 available processors)
+
+Solution count 1: 1.96678e-11 
+
+Optimal solution found (tolerance 5.00e-03)
+Best objective 0.000000000000e+00, best bound 0.000000000000e+00, gap 0.0000%
+  Phase 1 objective: 0.00 (solve time: 6.3s)
+  Incremental unit-hours: 0
+  Phase 2: Building SOCP...
+Traceback (most recent call last):
+  File "/Users/alexwasilkoff/PycharmProjects/RTS/ruc/run_ruc.py", line 562, in <module>
+    main()
+  File "/Users/alexwasilkoff/PycharmProjects/RTS/ruc/run_ruc.py", line 530, in main
+    outputs = run_ruc(
+              ^^^^^^^^
+  File "/Users/alexwasilkoff/PycharmProjects/RTS/ruc/run_ruc.py", line 295, in run_ruc
+    ccg_results = solve_ruc_ccg(
+                  ^^^^^^^^^^^^^^
+  File "/Users/alexwasilkoff/PycharmProjects/RTS/ruc/ruc_model.py", line 1127, in solve_ruc_ccg
+    p2_model, p2_vars = build_phase2_model(
+                        ^^^^^^^^^^^^^^^^^^^
+  File "/Users/alexwasilkoff/PycharmProjects/RTS/ruc/ruc_model.py", line 754, in build_phase2_model
+    Pmin[i] * u_it <= p0[i, t] - rho_t * z_gen[i, t],
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "src/gurobipy/tempconstr.pxi", line 64, in gurobipy._core.TempConstr.__bool__
+gurobipy._exception.GurobiError: Constraint has no bool value (are you trying "lb <= expr <= ub"?)
+Warning: environment still referenced so free is deferred (Continue to use WLS)

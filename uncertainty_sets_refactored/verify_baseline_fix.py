@@ -169,12 +169,12 @@ def verify_baseline_fix():
     print(f"Inverse variance (for comparison):  {omega_invvar.round(3)}")
     print(f"Learned omega:                      {omega_learned_raw.round(3)}")
     print(f"")
-    print(f"Baseline NLL (equal weights):       {nll_baseline:.3f}  ← Should be WORSE")
-    print(f"Inverse var NLL:                    {nll_invvar:.3f}  ← Better than baseline")
-    print(f"Learned NLL:                        {nll_learned:.3f}  ← Best")
+    print(f"Baseline NLL (equal weights):       {nll_baseline:.3f}  <- Should be WORSE")
+    print(f"Inverse var NLL:                    {nll_invvar:.3f}  <- Better than baseline")
+    print(f"Learned NLL:                        {nll_learned:.3f}  <- Best")
     print(f"")
-    print(f"Improvement vs baseline:            {nll_baseline - nll_learned:.3f}  ← Large!")
-    print(f"Improvement vs inverse var:         {nll_invvar - nll_learned:.3f}  ← Modest")
+    print(f"Improvement vs baseline:            {nll_baseline - nll_learned:.3f}  <- Large!")
+    print(f"Improvement vs inverse var:         {nll_invvar - nll_learned:.3f}  <- Modest")
 
     results["raw"] = {
         "omega_baseline": omega_baseline_raw.copy(),
@@ -197,38 +197,38 @@ def verify_baseline_fix():
     # Check 1: Baselines are equal weights
     checks_total += 1
     if np.allclose(results["standardized"]["omega_baseline"], np.ones(2)):
-        print("✓ Check 1: Standardized baseline is [1, 1]")
+        print("(ok) Check 1: Standardized baseline is [1, 1]")
         checks_passed += 1
     else:
-        print("✗ Check 1: Standardized baseline is NOT [1, 1]")
+        print("(x) Check 1: Standardized baseline is NOT [1, 1]")
 
     checks_total += 1
     if np.allclose(results["raw"]["omega_baseline"], np.ones(2)):
-        print("✓ Check 2: Raw baseline is [1, 1]")
+        print("(ok) Check 2: Raw baseline is [1, 1]")
         checks_passed += 1
     else:
-        print("✗ Check 2: Raw baseline is NOT [1, 1]")
+        print("(x) Check 2: Raw baseline is NOT [1, 1]")
 
     # Check 2: Learned omega for raw is similar to inverse variance
     checks_total += 1
     omega_learned_norm = results["raw"]["omega_learned"] / results["raw"]["omega_learned"].sum()
     omega_invvar_norm = results["raw"]["omega_invvar"] / results["raw"]["omega_invvar"].sum()
     if np.allclose(omega_learned_norm, omega_invvar_norm, rtol=0.5):
-        print(f"✓ Check 3: Learned omega for raw features is similar to inverse variance")
+        print(f"(ok) Check 3: Learned omega for raw features is similar to inverse variance")
         print(f"           Learned (normalized):  {omega_learned_norm.round(3)}")
         print(f"           InvVar (normalized):   {omega_invvar_norm.round(3)}")
         checks_passed += 1
     else:
-        print(f"✗ Check 3: Learned omega differs significantly from inverse variance")
+        print(f"(x) Check 3: Learned omega differs significantly from inverse variance")
 
     # Check 3: Raw improvement is larger than standardized
     checks_total += 1
     if results["raw"]["nll_improvement"] > results["standardized"]["nll_improvement"]:
-        print(f"✓ Check 4: Raw improvement ({results['raw']['nll_improvement']:.3f}) > "
+        print(f"(ok) Check 4: Raw improvement ({results['raw']['nll_improvement']:.3f}) > "
               f"Standardized ({results['standardized']['nll_improvement']:.3f})")
         checks_passed += 1
     else:
-        print(f"✗ Check 4: Raw improvement should be larger")
+        print(f"(x) Check 4: Raw improvement should be larger")
 
     print()
     print("=" * 80)
@@ -237,7 +237,7 @@ def verify_baseline_fix():
 
     if checks_passed == checks_total:
         print()
-        print("✓ All verification checks passed! Baseline fix is working correctly.")
+        print("(ok) All verification checks passed! Baseline fix is working correctly.")
         print()
         print("Key takeaway:")
         print("  - Baseline is consistently [1, 1, ...] for all feature sets")
@@ -246,7 +246,7 @@ def verify_baseline_fix():
         return True
     else:
         print()
-        print("✗ Some checks failed. Review the baseline comparison logic.")
+        print("(x) Some checks failed. Review the baseline comparison logic.")
         return False
 
 

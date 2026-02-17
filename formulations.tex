@@ -1,0 +1,338 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath, amssymb, mathtools}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+
+\newcommand{\bZ}{\mathbf{Z}}
+\newcommand{\br}{\mathbf{r}}
+\newcommand{\be}{\mathbf{e}}
+\newcommand{\bSigma}{\boldsymbol{\Sigma}}
+\newcommand{\bL}{\mathbf{L}}
+
+\title{ARUC and DARUC Formulations\\(as implemented in code)}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+%% ======================================================================
+\section{Sets and Indices}
+%% ======================================================================
+
+\begin{tabular}{ll}
+$i \in \mathcal{I}$        & Generators ($I$ total) \\
+$n \in \mathcal{N}$        & Buses ($N$ total) \\
+$\ell \in \mathcal{L}$     & Lines ($L$ total) \\
+$t \in \mathcal{T}$        & Time periods ($T$ total, $t = 0, \dots, T{-}1$) \\
+$b \in \mathcal{B}$        & Cost blocks ($B$ total) \\
+$k \in \mathcal{K}$        & Wind generators / uncertainty dimensions ($K$ total) \\
+$\mathcal{I}_n$            & Generators at bus $n$ \\
+$\mathcal{W} \subseteq \mathcal{I}$ & Wind generators \\
+$\mathcal{Z} \subseteq \mathcal{I}$ & Z-eligible generators (thermal + wind) \\
+\end{tabular}
+
+%% ======================================================================
+\section{Parameters}
+%% ======================================================================
+
+\begin{tabular}{ll}
+$C_i^{\text{NL}}$              & No-load cost \\
+$C_i^{\text{SU}}$              & Startup cost \\
+$C_i^{\text{SD}}$              & Shutdown cost \\
+$C_{i,b}^{\text{p}}$           & Block $b$ marginal cost for generator $i$ \\
+$\overline{P}_{i,b}$           & Block $b$ capacity for generator $i$ \\
+$P_i^{\min}$                   & Minimum output when committed \\
+$P_{i,t}^{\max}$               & Maximum output (time-varying for wind = forecast) \\
+$R_i^U, R_i^D$                 & Ramp-up / ramp-down limits \\
+$T_i^{\text{up}}, T_i^{\text{dn}}$ & Minimum up-time / down-time \\
+$d_{n,t}$                      & Load at bus $n$, period $t$ \\
+$D_t = \sum_n d_{n,t}$         & System load \\
+$H_{\ell,n}$                   & PTDF matrix entry \\
+$F_\ell^{\max}$                & Line flow limit \\
+$M^p$                          & Power balance slack penalty \\
+$u_i^0$                        & Initial commitment status \\
+$\bSigma_t \in \mathbb{R}^{K \times K}$ & Covariance matrix (time-varying) \\
+$\bL_t$                        & Cholesky factor: $\bSigma_t = \bL_t \bL_t^\top$ \\
+$\rho_t$                       & Ellipsoid radius (time-varying) \\
+$\rho_t^{\text{line}}$         & Line-flow ellipsoid radius ($= \gamma \cdot \rho_t$, where $\gamma$ = \texttt{rho\_lines\_frac}) \\
+\end{tabular}
+
+%% ======================================================================
+\section{DAM: Deterministic Day-Ahead UC}
+%% ======================================================================
+
+\paragraph{Variables.}
+$u_{i,t} \in \{0,1\}$ (commitment),
+$v_{i,t} \in \{0,1\}$ (startup),
+$w_{i,t} \in \{0,1\}$ (shutdown),
+$p_{i,t,b} \geq 0$ (block dispatch),
+$p_{i,t} \geq 0$ (total dispatch),
+$s_t^p \geq 0$ (power balance slack).
+
+\begin{subequations}\label{eq:dam}
+\begin{align}
+%% Objective
+\min \quad & \sum_{i,t} \Bigl[
+  C_i^{\text{NL}} u_{i,t}
++ C_i^{\text{SU}} v_{i,t}
++ C_i^{\text{SD}} w_{i,t}
++ \sum_b C_{i,b}^{\text{p}}\, p_{i,t,b}
+\Bigr]
++ \sum_t M^p s_t^p
+\label{eq:dam:obj} \\[6pt]
+%% Power balance
+\text{s.t.} \quad
+& \sum_i p_{i,t} + s_t^p = D_t
+  && \forall\, t
+  \label{eq:dam:bal} \\
+%% Block limits
+& p_{i,t,b} \leq \overline{P}_{i,b}\, u_{i,t}
+  && \forall\, i,t,b
+  \label{eq:dam:block} \\
+%% Block aggregation
+& p_{i,t} = \sum_b p_{i,t,b}
+  && \forall\, i,t
+  \label{eq:dam:agg} \\
+%% Pmin/Pmax
+& P_i^{\min}\, u_{i,t} \leq p_{i,t} \leq P_{i,t}^{\max}\, u_{i,t}
+  && \forall\, i,t
+  \label{eq:dam:bounds} \\
+%% Ramp up
+& p_{i,t} - p_{i,t-1} \leq R_i^U\, u_{i,t-1} + R_i^U\, v_{i,t}
+  && \forall\, i,\ t \geq 1
+  \label{eq:dam:rampup} \\
+%% Ramp down
+& p_{i,t-1} - p_{i,t} \leq R_i^D\, u_{i,t} + R_i^D\, w_{i,t}
+  && \forall\, i,\ t \geq 1
+  \label{eq:dam:rampdn} \\
+%% Commitment logic
+& u_{i,t} - u_{i,t-1} = v_{i,t} - w_{i,t}
+  && \forall\, i,t \quad (u_{i,-1} := u_i^0)
+  \label{eq:dam:logic} \\
+%% MUT
+& \sum_{\tau=t-T_i^{\text{up}}+1}^{t} v_{i,\tau} \leq u_{i,t}
+  && \forall\, i,\ t \geq T_i^{\text{up}}-1
+  \label{eq:dam:mut} \\
+%% MDT
+& \sum_{\tau=t-T_i^{\text{dn}}+1}^{t} w_{i,\tau} \leq 1 - u_{i,t}
+  && \forall\, i,\ t \geq T_i^{\text{dn}}-1
+  \label{eq:dam:mdt} \\
+%% Line flows
+& -F_\ell^{\max} \leq \sum_n H_{\ell,n} \Bigl(\sum_{i \in \mathcal{I}_n} p_{i,t} - d_{n,t}\Bigr) \leq F_\ell^{\max}
+  && \forall\, \ell, t
+  \label{eq:dam:lines}
+\end{align}
+\end{subequations}
+
+\paragraph{Implementation note.}
+Solar and hydro generators have $u_{i,t} = 1$ fixed (all costs zero, commitment is degenerate).
+
+%% ======================================================================
+\section{ARUC: Adaptive Robust UC with Linear Decision Rules}
+%% ======================================================================
+
+\paragraph{Decision rule.}
+Dispatch is affine in the uncertainty realization~$\br$:
+\begin{equation}\label{eq:ldr}
+  p_{i,t}(\br) = p_{i,t}^0 + \bZ_{i,t}^\top \br,
+\end{equation}
+where $p_{i,t}^0$ is the nominal dispatch and $\bZ_{i,t} \in \mathbb{R}^K$ encodes the linear response to~$\br$.
+
+\paragraph{Uncertainty set.}
+Time-varying ellipsoid:
+\begin{equation}\label{eq:uset}
+  \mathcal{U}_t = \bigl\{\br \in \mathbb{R}^K : \br^\top \bSigma_t^{-1}\, \br \leq \rho_t^2 \bigr\}.
+\end{equation}
+
+\paragraph{Variables.}
+Same commitment variables $(u, v, w)$ as DAM.
+Nominal dispatch: $p_{i,t}^0 \geq 0$, $p_{i,t,b}^0 \geq 0$.
+LDR coefficients: $Z_{i,t,k} \in \mathbb{R}$.
+Auxiliary SOC variables: $z_{i,t}^{\text{gen}} \geq 0$, $\mathbf{y}_{i,t}^{\text{gen}} \in \mathbb{R}^K$.
+
+\begin{subequations}\label{eq:aruc}
+\begin{align}
+%% Objective
+\min \quad & \sum_{i,t} \Bigl[
+  C_i^{\text{NL}} u_{i,t}
++ C_i^{\text{SU}} v_{i,t}
++ C_i^{\text{SD}} w_{i,t}
++ \sum_b C_{i,b}^{\text{p}}\, p_{i,t,b}^0
+\Bigr]
++ \sum_t M^p s_t^p
+\label{eq:aruc:obj}
+\end{align}
+subject to commitment constraints \eqref{eq:dam:logic}--\eqref{eq:dam:mdt} and:
+
+\paragraph{Nominal power balance and zero-net-response.}
+\begin{align}
+& \sum_i p_{i,t}^0 + s_t^p = D_t
+  && \forall\, t
+  \label{eq:aruc:bal} \\
+& \sum_i Z_{i,t,k} = 0
+  && \forall\, t,k
+  \label{eq:aruc:zbal}
+\end{align}
+Constraint~\eqref{eq:aruc:zbal} ensures power balance holds for all realizations: since $\sum_i p_{i,t}(\br) = \sum_i p_{i,t}^0 + (\sum_i \bZ_{i,t})^\top \br = D_t$ for all~$\br$.
+
+\paragraph{Nominal ramp constraints.}
+\begin{align}
+& p_{i,t}^0 - p_{i,t-1}^0 \leq R_i^U\, u_{i,t-1} + R_i^U\, v_{i,t}
+  && \forall\, i,\ t \geq 1
+  \label{eq:aruc:rampup} \\
+& p_{i,t-1}^0 - p_{i,t}^0 \leq R_i^D\, u_{i,t} + R_i^D\, w_{i,t}
+  && \forall\, i,\ t \geq 1
+  \label{eq:aruc:rampdn}
+\end{align}
+
+\paragraph{Robust generator constraints (thermal, $i \notin \mathcal{W}$, $i \in \mathcal{Z}$).}
+
+Define the auxiliary SOC variables:
+\begin{align}
+& \mathbf{y}_{i,t}^{\text{gen}} = \bL_t\, \bZ_{i,t}
+  \label{eq:aruc:ygendef} \\
+& z_{i,t}^{\text{gen}} \geq \bigl\|\mathbf{y}_{i,t}^{\text{gen}}\bigr\|_2
+  \label{eq:aruc:socgen}
+\end{align}
+Then the worst-case constraints become:
+\begin{align}
+%% Robust Pmax
+& p_{i,t}^0 + \rho_t\, z_{i,t}^{\text{gen}} \leq P_{i,t}^{\max}\, u_{i,t}
+  \label{eq:aruc:pmax} \\
+%% Robust Pmin
+& P_i^{\min}\, u_{i,t} \leq p_{i,t}^0 - \rho_t\, z_{i,t}^{\text{gen}}
+  \label{eq:aruc:pmin} \\
+%% Robust block aggregation
+& p_{i,t}^0 + \rho_t\, z_{i,t}^{\text{gen}} \leq \sum_b p_{i,t,b}^0
+  \label{eq:aruc:blockagg} \\
+%% Block capacity
+& p_{i,t,b}^0 \leq \overline{P}_{i,b}\, u_{i,t}
+  && \forall\, b
+  \label{eq:aruc:blockcap}
+\end{align}
+
+\paragraph{Wind generators ($i \in \mathcal{W}$).}
+Wind generators skip the generic robust $P^{\max}$/$P^{\min}$ constraints. Instead, dispatch is bounded by the realized wind availability $\bar{P}_{i,t} + r_{k(i)}$:
+\begin{align}
+& p_{i,t}^0 - \bar{P}_{i,t} + \rho_t \bigl\|\bL_t (\bZ_{i,t} - \be_{k(i)})\bigr\|_2 \leq 0
+  && \forall\, i \in \mathcal{W},\ t
+  \label{eq:aruc:windavail}
+\end{align}
+where $\be_{k(i)}$ is the unit vector for the $k$-th wind generator, and $\bar{P}_{i,t}$ is the wind forecast. Block constraints for wind are nominal only (not robustified).
+
+This is implemented via auxiliary variables $z_{k,t}^{\text{wind}}$, $\mathbf{y}_{k,t}^{\text{wind}}$:
+\begin{align}
+& \mathbf{y}_{k,t}^{\text{wind}} = \bL_t (\bZ_{i,t} - \be_k)
+  \label{eq:aruc:ywinddef} \\
+& z_{k,t}^{\text{wind}} \geq \bigl\|\mathbf{y}_{k,t}^{\text{wind}}\bigr\|_2
+  \label{eq:aruc:socwind} \\
+& p_{i,t}^0 - \bar{P}_{i,t} + \rho_t\, z_{k,t}^{\text{wind}} \leq 0
+  \label{eq:aruc:windmax}
+\end{align}
+
+\paragraph{Solar/Hydro ($i \notin \mathcal{Z}$).}
+These have $Z_{i,t,k} = 0$ for all $k$ (no uncertainty response). Constraints are nominal only.
+
+\paragraph{Robust line flow constraints.}
+
+Define the net flow sensitivity to $r_k$:
+\begin{equation}
+  a_{\ell,t,k} = \sum_n H_{\ell,n} \sum_{i \in \mathcal{I}_n} Z_{i,t,k}
+\end{equation}
+and auxiliary variables:
+\begin{align}
+& \mathbf{y}_{\ell,t}^{\text{line}} = \bL_t\, \mathbf{a}_{\ell,t}
+  \label{eq:aruc:ylinedef} \\
+& z_{\ell,t}^{\text{line}} \geq \bigl\|\mathbf{y}_{\ell,t}^{\text{line}}\bigr\|_2
+  \label{eq:aruc:socline}
+\end{align}
+Then:
+\begin{align}
+& f_{\ell,t}^{\text{nom}} + \rho_t^{\text{line}}\, z_{\ell,t}^{\text{line}} \leq F_\ell^{\max}
+  && \forall\, \ell, t
+  \label{eq:aruc:linemax} \\
+& -f_{\ell,t}^{\text{nom}} + \rho_t^{\text{line}}\, z_{\ell,t}^{\text{line}} \leq F_\ell^{\max}
+  && \forall\, \ell, t
+  \label{eq:aruc:linemin}
+\end{align}
+where $f_{\ell,t}^{\text{nom}} = \sum_n H_{\ell,n}(\sum_{i \in \mathcal{I}_n} p_{i,t}^0 - d_{n,t})$ and $\rho_t^{\text{line}} = \gamma \cdot \rho_t$ with $\gamma = $ \texttt{rho\_lines\_frac}.
+
+\end{subequations}
+
+%% ======================================================================
+\section{DARUC: Two-Step Day-Ahead Robust UC}
+%% ======================================================================
+
+\paragraph{Step 1 (Noon).} Solve the deterministic DAM~\eqref{eq:dam} to obtain $u^{\text{DAM}}_{i,t}$, $v^{\text{DAM}}_{i,t}$, $w^{\text{DAM}}_{i,t}$.
+
+\paragraph{Step 2 (5 PM).} Solve the ARUC~\eqref{eq:aruc} with additional monotonicity constraints:
+\begin{equation}\label{eq:daruc:floor}
+  u_{i,t} \geq u_{i,t}^{\text{DAM}} \qquad \forall\, i, t
+\end{equation}
+This means DARUC can only \emph{add} commitments on top of DAM---it cannot decommit any unit that DAM committed.
+
+\paragraph{Deviation tracking.}
+The code defines:
+\begin{align}
+  u'_{i,t} &= u_{i,t} - u^{\text{DAM}}_{i,t} \geq 0 \\
+  v'_{i,t} &= v_{i,t} - v^{\text{DAM}}_{i,t} \\
+  w'_{i,t} &= w_{i,t} - w^{\text{DAM}}_{i,t}
+\end{align}
+
+\paragraph{Incremental objective (\texttt{incremental\_obj=True}).}
+When enabled, the DARUC objective only charges commitment costs for \emph{additionally} committed units, with dispatch costs scaled down to break ties:
+\begin{equation}\label{eq:daruc:incrobj}
+\min \quad
+\sum_{\substack{i,t \\ u^{\text{DAM}}_{i,t} = 0}} \Bigl[
+  C_i^{\text{NL}} u_{i,t}
++ C_i^{\text{SU}} v_{i,t}
++ C_i^{\text{SD}} w_{i,t}
+\Bigr]
++ \epsilon \sum_{i,t,b} C_{i,b}^{\text{p}}\, p_{i,t,b}^0
++ \sum_t M^p s_t^p
+\end{equation}
+where $\epsilon = $ \texttt{dispatch\_cost\_scale} (default 0.1). This focuses the optimizer on which additional units to commit for reliability, without re-optimizing dispatch economics.
+
+%% ======================================================================
+\section{Robust Counterpart Derivation}
+%% ======================================================================
+
+The robust constraints arise from requiring feasibility for all $\br \in \mathcal{U}_t$. For a generic linear constraint of the form:
+\[
+  \mathbf{a}^\top \br \leq c \quad \forall\, \br^\top \bSigma_t^{-1} \br \leq \rho_t^2
+\]
+the robust counterpart is:
+\[
+  \rho_t \|\bL_t \mathbf{a}\|_2 \leq c
+\]
+which is a second-order cone (SOC) constraint. In the Gurobi implementation, this is represented via auxiliary variables $\mathbf{y} = \bL_t \mathbf{a}$ and $z \geq \|\mathbf{y}\|_2$, yielding the linear constraint $\rho_t z \leq c$ with an SOC constraint $z^2 \geq \sum_k y_k^2$.
+
+%% ======================================================================
+\section{Code-to-Formulation Mapping}
+%% ======================================================================
+
+\begin{tabular}{lll}
+\toprule
+\textbf{Code variable} & \textbf{Math symbol} & \textbf{File:line} \\
+\midrule
+\texttt{u[i,t]}        & $u_{i,t}$            & \texttt{aruc\_model.py:241} \\
+\texttt{v[i,t]}        & $v_{i,t}$            & \texttt{aruc\_model.py:242} \\
+\texttt{w[i,t]}        & $w_{i,t}$            & \texttt{aruc\_model.py:243} \\
+\texttt{p0[i,t]}       & $p_{i,t}^0$          & \texttt{aruc\_model.py:246} \\
+\texttt{p0\_block[i,t,b]} & $p_{i,t,b}^0$     & \texttt{aruc\_model.py:249} \\
+\texttt{Z[i,t,k]}      & $Z_{i,t,k}$          & \texttt{aruc\_model.py:271} \\
+\texttt{s\_p[t]}        & $s_t^p$              & \texttt{aruc\_model.py:252} \\
+\texttt{z\_gen[i,t]}    & $z_{i,t}^{\text{gen}}$ & \texttt{aruc\_model.py:317} \\
+\texttt{y\_gen[i,t,k]}  & $y_{i,t,k}^{\text{gen}}$ & \texttt{aruc\_model.py:318} \\
+\texttt{z\_wind[k,t]}   & $z_{k,t}^{\text{wind}}$ & \texttt{aruc\_model.py:589} \\
+\texttt{y\_wind[k,t,j]} & $y_{k,t,j}^{\text{wind}}$ & \texttt{aruc\_model.py:591} \\
+\texttt{z\_line[l,t]}   & $z_{\ell,t}^{\text{line}}$ & \texttt{aruc\_model.py:530} \\
+\texttt{y\_line[l,t,k]} & $y_{\ell,t,k}^{\text{line}}$ & \texttt{aruc\_model.py:531} \\
+\texttt{u\_prime[i,t]}  & $u'_{i,t}$           & \texttt{aruc\_model.py:488} \\
+\texttt{sqrt\_Sigma}    & $\bL_t$              & \texttt{aruc\_model.py:204--206} \\
+\texttt{rho\_lines}     & $\rho_t^{\text{line}}$ & \texttt{aruc\_model.py:198} \\
+\bottomrule
+\end{tabular}
+
+\end{document}

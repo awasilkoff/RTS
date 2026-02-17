@@ -13,21 +13,21 @@ def test_temporal_split_bug():
 
     # OLD LOGIC (temporal split)
     sample_idx_eval = n_train // 4  # 553 (middle of eval set)
-    target_idx_old = n_train + sample_idx_eval  # 2214 + 553 = 2767 ✓ Valid
+    target_idx_old = n_train + sample_idx_eval  # 2214 + 553 = 2767 (ok) Valid
 
     # But with n=2952:
     sample_idx_eval_end = (n - n_train) // 2  # 369 (middle of 738 eval samples)
-    target_idx_end = n_train + sample_idx_eval_end  # 2214 + 369 = 2583 ✓ Valid
+    target_idx_end = n_train + sample_idx_eval_end  # 2214 + 369 = 2583 (ok) Valid
 
     # Edge case that caused the bug:
     sample_idx_edge = (n - n_train)  # 738 (beyond eval set!)
-    target_idx_edge = n_train + sample_idx_edge  # 2214 + 738 = 2952 ✗ OUT OF BOUNDS!
+    target_idx_edge = n_train + sample_idx_edge  # 2214 + 738 = 2952 (x) OUT OF BOUNDS!
 
     print("Temporal split (old logic):")
     print(f"  n={n}, n_train={n_train}, n_eval={n - n_train}")
     print(f"  Valid indices: 0-{n-1}")
-    print(f"  Middle of eval: sample_idx={sample_idx_eval_end}, target_idx={target_idx_end} ✓")
-    print(f"  Edge case: sample_idx={sample_idx_edge}, target_idx={target_idx_edge} ✗ OUT OF BOUNDS")
+    print(f"  Middle of eval: sample_idx={sample_idx_eval_end}, target_idx={target_idx_end} (ok)")
+    print(f"  Edge case: sample_idx={sample_idx_edge}, target_idx={target_idx_edge} (x) OUT OF BOUNDS")
     print()
 
 
@@ -63,7 +63,7 @@ def test_random_split_fix():
     # Verify all eval indices are valid
     assert eval_idx.max() < n, f"Max eval index {eval_idx.max()} >= {n}"
     assert eval_idx.min() >= 0, f"Min eval index {eval_idx.min()} < 0"
-    print(f"  ✓ All {len(eval_idx)} eval indices are valid (0-{n-1})")
+    print(f"  (ok) All {len(eval_idx)} eval indices are valid (0-{n-1})")
     print()
 
 
@@ -76,7 +76,7 @@ def test_simple_fix():
 
     print("Simplest fix (for visualization):")
     print(f"  n={n}")
-    print(f"  sample_idx = n // 2 = {sample_idx_simple} ✓ Always valid")
+    print(f"  sample_idx = n // 2 = {sample_idx_simple} (ok) Always valid")
     print(f"  No need to track eval_idx if just picking a sample for viz")
     print()
 
@@ -96,12 +96,12 @@ if __name__ == "__main__":
     print("=" * 70)
     print()
     print("With temporal split:")
-    print("  target_idx = n_train + sample_idx_in_eval  ✓ Works")
+    print("  target_idx = n_train + sample_idx_in_eval  (ok) Works")
     print()
     print("With random split:")
-    print("  target_idx = n_train + sample_idx_in_eval  ✗ WRONG")
-    print("  target_idx = eval_idx[sample_idx_in_eval]  ✓ Correct")
+    print("  target_idx = n_train + sample_idx_in_eval  (x) WRONG")
+    print("  target_idx = eval_idx[sample_idx_in_eval]  (ok) Correct")
     print()
     print("For visualization only:")
-    print("  sample_idx = len(X) // 2  ✓ Simplest (no eval_idx needed)")
+    print("  sample_idx = len(X) // 2  (ok) Simplest (no eval_idx needed)")
     print()

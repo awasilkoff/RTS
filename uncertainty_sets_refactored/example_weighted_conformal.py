@@ -138,7 +138,7 @@ def run_simple_example():
     print("  - Provides valid coverage guarantee under weighted exchangeability\n")
 
     print("="*70)
-    print("✓ Example complete!")
+    print("(ok) Example complete!")
     print("="*70 + "\n")
 
     return bundle, metrics, df_test
@@ -205,7 +205,7 @@ def run_rts_example():
     print(f"q_hat:    mean={metrics['q_hat_mean']:.3f}, std={metrics['q_hat_std']:.3f}")
 
     print("\n" + "="*70)
-    print("✓ RTS example complete!")
+    print("(ok) RTS example complete!")
     print("="*70 + "\n")
 
     return bundle, metrics, df_test

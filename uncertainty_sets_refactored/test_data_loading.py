@@ -47,15 +47,15 @@ def main():
 
     try:
         actuals = pd.read_parquet(actuals_path)
-        print(f"\n✓ Actuals loaded: {len(actuals)} rows, {len(actuals.columns)} columns")
+        print(f"\n(ok) Actuals loaded: {len(actuals)} rows, {len(actuals.columns)} columns")
         print(f"  Columns: {actuals.columns.tolist()[:5]}...")
 
         forecasts = pd.read_parquet(forecasts_path)
-        print(f"\n✓ Forecasts loaded: {len(forecasts)} rows, {len(forecasts.columns)} columns")
+        print(f"\n(ok) Forecasts loaded: {len(forecasts)} rows, {len(forecasts.columns)} columns")
         print(f"  Columns: {forecasts.columns.tolist()[:5]}...")
 
         df_tot = build_conformal_totals_df(actuals, forecasts)
-        print(f"\n✓ Conformal totals built: {len(df_tot)} time points")
+        print(f"\n(ok) Conformal totals built: {len(df_tot)} time points")
         print(f"  Columns: {df_tot.columns.tolist()}")
         print(f"\n  Sample data (first 3 rows):")
         print(df_tot[["y", "ens_mean", "ens_std"]].head(3).to_string())
@@ -64,7 +64,7 @@ def main():
         required_cols = ["y", "ens_mean", "ens_std", "TIME_HOURLY"]
         missing = [c for c in required_cols if c not in df_tot.columns]
         if missing:
-            print(f"\n✗ ERROR: Missing required columns: {missing}")
+            print(f"\n(x) ERROR: Missing required columns: {missing}")
             return 1
 
         print("\n" + "="*70)
@@ -75,7 +75,7 @@ def main():
         return 0
 
     except Exception as e:
-        print(f"\n✗ ERROR loading data: {e}")
+        print(f"\n(x) ERROR loading data: {e}")
         import traceback
         traceback.print_exc()
         return 1

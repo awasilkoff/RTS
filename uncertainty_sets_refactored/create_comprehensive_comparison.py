@@ -148,7 +148,7 @@ def create_nll_boxplot(nll_dict, save_path=None, outlier_percentile=99):
             label_text = f'μ={mean_val:.2f}'
         else:
             label_y = y_max - 0.05 * (y_max - y_min)
-            label_text = f'μ={mean_val:.1f}↑' if mean_val > y_max else f'μ={mean_val:.1f}↓'
+            label_text = f'μ={mean_val:.1f}^' if mean_val > y_max else f'μ={mean_val:.1f}v'
 
         ax.text(i+1, label_y, label_text,
                 ha='center', va='bottom', fontsize=9, fontweight='bold')

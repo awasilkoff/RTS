@@ -133,7 +133,7 @@ def main():
             figsize=(16, 7),
         )
 
-        print(f"  ✓ {i+1}/{len(target_indices)}: {filename}")
+        print(f"  (ok) {i+1}/{len(target_indices)}: {filename}")
 
     print()
     print("=" * 80)
@@ -172,7 +172,7 @@ def main():
             f.write(f"- **File:** `{filename}`\n\n")
             f.write(f"![{desc}]({filename})\n\n")
 
-    print(f"✓ Created index: {index_path}")
+    print(f"(ok) Created index: {index_path}")
     print()
 
 

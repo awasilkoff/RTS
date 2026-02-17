@@ -748,7 +748,7 @@ def fig4_nll_vs_tau(
         nll_min = stats["val_nll_min"].values
         nll_max = stats["val_nll_max"].values
 
-        # Filter diverged taus (very small tau → near-singular covariance)
+        # Filter diverged taus (very small tau -> near-singular covariance)
         tau_values, nll_mean, nll_std, nll_min, nll_max = _filter_diverged_taus(
             tau_values, nll_mean, nll_std, nll_min, nll_max, nll_std=nll_std
         )

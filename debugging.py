@@ -30,10 +30,10 @@ def debug_step_1_check_deterministic(data: DAMData) -> bool:
     model.optimize()
 
     if model.Status == GRB.OPTIMAL:
-        print(f"✓ Deterministic DAM is FEASIBLE (obj = {model.ObjVal:,.2f})")
+        print(f"(ok) Deterministic DAM is FEASIBLE (obj = {model.ObjVal:,.2f})")
         return True
     else:
-        print(f"✗ Deterministic DAM is INFEASIBLE (status = {model.Status})")
+        print(f"(x) Deterministic DAM is INFEASIBLE (status = {model.Status})")
         print("   Problem is in the base data, not the robust formulation!")
         return False
 
@@ -64,12 +64,12 @@ def debug_step_2_relax_robust_constraints(
         model.optimize()
 
         if model.Status == GRB.OPTIMAL:
-            print(f"  ✓ FEASIBLE with rho={test_rho:.2f} (obj = {model.ObjVal:,.2f})")
+            print(f"  (ok) FEASIBLE with rho={test_rho:.2f} (obj = {model.ObjVal:,.2f})")
         else:
-            print(f"  ✗ INFEASIBLE with rho={test_rho:.2f}")
+            print(f"  (x) INFEASIBLE with rho={test_rho:.2f}")
             if test_rho == 0.0:
                 print(
-                    "    → Even rho=0 is infeasible! Issue is in nominal constraints."
+                    "    -> Even rho=0 is infeasible! Issue is in nominal constraints."
                 )
             break
 
@@ -201,9 +201,9 @@ def debug_step_5_disable_constraint_groups(
         model.optimize()
 
         if model.Status == GRB.OPTIMAL:
-            print(f"  ✓ FEASIBLE (obj = {model.ObjVal:,.2f})")
+            print(f"  (ok) FEASIBLE (obj = {model.ObjVal:,.2f})")
         else:
-            print(f"  ✗ INFEASIBLE")
+            print(f"  (x) INFEASIBLE")
 
 
 def debug_step_6_check_z_bounds(data: DAMData, Sigma: np.ndarray, rho: float) -> None:
@@ -219,7 +219,7 @@ def debug_step_6_check_z_bounds(data: DAMData, Sigma: np.ndarray, rho: float) ->
     n_wind = len(wind_idx)
 
     print(
-        f"\nZ variables dimensions: {data.n_gens} gens × {data.n_periods} periods × {n_wind} uncertainty dims"
+        f"\nZ variables dimensions: {data.n_gens} gens x {data.n_periods} periods x {n_wind} uncertainty dims"
     )
     print(f"Total Z variables: {data.n_gens * data.n_periods * n_wind}")
 

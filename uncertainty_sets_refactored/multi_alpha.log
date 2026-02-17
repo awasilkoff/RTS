@@ -1,0 +1,142 @@
+2026-02-15 14:51:06,585 - INFO - Loading data...
+2026-02-15 14:51:07,053 - INFO - Actuals shape: (14684, 4), Forecasts shape: (602208, 5)
+2026-02-15 14:51:07,054 - INFO - Building X/Y matrices for covariance (feature_set=high_dim_16d)...
+2026-02-15 14:51:08,379 - INFO - build_features_system_total_mean_std: built features with shape=(2952, 2)
+2026-02-15 14:51:09,983 - INFO - build_features_per_unit_mean_std: built features with shape=(2952, 8)
+2026-02-15 14:51:10,048 - INFO - build_Y_actuals_matrix: built Y with shape=(3671, 4)
+2026-02-15 14:51:10,057 - INFO - build_XY_high_dim_16d: dropping 3 rows due to NaNs
+2026-02-15 14:51:10,059 - INFO - Covariance data: X=(2949, 18), Y=(2949, 4), T=2949
+2026-02-15 14:51:10,061 - INFO - Split: train=2211, eval=738 samples
+2026-02-15 14:51:10,061 - INFO - Training omega with constraint=softmax...
+2026-02-15 14:51:35,372 - INFO - Iter 10: loss=700.154907, grad_norm=1.000e+01
+2026-02-15 14:51:35,476 - INFO - omega: min=5.488e-02, max=5.599e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:51:35,477 - INFO - kernel: phi_max_mean=0.408, eff_k_mean=8.1 (neighbors >5% of max weight)
+2026-02-15 14:51:54,717 - INFO - Iter 20: loss=682.821777, grad_norm=1.000e+01
+2026-02-15 14:51:54,770 - INFO - omega: min=5.419e-02, max=5.645e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:51:54,772 - INFO - kernel: phi_max_mean=0.408, eff_k_mean=8.1 (neighbors >5% of max weight)
+2026-02-15 14:52:05,358 - INFO - Iter 30: loss=666.162048, grad_norm=1.000e+01
+2026-02-15 14:52:05,420 - INFO - omega: min=5.351e-02, max=5.694e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:52:05,421 - INFO - kernel: phi_max_mean=0.407, eff_k_mean=8.2 (neighbors >5% of max weight)
+2026-02-15 14:52:16,969 - INFO - Iter 40: loss=649.428711, grad_norm=1.000e+01
+2026-02-15 14:52:17,022 - INFO - omega: min=5.280e-02, max=5.746e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:52:17,022 - INFO - kernel: phi_max_mean=0.406, eff_k_mean=8.2 (neighbors >5% of max weight)
+2026-02-15 14:52:26,437 - INFO - Iter 50: loss=632.019714, grad_norm=1.000e+01
+2026-02-15 14:52:26,524 - INFO - omega: min=5.206e-02, max=5.799e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:52:26,524 - INFO - kernel: phi_max_mean=0.405, eff_k_mean=8.2 (neighbors >5% of max weight)
+2026-02-15 14:52:34,326 - INFO - Iter 60: loss=613.268066, grad_norm=1.000e+01
+2026-02-15 14:52:34,366 - INFO - omega: min=5.128e-02, max=5.852e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:52:34,366 - INFO - kernel: phi_max_mean=0.405, eff_k_mean=8.3 (neighbors >5% of max weight)
+2026-02-15 14:52:41,960 - INFO - Iter 70: loss=592.382019, grad_norm=1.000e+01
+2026-02-15 14:52:41,994 - INFO - omega: min=5.048e-02, max=5.904e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:52:41,994 - INFO - kernel: phi_max_mean=0.404, eff_k_mean=8.3 (neighbors >5% of max weight)
+2026-02-15 14:52:49,246 - INFO - Iter 80: loss=568.705933, grad_norm=1.000e+01
+2026-02-15 14:52:49,282 - INFO - omega: min=4.967e-02, max=5.956e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:52:49,282 - INFO - kernel: phi_max_mean=0.403, eff_k_mean=8.3 (neighbors >5% of max weight)
+2026-02-15 14:52:56,104 - INFO - Iter 90: loss=541.832947, grad_norm=1.000e+01
+2026-02-15 14:52:56,139 - INFO - omega: min=4.886e-02, max=6.006e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:52:56,139 - INFO - kernel: phi_max_mean=0.402, eff_k_mean=8.3 (neighbors >5% of max weight)
+2026-02-15 14:53:02,679 - INFO - Iter 100: loss=511.594086, grad_norm=1.000e+01
+2026-02-15 14:53:02,714 - INFO - omega: min=4.806e-02, max=6.055e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:53:02,714 - INFO - kernel: phi_max_mean=0.401, eff_k_mean=8.4 (neighbors >5% of max weight)
+2026-02-15 14:53:09,142 - INFO - Iter 110: loss=478.379517, grad_norm=1.000e+01
+2026-02-15 14:53:09,181 - INFO - omega: min=4.727e-02, max=6.104e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:53:09,181 - INFO - kernel: phi_max_mean=0.401, eff_k_mean=8.4 (neighbors >5% of max weight)
+2026-02-15 14:53:15,939 - INFO - Iter 120: loss=442.887634, grad_norm=1.000e+01
+2026-02-15 14:53:15,977 - INFO - omega: min=4.651e-02, max=6.152e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:53:15,977 - INFO - kernel: phi_max_mean=0.400, eff_k_mean=8.4 (neighbors >5% of max weight)
+2026-02-15 14:53:22,672 - INFO - Iter 130: loss=406.135040, grad_norm=1.000e+01
+2026-02-15 14:53:22,719 - INFO - omega: min=4.576e-02, max=6.200e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:53:22,719 - INFO - kernel: phi_max_mean=0.399, eff_k_mean=8.5 (neighbors >5% of max weight)
+2026-02-15 14:53:29,408 - INFO - Iter 140: loss=369.397797, grad_norm=1.000e+01
+2026-02-15 14:53:29,442 - INFO - omega: min=4.504e-02, max=6.248e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:53:29,442 - INFO - kernel: phi_max_mean=0.398, eff_k_mean=8.5 (neighbors >5% of max weight)
+2026-02-15 14:53:36,667 - INFO - Iter 150: loss=333.809753, grad_norm=1.000e+01
+2026-02-15 14:53:36,701 - INFO - omega: min=4.433e-02, max=6.296e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:53:36,701 - INFO - kernel: phi_max_mean=0.398, eff_k_mean=8.5 (neighbors >5% of max weight)
+2026-02-15 14:53:43,215 - INFO - Iter 160: loss=300.453888, grad_norm=1.000e+01
+2026-02-15 14:53:43,248 - INFO - omega: min=4.365e-02, max=6.344e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:53:43,249 - INFO - kernel: phi_max_mean=0.397, eff_k_mean=8.6 (neighbors >5% of max weight)
+2026-02-15 14:53:49,763 - INFO - Iter 170: loss=270.010834, grad_norm=1.000e+01
+2026-02-15 14:53:49,795 - INFO - omega: min=4.299e-02, max=6.393e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:53:49,796 - INFO - kernel: phi_max_mean=0.396, eff_k_mean=8.6 (neighbors >5% of max weight)
+2026-02-15 14:53:56,469 - INFO - Iter 180: loss=242.884079, grad_norm=1.000e+01
+2026-02-15 14:53:56,509 - INFO - omega: min=4.234e-02, max=6.443e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:53:56,509 - INFO - kernel: phi_max_mean=0.395, eff_k_mean=8.6 (neighbors >5% of max weight)
+2026-02-15 14:54:04,122 - INFO - Iter 190: loss=219.160248, grad_norm=1.000e+01
+2026-02-15 14:54:04,164 - INFO - omega: min=4.172e-02, max=6.493e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:54:04,164 - INFO - kernel: phi_max_mean=0.394, eff_k_mean=8.7 (neighbors >5% of max weight)
+2026-02-15 14:54:14,598 - INFO - Iter 200: loss=198.686005, grad_norm=1.000e+01
+2026-02-15 14:54:14,647 - INFO - omega: min=4.112e-02, max=6.545e-02, mean=5.556e-02, sum=1.000, nnz=18/18
+2026-02-15 14:54:14,647 - INFO - kernel: phi_max_mean=0.393, eff_k_mean=8.7 (neighbors >5% of max weight)
+2026-02-15 14:54:14,869 - INFO - Learned omega: [0.06486617 0.04623807 0.06178284 0.06495894 0.06545319 0.06536514
+ 0.04111604 0.04328764 0.06200481 0.04206523 0.06422662 0.04163072
+ 0.04771814 0.05833444 0.05887239 0.04496675 0.06540217 0.06171061] (sum=1.0000)
+2026-02-15 14:54:14,981 - INFO - Computing conditional moments for all timestamps...
+2026-02-15 14:54:15,493 - INFO - Moments computed: mu=(2949, 4), sigma=(2949, 4, 4)
+2026-02-15 14:54:15,495 - INFO - Building conformal totals dataframe...
+2026-02-15 14:54:17,337 - INFO - Training conformal model for alpha=0.900...
+2026-02-15 14:54:17,337 - INFO -   Features: ['ens_mean', 'ens_std', 'ens_min', 'ens_max', 'n_models', 'hour', 'dow', 'forecast_range', 'forecast_range_normalized', 'forecast_cv', 'y_lag24', 'forecast_error_lag24']
+2026-02-15 14:54:35,879 - INFO - Conformal trained (alpha=0.900): coverage=87.52%, rmse=449.5935
+2026-02-15 14:54:36,033 - INFO - Computing rho (ellipsoid radii) for alpha=0.900...
+2026-02-15 14:54:36,243 - INFO - Generated uncertainty sets for 2949 hours (alpha=0.900).
+2026-02-15 14:54:36,269 - INFO - Saving to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha0.90.npz
+2026-02-15 14:54:36,516 - INFO - Saved metadata to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/metadata.json
+2026-02-15 14:54:36,516 - INFO - Success: generated 2949 hours of uncertainty sets (alpha=0.900).
+2026-02-15 14:54:36,567 - INFO - Training conformal model for alpha=0.950...
+2026-02-15 14:54:36,567 - INFO -   Features: ['ens_mean', 'ens_std', 'ens_min', 'ens_max', 'n_models', 'hour', 'dow', 'forecast_range', 'forecast_range_normalized', 'forecast_cv', 'y_lag24', 'forecast_error_lag24']
+2026-02-15 14:54:38,234 - INFO - Conformal trained (alpha=0.950): coverage=94.76%, rmse=520.6976
+2026-02-15 14:54:38,382 - INFO - Computing rho (ellipsoid radii) for alpha=0.950...
+2026-02-15 14:54:38,536 - INFO - Generated uncertainty sets for 2949 hours (alpha=0.950).
+2026-02-15 14:54:38,546 - INFO - Saving to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha0.95.npz
+2026-02-15 14:54:38,563 - INFO - Saved metadata to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/metadata.json
+2026-02-15 14:54:38,563 - INFO - Success: generated 2949 hours of uncertainty sets (alpha=0.950).
+2026-02-15 14:54:38,587 - INFO - Training conformal model for alpha=0.990...
+2026-02-15 14:54:38,587 - INFO -   Features: ['ens_mean', 'ens_std', 'ens_min', 'ens_max', 'n_models', 'hour', 'dow', 'forecast_range', 'forecast_range_normalized', 'forecast_cv', 'y_lag24', 'forecast_error_lag24']
+2026-02-15 14:54:43,455 - INFO - Conformal trained (alpha=0.990): coverage=98.55%, rmse=760.2398
+2026-02-15 14:54:43,586 - INFO - Computing rho (ellipsoid radii) for alpha=0.990...
+2026-02-15 14:54:43,753 - INFO - Generated uncertainty sets for 2949 hours (alpha=0.990).
+2026-02-15 14:54:43,770 - INFO - Saving to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha0.99.npz
+2026-02-15 14:54:43,786 - INFO - Saved metadata to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/metadata.json
+2026-02-15 14:54:43,787 - INFO - Success: generated 2949 hours of uncertainty sets (alpha=0.990).
+======================================================================
+Phase 1: Pre-computing covariance (this takes a few minutes)...
+======================================================================
+Covariance done.
+
+======================================================================
+Phase 2: Generating uncertainty sets for alpha=0.9
+======================================================================
+  Saved: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha0.90.npz
+
+======================================================================
+Phase 2: Generating uncertainty sets for alpha=0.95
+======================================================================
+  Saved: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha0.95.npz
+
+======================================================================
+Phase 2: Generating uncertainty sets for alpha=0.99
+======================================================================
+  Saved: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha0.99.npz
+
+
+======================================================================
+ALPHA COMPARISON SUMMARY
+======================================================================
+Metric                        alpha=0.9    alpha=0.95    alpha=0.99
+-------------------------------------------------------------------
+Rho mean                          4.395         5.297         8.010
+Rho median                        1.523         2.003         3.380
+Rho 95th pctile                   6.840         8.219        12.393
+Rho max                        3441.411      3856.359      5079.521
+% hours rho=0                      4.4%          1.9%          0.2%
+MW unc. mean                    310.2 MW       389.5 MW       629.3 MW
+MW unc. median                  253.0 MW       336.2 MW       588.7 MW
+MW unc. 95th pctile             779.7 MW       899.3 MW      1277.4 MW
+MW unc. max                    1497.5 MW      1726.3 MW      2400.8 MW
+
+======================================================================
+Files generated:
+  alpha=0.9: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha0.90.npz
+  alpha=0.95: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha0.95.npz
+  alpha=0.99: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha0.99.npz
+======================================================================

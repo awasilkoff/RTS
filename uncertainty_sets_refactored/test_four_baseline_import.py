@@ -14,9 +14,9 @@ try:
         predict_mu_sigma_topk_cross,
         predict_mu_sigma_knn,
     )
-    print("✓ Successfully imported all prediction functions")
+    print("(ok) Successfully imported all prediction functions")
 except ImportError as e:
-    print(f"✗ Import error: {e}")
+    print(f"(x) Import error: {e}")
     exit(1)
 
 # Test that predict_mu_sigma_knn exists and has correct signature
@@ -29,9 +29,9 @@ print(f"  Parameters: {params}")
 expected_params = ["X_query", "X_ref", "Y_ref", "k", "ridge"]
 for param in expected_params:
     if param in params:
-        print(f"  ✓ {param}")
+        print(f"  (ok) {param}")
     else:
-        print(f"  ✗ Missing parameter: {param}")
+        print(f"  (x) Missing parameter: {param}")
 
 # Test CovPredictConfig with new parameters
 print("\nTesting CovPredictConfig with numerical stability settings...")
@@ -43,9 +43,9 @@ try:
         dtype="float64",
         device="cpu",
     )
-    print(f"✓ Created stable config: ridge={pred_cfg_stable.ridge}, dtype={pred_cfg_stable.dtype}")
+    print(f"(ok) Created stable config: ridge={pred_cfg_stable.ridge}, dtype={pred_cfg_stable.dtype}")
 except Exception as e:
-    print(f"✗ Error creating config: {e}")
+    print(f"(x) Error creating config: {e}")
     exit(1)
 
 # Test with dummy data
@@ -66,7 +66,7 @@ try:
         k=16,
         ridge=1e-3,
     )
-    print(f"✓ Euclidean k-NN: Mu shape={Mu_knn.shape}, Sigma shape={Sigma_knn.shape}")
+    print(f"(ok) Euclidean k-NN: Mu shape={Mu_knn.shape}, Sigma shape={Sigma_knn.shape}")
 
     # Test kernel with equal omega
     Mu_kernel, Sigma_kernel = predict_mu_sigma_topk_cross(
@@ -77,14 +77,14 @@ try:
         cfg=pred_cfg_stable,
         k=16,
     )
-    print(f"✓ Kernel(ω=1): Mu shape={Mu_kernel.shape}, Sigma shape={Sigma_kernel.shape}")
+    print(f"(ok) Kernel(ω=1): Mu shape={Mu_kernel.shape}, Sigma shape={Sigma_kernel.shape}")
 
     # Check that outputs are different (different methods)
     mu_diff = np.abs(Mu_knn - Mu_kernel).mean()
-    print(f"✓ Methods produce different results (mean |Δμ| = {mu_diff:.4f})")
+    print(f"(ok) Methods produce different results (mean |Δμ| = {mu_diff:.4f})")
 
 except Exception as e:
-    print(f"✗ Error in prediction: {e}")
+    print(f"(x) Error in prediction: {e}")
     import traceback
     traceback.print_exc()
     exit(1)

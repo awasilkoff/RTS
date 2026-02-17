@@ -77,15 +77,15 @@ def test_basic_functionality():
             n_bins=3,
             alpha_target=0.90,
         )
-        print("  ✓ Training completed successfully")
+        print("  (ok) Training completed successfully")
         print(f"    Coverage: {metrics['coverage']:.4f}")
         assert bundle.binning == "y_actual"
-        print("  ✓ Bundle has correct binning attribute")
+        print("  (ok) Bundle has correct binning attribute")
     except Exception as e:
-        print(f"  ✗ FAILED: {e}")
+        print(f"  (x) FAILED: {e}")
         raise
 
-    print("  ✓ Test passed\n")
+    print("  (ok) Test passed\n")
 
 
 def test_calibration_uses_actuals():
@@ -115,9 +115,9 @@ def test_calibration_uses_actuals():
     assert bin_edges[0] <= y_min, f"Lower edge {bin_edges[0]} > y_min {y_min}"
     assert bin_edges[-1] >= y_max, f"Upper edge {bin_edges[-1]} < y_max {y_max}"
 
-    print(f"  ✓ Bin edges span calibration actual range: [{bin_edges[0]:.1f}, {bin_edges[-1]:.1f}]")
+    print(f"  (ok) Bin edges span calibration actual range: [{bin_edges[0]:.1f}, {bin_edges[-1]:.1f}]")
     print(f"    Calibration actuals range: [{y_min:.1f}, {y_max:.1f}]")
-    print("  ✓ Test passed\n")
+    print("  (ok) Test passed\n")
 
 
 def test_prediction_uses_proxy():
@@ -144,8 +144,8 @@ def test_prediction_uses_proxy():
     assert "y_pred_base" in df_pred.columns
     assert np.allclose(df_pred["bin_feature"], df_pred["y_pred_base"])
 
-    print("  ✓ Bin feature equals y_pred_base at prediction time")
-    print("  ✓ Test passed\n")
+    print("  (ok) Bin feature equals y_pred_base at prediction time")
+    print("  (ok) Test passed\n")
 
 
 def test_coverage_maintained():
@@ -172,8 +172,8 @@ def test_coverage_maintained():
     print(f"  Gap: {gap:.4f}")
 
     assert gap < 0.05, f"Coverage gap {gap:.4f} >= 0.05"
-    print("  ✓ Coverage gap < 5%")
-    print("  ✓ Test passed\n")
+    print("  (ok) Coverage gap < 5%")
+    print("  (ok) Test passed\n")
 
 
 def test_q_hats_vary():
@@ -200,8 +200,8 @@ def test_q_hats_vary():
     # If q_hats are all identical (or very close), adaptation is not happening
     assert q_hat_std > 0.01, f"q_hats are too similar (std={q_hat_std:.3f})"
 
-    print("  ✓ q_hats vary across bins (adaptive correction working)")
-    print("  ✓ Test passed\n")
+    print("  (ok) q_hats vary across bins (adaptive correction working)")
+    print("  (ok) Test passed\n")
 
 
 def test_extract_binning_feature():
@@ -217,14 +217,14 @@ def test_extract_binning_feature():
     # y_actual should return y_pred_base (proxy behavior)
     result = _extract_binning_feature(df, "y_actual", y_pred_base=y_pred_base)
     assert np.array_equal(result, y_pred_base)
-    print("  ✓ y_actual returns y_pred_base (proxy behavior)")
+    print("  (ok) y_actual returns y_pred_base (proxy behavior)")
 
     # Compare with y_pred (should be identical)
     result_y_pred = _extract_binning_feature(df, "y_pred", y_pred_base=y_pred_base)
     assert np.array_equal(result, result_y_pred)
-    print("  ✓ y_actual and y_pred return same value at prediction time")
+    print("  (ok) y_actual and y_pred return same value at prediction time")
 
-    print("  ✓ Test passed\n")
+    print("  (ok) Test passed\n")
 
 
 def test_comparison_with_y_pred():
@@ -256,8 +256,8 @@ def test_comparison_with_y_pred():
     assert results["y_pred"]["coverage"] > 0.90
     assert results["y_actual"]["coverage"] > 0.90
 
-    print("  ✓ Both strategies achieve coverage > 0.90")
-    print("  ✓ Test passed\n")
+    print("  (ok) Both strategies achieve coverage > 0.90")
+    print("  (ok) Test passed\n")
 
 
 def run_all_tests():
@@ -276,7 +276,7 @@ def run_all_tests():
     test_comparison_with_y_pred()
 
     print("="*70)
-    print("All Tests Passed! ✓")
+    print("All Tests Passed! (ok)")
     print("="*70)
 
 

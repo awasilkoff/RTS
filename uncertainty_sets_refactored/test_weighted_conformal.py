@@ -328,19 +328,19 @@ if __name__ == "__main__":
     test_weighted_quantile_uniform_weights()
     test_weighted_quantile_with_test_weight()
     test_weighted_quantile_edge_cases()
-    print("   ✓ weighted_quantile tests passed")
+    print("   (ok) weighted_quantile tests passed")
 
     print("\n2. Testing kernel distances...")
     test_compute_kernel_distances_self_similarity()
     test_compute_kernel_distances_omega_weighting()
-    print("   ✓ kernel distance tests passed")
+    print("   (ok) kernel distance tests passed")
 
     print("\n3. Testing weighted conformal training...")
     test_weighted_conformal_basic()
-    print("   ✓ basic weighted conformal test passed")
+    print("   (ok) basic weighted conformal test passed")
 
     print("\n4. Testing coverage levels...")
     test_weighted_conformal_coverage_levels()
-    print("   ✓ coverage level tests passed")
+    print("   (ok) coverage level tests passed")
 
-    print("\n✓ All tests passed!")
+    print("\n(ok) All tests passed!")

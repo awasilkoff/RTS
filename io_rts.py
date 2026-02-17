@@ -18,7 +18,7 @@ def add_timestamp_column(df: pd.DataFrame) -> pd.DataFrame:
     Given a DF with Year, Month, Day, Period columns,
     add a 'time' column as a pandas.Timestamp.
     """
-    # Period is 1..24 → hour = Period-1
+    # Period is 1..24 -> hour = Period-1
     hour = df["Period"] - 1
 
     df = df.copy()
@@ -558,8 +558,8 @@ def build_damdata_from_rts(
         gen_to_bus[i] = bus_idx[row["Bus ID"]]
         Pmin[i] = row["PMin MW"]
         Pmax[i] = row["PMax MW"]
-        RU[i] = row["Ramp Rate MW/Min"] * 60  # MW/min → MW/h
-        RD[i] = row["Ramp Rate MW/Min"] * 60  # MW/min → MW/h
+        RU[i] = row["Ramp Rate MW/Min"] * 60  # MW/min -> MW/h
+        RD[i] = row["Ramp Rate MW/Min"] * 60  # MW/min -> MW/h
         MUT[i] = row["Min Up Time Hr"]
         MDT[i] = row["Min Down Time Hr"]
         startup_cost[i] = (
@@ -622,7 +622,7 @@ def build_damdata_from_rts(
         RD *= ramp_scale
         print(f"  Ramp rates scaled by {ramp_scale}x")
 
-    # Collapse 3 blocks → 1 block with weighted-average marginal cost
+    # Collapse 3 blocks -> 1 block with weighted-average marginal cost
     if single_block:
         avg_cost = np.zeros(I)
         for i in range(I):
@@ -763,7 +763,7 @@ def build_damdata_from_rts(
             [1.0] * day1_hours + [float(day2_interval_hours)] * day2_periods
         )
 
-        print(f"  Variable intervals: {day1_hours} × 1h + {day2_periods} × {day2_interval_hours}h = {T_new} periods")
+        print(f"  Variable intervals: {day1_hours} x 1h + {day2_periods} x {day2_interval_hours}h = {T_new} periods")
 
     # 7) Build DAMData
     dam = DAMData(

@@ -221,7 +221,7 @@ def print_summary_stats(data_dict, metrics):
     # Find periods with high wind and high rho (stress test)
     wind_rho_product = system_mean * rho
     top_stress_idx = np.argsort(wind_rho_product)[-10:][::-1]
-    print("\nTop 10 hours by wind×rho (high wind + high uncertainty):")
+    print("\nTop 10 hours by windxrho (high wind + high uncertainty):")
     for i, idx in enumerate(top_stress_idx, 1):
         print(
             f"  {i:2d}. {times[idx]}  wind={system_mean[idx]:.1f} MW  ρ={rho[idx]:.3f}"
@@ -297,7 +297,7 @@ def main():
     if args.output_html:
         print(f"\nSaving to {args.output_html}...")
         fig.write_html(args.output_html)
-        print(f"✓ Saved. Open in browser: file://{args.output_html.absolute()}")
+        print(f"(ok) Saved. Open in browser: file://{args.output_html.absolute()}")
     else:
         print("\nOpening in browser...")
         fig.show()

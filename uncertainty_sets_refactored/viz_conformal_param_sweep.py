@@ -5,7 +5,7 @@ Visualize conformal prediction hyperparameter sweep results.
 Creates plots to understand parameter sensitivity:
 - Coverage gap vs n_bins (grouped by bin_strategy)
 - Coverage gap vs safety_margin (grouped by binning_strategy)
-- Heatmap: n_bins × safety_margin
+- Heatmap: n_bins x safety_margin
 """
 from pathlib import Path
 import pandas as pd

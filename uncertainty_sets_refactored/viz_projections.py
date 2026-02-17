@@ -1,5 +1,5 @@
 """
-Projection utilities for high-D → 2D visualization of learned omega.
+Projection utilities for high-D -> 2D visualization of learned omega.
 
 Provides clean 2D visualizations of kernel distances and weights in high-dimensional
 feature spaces by selecting the most important dimensions based on learned omega values.

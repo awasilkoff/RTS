@@ -251,11 +251,11 @@ def plot_3d_ellipsoids_overlay(
 
     output_path = output_dir / f"knn_3d_ellipsoid_overlay_sample{sample_idx}.png"
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"✓ Saved 3D ellipsoid overlay to {output_path}")
+    print(f"(ok) Saved 3D ellipsoid overlay to {output_path}")
 
     output_path_pdf = output_dir / f"knn_3d_ellipsoid_overlay_sample{sample_idx}.pdf"
     plt.savefig(output_path_pdf, dpi=300, bbox_inches="tight")
-    print(f"✓ Saved PDF to {output_path_pdf}")
+    print(f"(ok) Saved PDF to {output_path_pdf}")
 
     plt.close()
 
@@ -493,11 +493,11 @@ def plot_nll_vs_tau(
 
     output_path = output_dir / "learned_omega_nll_vs_tau.png"
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"✓ Saved tau sweep plot to {output_path}")
+    print(f"(ok) Saved tau sweep plot to {output_path}")
 
     output_path_pdf = output_dir / "learned_omega_nll_vs_tau.pdf"
     plt.savefig(output_path_pdf, dpi=300, bbox_inches="tight")
-    print(f"✓ Saved PDF to {output_path_pdf}")
+    print(f"(ok) Saved PDF to {output_path_pdf}")
 
     plt.close()
 
@@ -595,11 +595,11 @@ def plot_nll_vs_k(results: dict, output_dir: Path, learned_omega_result: dict = 
 
     output_path = output_dir / "knn_nll_vs_k.png"
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"✓ Saved NLL plot to {output_path}")
+    print(f"(ok) Saved NLL plot to {output_path}")
 
     output_path_pdf = output_dir / "knn_nll_vs_k.pdf"
     plt.savefig(output_path_pdf, dpi=300, bbox_inches="tight")
-    print(f"✓ Saved PDF to {output_path_pdf}")
+    print(f"(ok) Saved PDF to {output_path_pdf}")
 
     plt.close()
 
@@ -680,7 +680,7 @@ def plot_ellipses_at_various_k(
 
     output_path = output_dir / "knn_ellipses_by_k.png"
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"✓ Saved ellipse grid to {output_path}")
+    print(f"(ok) Saved ellipse grid to {output_path}")
 
     plt.close()
 
@@ -769,11 +769,11 @@ def plot_ellipse_size_vs_k(
 
     output_path = output_dir / "knn_ellipse_size_vs_k.png"
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"✓ Saved ellipse size plot to {output_path}")
+    print(f"(ok) Saved ellipse size plot to {output_path}")
 
     output_path_pdf = output_dir / "knn_ellipse_size_vs_k.pdf"
     plt.savefig(output_path_pdf, dpi=300, bbox_inches="tight")
-    print(f"✓ Saved PDF to {output_path_pdf}")
+    print(f"(ok) Saved PDF to {output_path_pdf}")
 
     plt.close()
 
@@ -887,11 +887,11 @@ def plot_single_sample_overlay(
 
     output_path = output_dir / f"knn_ellipse_overlay_sample{sample_idx}.png"
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"✓ Saved overlay plot to {output_path}")
+    print(f"(ok) Saved overlay plot to {output_path}")
 
     output_path_pdf = output_dir / f"knn_ellipse_overlay_sample{sample_idx}.pdf"
     plt.savefig(output_path_pdf, dpi=300, bbox_inches="tight")
-    print(f"✓ Saved PDF to {output_path_pdf}")
+    print(f"(ok) Saved PDF to {output_path_pdf}")
 
     plt.close()
 
@@ -910,7 +910,7 @@ def save_summary(results: dict, output_dir: Path):
     df = pd.DataFrame(rows)
     output_path = output_dir / "knn_k_sweep_summary.csv"
     df.to_csv(output_path, index=False)
-    print(f"✓ Saved summary to {output_path}")
+    print(f"(ok) Saved summary to {output_path}")
 
     return df
 
@@ -1099,7 +1099,7 @@ def run_knn_k_sweep(
         n_eval = Y_eval.shape[0]
         sample_indices = [0, n_eval // 4, n_eval // 2, 3 * n_eval // 4]
 
-    # 4. Ellipse grid (samples × k values)
+    # 4. Ellipse grid (samples x k values)
     k_subset = [32, 64, 2048]
     plot_ellipses_at_various_k(
         results, Y_eval, sample_indices[:3], k_subset, output_dir, dims=dims, rho=rho
@@ -1166,7 +1166,7 @@ def run_knn_k_sweep(
 
     print("=" * 80)
 
-    print("\n✓ k-NN k-value sweep complete!")
+    print("\n(ok) k-NN k-value sweep complete!")
     print(f"\nOutputs saved to: {output_dir}/")
     print("  - knn_nll_vs_k.png/pdf (with learned omega comparison)")
     if tau_sweep_results is not None:

@@ -1,0 +1,1183 @@
+============ ACTUALS MODE ============
+=== [1/8] sweep_and_viz focused_2d ===
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_and_viz_feature_set.py:71: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_and_viz_feature_set.py:71: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_and_viz_feature_set.py:71: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+
+*** Using raw ACTUALS as target ***
+
+Created artifact directory: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d
+  - Config: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d/feature_config.json
+  - README: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d/README.md
+================================================================================
+Running sweep for feature set: focused_2d
+================================================================================
+Feature set: focused_2d
+  Description: 2D focused baseline (SYS_MEAN, SYS_STD)
+  Data shape: X=(2952, 2), Y=(2952, 3)
+  Features: ['SYS_MEAN', 'SYS_STD']
+  Targets: ['122_WIND_1', '309_WIND_1', '317_WIND_1']
+
+Train: 1476, Val: 738, Test: 738
+Split: Random 50%/25%/25% (seed=42)
+  - Val used for hyperparameter selection
+  - Test used ONCE for final unbiased evaluation
+
+scaler=standard, tau=0.010, reg=0.00/softmax => ω=[0.555, 0.445], NLL: 3251.712 vs kernel(+)3275.490 euclid(-)12.915 global(-)13.232 | win%: 54/52/73
+scaler=standard, tau=0.050, reg=0.00/softmax => ω=[0.797, 0.203], NLL: 12.670 vs kernel(+)12.999 euclid(+)12.915 global(+)13.232 | win%: 51/51/76
+scaler=standard, tau=0.100, reg=0.00/softmax => ω=[0.644, 0.356], NLL: 13.027 vs kernel(-)12.928 euclid(-)12.915 global(+)13.232 | win%: 49/50/75
+scaler=standard, tau=0.250, reg=0.00/softmax => ω=[0.665, 0.335], NLL: 13.026 vs kernel(-)12.917 euclid(-)12.915 global(+)13.232 | win%: 49/50/76
+scaler=standard, tau=0.500, reg=0.00/softmax => ω=[0.696, 0.304], NLL: 12.990 vs kernel(-)12.916 euclid(-)12.915 global(+)13.232 | win%: 49/50/76
+scaler=standard, tau=1.000, reg=0.00/softmax => ω=[0.842, 0.158], NLL: 12.681 vs kernel(+)12.915 euclid(+)12.915 global(+)13.232 | win%: 51/51/75
+scaler=standard, tau=2.500, reg=0.00/softmax => ω=[0.995, 0.005], NLL: 12.905 vs kernel(+)12.915 euclid(+)12.915 global(+)13.232 | win%: 49/49/76
+scaler=standard, tau=5.000, reg=0.00/softmax => ω=[0.998, 0.002], NLL: 12.818 vs kernel(+)12.915 euclid(+)12.915 global(+)13.232 | win%: 47/47/76
+scaler=standard, tau=7.500, reg=0.00/softmax => ω=[0.998, 0.002], NLL: 12.791 vs kernel(+)12.915 euclid(+)12.915 global(+)13.232 | win%: 48/48/76
+scaler=standard, tau=10.000, reg=0.00/softmax => ω=[0.998, 0.002], NLL: 12.802 vs kernel(+)12.915 euclid(+)12.915 global(+)13.232 | win%: 48/48/76
+scaler=standard, tau=20.000, reg=0.00/softmax => ω=[0.997, 0.003], NLL: 12.780 vs kernel(+)12.915 euclid(+)12.915 global(+)13.232 | win%: 48/48/76
+
+  Divergence filter: excluding 1 config(s) with val_nll > 26.5 (2x global baseline 13.2). Diverged taus: [0.01]
+
+Best configuration (selected on VALIDATION set):
+  scaler_type=standard, tau=0.05, omega_l2_reg=0.0, constraint=softmax
+  Learned omega: [0.79652524 0.20347477]
+  Validation NLL:
+    Learned:       12.6702
+    Uniform(ω=1/2): 12.9995
+    Euclidean kNN: 12.9153
+    Global:        13.2324
+
+--- Final Evaluation on TEST set (unbiased) ---
+  Test NLL (unbiased):
+    Learned:       15.9692
+    Uniform(ω=1/2): 30.6993
+    Euclidean kNN: 12.6790
+    Global:        13.2178
+  Test Improvement (positive = learned is better):
+    vs Uniform(ω=1/2): 14.7300
+    vs Euclidean kNN: -3.2903
+    vs Global:        -2.7515
+Saved sweep results: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d/sweep_results.csv
+Saved best omega: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d/best_omega.npy
+Saved best config summary: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d/best_config_summary.json
+
+================================================================================
+MULTI-SEED VALIDATION (5 seeds x 11 taus)
+  constraint=softmax, l2_reg=0.0, scaler=standard
+================================================================================
+
+tau=0.01:
+  seed=0: val_NLL=3260.1031, ω=[0.544, 0.456]
+  seed=1: val_NLL=3254.3050, ω=[0.552, 0.448]
+  seed=2: val_NLL=3258.9478, ω=[0.546, 0.454]
+  seed=3: val_NLL=3252.7426, ω=[0.554, 0.446]
+  seed=4: val_NLL=3216.8943, ω=[0.170, 0.830]
+
+tau=0.05:
+  seed=0: val_NLL=12.6670, ω=[0.799, 0.201]
+  seed=1: val_NLL=12.6703, ω=[0.797, 0.203]
+  seed=2: val_NLL=12.6704, ω=[0.798, 0.202]
+  seed=3: val_NLL=12.6709, ω=[0.797, 0.203]
+  seed=4: val_NLL=12.4548, ω=[0.913, 0.087]
+
+tau=0.1:
+  seed=0: val_NLL=13.0623, ω=[0.638, 0.362]
+  seed=1: val_NLL=13.0376, ω=[0.640, 0.360]
+  seed=2: val_NLL=13.0563, ω=[0.645, 0.355]
+  seed=3: val_NLL=13.0365, ω=[0.638, 0.362]
+  seed=4: val_NLL=13.0606, ω=[0.630, 0.370]
+
+tau=0.25:
+  seed=0: val_NLL=13.0458, ω=[0.648, 0.352]
+  seed=1: val_NLL=13.0476, ω=[0.648, 0.352]
+  seed=2: val_NLL=13.0319, ω=[0.639, 0.361]
+  seed=3: val_NLL=13.0600, ω=[0.636, 0.364]
+  seed=4: val_NLL=13.0457, ω=[0.649, 0.351]
+
+tau=0.5:
+  seed=0: val_NLL=12.9849, ω=[0.702, 0.298]
+  seed=1: val_NLL=12.9922, ω=[0.698, 0.302]
+  seed=2: val_NLL=12.9918, ω=[0.697, 0.303]
+  seed=3: val_NLL=12.9927, ω=[0.698, 0.302]
+  seed=4: val_NLL=12.9849, ω=[0.702, 0.298]
+
+tau=1.0:
+  seed=0: val_NLL=12.6385, ω=[0.830, 0.170]
+  seed=1: val_NLL=12.7006, ω=[0.848, 0.152]
+  seed=2: val_NLL=12.6834, ω=[0.835, 0.165]
+  seed=3: val_NLL=12.6814, ω=[0.841, 0.159]
+  seed=4: val_NLL=12.6382, ω=[0.827, 0.173]
+
+tau=2.5:
+  seed=0: val_NLL=12.7664, ω=[0.997, 0.003]
+  seed=1: val_NLL=12.7980, ω=[0.997, 0.003]
+  seed=2: val_NLL=12.7888, ω=[0.997, 0.003]
+  seed=3: val_NLL=12.7664, ω=[0.996, 0.004]
+  seed=4: val_NLL=12.9146, ω=[0.995, 0.005]
+
+tau=5.0:
+  seed=0: val_NLL=12.8443, ω=[0.998, 0.002]
+  seed=1: val_NLL=12.8603, ω=[0.998, 0.002]
+  seed=2: val_NLL=12.8424, ω=[0.998, 0.002]
+  seed=3: val_NLL=12.8492, ω=[0.998, 0.002]
+  seed=4: val_NLL=12.7922, ω=[0.998, 0.002]
+
+tau=7.5:
+  seed=0: val_NLL=12.8445, ω=[0.998, 0.002]
+  seed=1: val_NLL=12.7915, ω=[0.998, 0.002]
+  seed=2: val_NLL=12.8444, ω=[0.998, 0.002]
+  seed=3: val_NLL=12.8430, ω=[0.998, 0.002]
+  seed=4: val_NLL=12.7782, ω=[0.997, 0.003]
+
+tau=10.0:
+  seed=0: val_NLL=12.8488, ω=[0.998, 0.002]
+  seed=1: val_NLL=12.8174, ω=[0.998, 0.002]
+  seed=2: val_NLL=12.8441, ω=[0.998, 0.002]
+  seed=3: val_NLL=12.8208, ω=[0.998, 0.002]
+  seed=4: val_NLL=12.7896, ω=[0.998, 0.002]
+
+tau=20.0:
+  seed=0: val_NLL=12.7804, ω=[0.997, 0.003]
+  seed=1: val_NLL=12.7786, ω=[0.997, 0.003]
+  seed=2: val_NLL=12.7796, ω=[0.997, 0.003]
+  seed=3: val_NLL=12.8126, ω=[0.998, 0.002]
+  seed=4: val_NLL=12.7612, ω=[0.997, 0.003]
+
+Best tau (by mean): 0.05 (NLL = 12.6267 ± 0.0961)
+Best overall: tau=0.05, seed=4, NLL=12.4548
+
+Saved multi-seed results to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d/
+
+Generating visualizations...
+✓ Saved NLL vs tau plot to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d/nll_vs_tau.png
+✓ Saved PDF to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d/nll_vs_tau.pdf
+Saved: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d/omega_bar_chart.png
+Saved: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d/kernel_distance_comparison.png
+Visualizations complete!
+
+All outputs saved to: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d
+
+Done!
+=== [2/8] sweep_and_viz high_dim_16d ===
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_and_viz_feature_set.py:71: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_and_viz_feature_set.py:71: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_and_viz_feature_set.py:71: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+
+*** Using raw ACTUALS as target ***
+
+Created artifact directory: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d
+  - Config: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d/feature_config.json
+  - README: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d/README.md
+================================================================================
+Running sweep for feature set: high_dim_16d
+================================================================================
+Feature set: high_dim_16d
+  Description: 16D comprehensive (8D base + temporal + ramp + spread)
+  Data shape: X=(2949, 16), Y=(2949, 3)
+  Features: ['SYS_MEAN', 'SYS_STD', 'WIND_122_MEAN', 'WIND_309_MEAN', 'WIND_317_MEAN', 'WIND_122_STD', 'WIND_309_STD', 'WIND_317_STD', 'HOUR_SIN', 'HOUR_COS', 'DOW_SIN', 'DOW_COS', 'SYS_MEAN_DELTA_3H', 'SYS_MEAN_DELTA_1H', 'SYS_STD_ROLLING_6H', 'FORECAST_SPREAD']
+  Targets: ['122_WIND_1', '309_WIND_1', '317_WIND_1']
+
+Train: 1474, Val: 737, Test: 738
+Split: Random 50%/25%/25% (seed=42)
+  - Val used for hyperparameter selection
+  - Test used ONCE for final unbiased evaluation
+
+scaler=standard, tau=0.010, reg=0.00/softmax => ω=[0.280, 0.000, 0.037, 0.653, 0.020, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.008], NLL: 20.294 vs kernel(+)68950.796 euclid(-)11.490 global(-)13.248 | win%: 92/51/82
+scaler=standard, tau=0.050, reg=0.00/softmax => ω=[0.191, 0.008, 0.080, 0.233, 0.152, 0.056, 0.018, 0.002, 0.023, 0.020, 0.017, 0.110, 0.006, 0.003, 0.018, 0.063], NLL: 11.181 vs kernel(+)372.022 euclid(+)11.490 global(+)13.248 | win%: 49/72/87
+scaler=standard, tau=0.100, reg=0.00/softmax => ω=[0.020, 0.002, 0.162, 0.130, 0.035, 0.117, 0.035, 0.007, 0.068, 0.058, 0.075, 0.134, 0.012, 0.002, 0.076, 0.065], NLL: 11.200 vs kernel(+)11.646 euclid(+)11.490 global(+)13.248 | win%: 53/76/89
+scaler=standard, tau=0.250, reg=0.00/softmax => ω=[0.001, 0.002, 0.229, 0.126, 0.001, 0.118, 0.046, 0.082, 0.045, 0.025, 0.054, 0.074, 0.035, 0.003, 0.022, 0.140], NLL: 11.192 vs kernel(+)11.227 euclid(+)11.490 global(+)13.248 | win%: 60/73/91
+scaler=standard, tau=0.500, reg=0.00/softmax => ω=[0.003, 0.002, 0.360, 0.155, 0.004, 0.075, 0.003, 0.132, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.264], NLL: 11.635 vs kernel(-)11.350 euclid(-)11.490 global(+)13.248 | win%: 53/57/84
+scaler=standard, tau=1.000, reg=0.00/softmax => ω=[0.008, 0.001, 0.410, 0.150, 0.010, 0.001, 0.001, 0.069, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.349], NLL: 11.826 vs kernel(-)11.419 euclid(-)11.490 global(+)13.248 | win%: 54/55/85
+scaler=standard, tau=2.500, reg=0.00/softmax => ω=[0.421, 0.000, 0.355, 0.057, 0.053, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.111], NLL: 11.976 vs kernel(-)11.461 euclid(-)11.490 global(+)13.248 | win%: 51/51/81
+scaler=standard, tau=5.000, reg=0.00/softmax => ω=[0.739, 0.000, 0.224, 0.008, 0.020, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.009], NLL: 12.392 vs kernel(-)11.475 euclid(-)11.490 global(+)13.248 | win%: 48/48/81
+scaler=standard, tau=7.500, reg=0.00/softmax => ω=[0.867, 0.000, 0.101, 0.006, 0.018, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.007], NLL: 12.570 vs kernel(-)11.480 euclid(-)11.490 global(+)13.248 | win%: 48/48/80
+scaler=standard, tau=10.000, reg=0.00/softmax => ω=[0.959, 0.000, 0.009, 0.006, 0.019, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.007], NLL: 12.522 vs kernel(-)11.483 euclid(-)11.490 global(+)13.248 | win%: 43/44/80
+scaler=standard, tau=20.000, reg=0.00/softmax => ω=[0.962, 0.000, 0.002, 0.007, 0.021, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.007], NLL: 12.527 vs kernel(-)11.486 euclid(-)11.490 global(+)13.248 | win%: 41/41/82
+
+Best configuration (selected on VALIDATION set):
+  scaler_type=standard, tau=0.05, omega_l2_reg=0.0, constraint=softmax
+  Learned omega: [0.19109043 0.00841055 0.07970221 0.23279281 0.15243405 0.05567592
+ 0.01769458 0.00216344 0.02265442 0.02011913 0.01726441 0.11027054
+ 0.00583948 0.00296833 0.01806759 0.06285208]
+  Validation NLL:
+    Learned:       11.1808
+    Uniform(ω=1/16): 372.0220
+    Euclidean kNN: 11.4898
+    Global:        13.2484
+
+--- Final Evaluation on TEST set (unbiased) ---
+  Test NLL (unbiased):
+    Learned:       11.3351
+    Uniform(ω=1/16): 41.5643
+    Euclidean kNN: 11.5512
+    Global:        13.3019
+  Test Improvement (positive = learned is better):
+    vs Uniform(ω=1/16): 30.2291
+    vs Euclidean kNN: 0.2160
+    vs Global:        1.9668
+Saved sweep results: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d/sweep_results.csv
+Saved best omega: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d/best_omega.npy
+Saved best config summary: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d/best_config_summary.json
+
+================================================================================
+MULTI-SEED VALIDATION (5 seeds x 11 taus)
+  constraint=softmax, l2_reg=0.0, scaler=standard
+================================================================================
+
+tau=0.01:
+  seed=0: val_NLL=11.4921, ω=[0.668, 0.001, 0.012, 0.167, 0.119, 0.016, 0.000, 0.001, 0.001, 0.002, 0.001, 0.002, 0.000, 0.001, 0.001, 0.008]
+  seed=1: val_NLL=11.4954, ω=[0.025, 0.001, 0.011, 0.019, 0.013, 0.008, 0.001, 0.000, 0.004, 0.004, 0.393, 0.506, 0.001, 0.001, 0.003, 0.009]
+  seed=2: val_NLL=11.4498, ω=[0.034, 0.001, 0.012, 0.069, 0.039, 0.003, 0.001, 0.001, 0.006, 0.005, 0.002, 0.815, 0.000, 0.001, 0.002, 0.009]
+  seed=3: val_NLL=11.5201, ω=[0.662, 0.002, 0.008, 0.235, 0.036, 0.007, 0.001, 0.001, 0.003, 0.002, 0.002, 0.004, 0.001, 0.001, 0.002, 0.034]
+  seed=4: val_NLL=67.7040, ω=[0.120, 0.004, 0.023, 0.786, 0.043, 0.001, 0.000, 0.002, 0.000, 0.002, 0.000, 0.000, 0.000, 0.001, 0.004, 0.012]
+
+tau=0.05:
+  seed=0: val_NLL=11.1428, ω=[0.174, 0.002, 0.068, 0.191, 0.205, 0.041, 0.018, 0.002, 0.022, 0.015, 0.015, 0.104, 0.005, 0.002, 0.106, 0.031]
+  seed=1: val_NLL=11.1351, ω=[0.225, 0.001, 0.065, 0.171, 0.135, 0.041, 0.019, 0.003, 0.022, 0.014, 0.015, 0.101, 0.005, 0.003, 0.106, 0.074]
+  seed=2: val_NLL=11.2227, ω=[0.088, 0.002, 0.081, 0.234, 0.253, 0.052, 0.019, 0.005, 0.025, 0.019, 0.015, 0.135, 0.002, 0.005, 0.024, 0.043]
+  seed=3: val_NLL=11.2076, ω=[0.262, 0.002, 0.079, 0.230, 0.093, 0.057, 0.021, 0.004, 0.023, 0.021, 0.019, 0.106, 0.005, 0.005, 0.016, 0.056]
+  seed=4: val_NLL=11.4507, ω=[0.132, 0.016, 0.146, 0.181, 0.029, 0.139, 0.007, 0.007, 0.001, 0.009, 0.321, 0.001, 0.000, 0.000, 0.002, 0.009]
+
+tau=0.1:
+  seed=0: val_NLL=11.2067, ω=[0.007, 0.001, 0.162, 0.106, 0.023, 0.118, 0.024, 0.001, 0.066, 0.057, 0.076, 0.131, 0.014, 0.001, 0.125, 0.088]
+  seed=1: val_NLL=11.1987, ω=[0.006, 0.001, 0.165, 0.134, 0.011, 0.117, 0.039, 0.009, 0.069, 0.058, 0.074, 0.135, 0.012, 0.001, 0.073, 0.095]
+  seed=2: val_NLL=11.1530, ω=[0.011, 0.001, 0.163, 0.135, 0.050, 0.117, 0.034, 0.010, 0.068, 0.058, 0.076, 0.133, 0.011, 0.003, 0.074, 0.056]
+  seed=3: val_NLL=11.2010, ω=[0.016, 0.000, 0.161, 0.101, 0.015, 0.118, 0.019, 0.002, 0.065, 0.057, 0.077, 0.130, 0.013, 0.002, 0.128, 0.095]
+  seed=4: val_NLL=11.1991, ω=[0.015, 0.001, 0.159, 0.122, 0.040, 0.119, 0.028, 0.005, 0.068, 0.057, 0.074, 0.136, 0.012, 0.003, 0.094, 0.066]
+
+tau=0.25:
+  seed=0: val_NLL=11.1870, ω=[0.002, 0.000, 0.229, 0.125, 0.002, 0.118, 0.046, 0.083, 0.045, 0.025, 0.054, 0.074, 0.037, 0.001, 0.022, 0.138]
+  seed=1: val_NLL=11.1869, ω=[0.001, 0.001, 0.229, 0.126, 0.001, 0.118, 0.046, 0.083, 0.045, 0.025, 0.054, 0.074, 0.037, 0.001, 0.021, 0.139]
+  seed=2: val_NLL=11.1853, ω=[0.000, 0.001, 0.229, 0.126, 0.001, 0.118, 0.046, 0.083, 0.045, 0.025, 0.054, 0.074, 0.035, 0.004, 0.022, 0.140]
+  seed=3: val_NLL=11.1862, ω=[0.000, 0.001, 0.229, 0.126, 0.000, 0.118, 0.046, 0.082, 0.045, 0.025, 0.054, 0.074, 0.033, 0.006, 0.022, 0.141]
+  seed=4: val_NLL=11.1921, ω=[0.001, 0.002, 0.229, 0.126, 0.001, 0.118, 0.046, 0.082, 0.045, 0.025, 0.054, 0.074, 0.036, 0.002, 0.021, 0.140]
+
+tau=0.5:
+  seed=0: val_NLL=11.6097, ω=[0.001, 0.000, 0.360, 0.156, 0.003, 0.075, 0.002, 0.134, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.266]
+  seed=1: val_NLL=11.6306, ω=[0.004, 0.001, 0.360, 0.155, 0.004, 0.075, 0.004, 0.132, 0.000, 0.000, 0.000, 0.001, 0.000, 0.000, 0.001, 0.263]
+  seed=2: val_NLL=11.6122, ω=[0.001, 0.000, 0.360, 0.156, 0.003, 0.075, 0.002, 0.134, 0.000, 0.000, 0.000, 0.001, 0.000, 0.000, 0.000, 0.266]
+  seed=3: val_NLL=11.6606, ω=[0.005, 0.000, 0.360, 0.154, 0.002, 0.075, 0.001, 0.135, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000, 0.265]
+  seed=4: val_NLL=11.6375, ω=[0.002, 0.002, 0.360, 0.155, 0.004, 0.075, 0.004, 0.130, 0.000, 0.001, 0.000, 0.000, 0.000, 0.000, 0.001, 0.264]
+
+tau=1.0:
+  seed=0: val_NLL=11.8309, ω=[0.006, 0.001, 0.411, 0.150, 0.008, 0.001, 0.001, 0.070, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.352]
+  seed=1: val_NLL=11.8285, ω=[0.011, 0.001, 0.410, 0.149, 0.009, 0.001, 0.001, 0.069, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.348]
+  seed=2: val_NLL=11.8017, ω=[0.003, 0.000, 0.411, 0.150, 0.011, 0.000, 0.000, 0.070, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.352]
+  seed=3: val_NLL=11.8164, ω=[0.013, 0.001, 0.410, 0.145, 0.006, 0.000, 0.000, 0.071, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.352]
+  seed=4: val_NLL=11.8288, ω=[0.005, 0.002, 0.410, 0.149, 0.011, 0.001, 0.001, 0.068, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.351]
+
+tau=2.5:
+  seed=0: val_NLL=12.0169, ω=[0.435, 0.000, 0.354, 0.050, 0.058, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.102]
+  seed=1: val_NLL=11.9516, ω=[0.434, 0.000, 0.355, 0.052, 0.047, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.111]
+  seed=2: val_NLL=12.0129, ω=[0.427, 0.000, 0.353, 0.059, 0.068, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.092]
+  seed=3: val_NLL=11.9942, ω=[0.438, 0.000, 0.355, 0.050, 0.037, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.118]
+  seed=4: val_NLL=11.9992, ω=[0.417, 0.000, 0.355, 0.062, 0.057, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.109]
+
+tau=5.0:
+  seed=0: val_NLL=12.4804, ω=[0.741, 0.000, 0.224, 0.009, 0.022, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.004]
+  seed=1: val_NLL=12.4493, ω=[0.738, 0.000, 0.225, 0.008, 0.018, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.010]
+  seed=2: val_NLL=12.5277, ω=[0.737, 0.000, 0.222, 0.009, 0.026, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.006]
+  seed=3: val_NLL=12.4980, ω=[0.741, 0.000, 0.226, 0.013, 0.013, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.007]
+  seed=4: val_NLL=12.5054, ω=[0.741, 0.000, 0.222, 0.009, 0.019, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.008]
+
+tau=7.5:
+  seed=0: val_NLL=12.5503, ω=[0.858, 0.000, 0.104, 0.009, 0.025, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.003]
+  seed=1: val_NLL=12.5503, ω=[0.862, 0.000, 0.106, 0.007, 0.017, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.008]
+  seed=2: val_NLL=12.5565, ω=[0.872, 0.000, 0.090, 0.008, 0.025, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.004]
+  seed=3: val_NLL=12.5476, ω=[0.861, 0.000, 0.109, 0.012, 0.013, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.006]
+  seed=4: val_NLL=12.5910, ω=[0.875, 0.000, 0.091, 0.008, 0.019, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.006]
+
+tau=10.0:
+  seed=0: val_NLL=12.5578, ω=[0.958, 0.000, 0.008, 0.008, 0.023, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.003]
+  seed=1: val_NLL=12.5211, ω=[0.962, 0.000, 0.009, 0.006, 0.016, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.007]
+  seed=2: val_NLL=12.6938, ω=[0.964, 0.000, 0.006, 0.006, 0.021, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.003]
+  seed=3: val_NLL=12.4842, ω=[0.960, 0.000, 0.010, 0.011, 0.013, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.005]
+  seed=4: val_NLL=12.7236, ω=[0.968, 0.000, 0.006, 0.006, 0.015, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.005]
+
+tau=20.0:
+  seed=0: val_NLL=12.3305, ω=[0.949, 0.000, 0.002, 0.011, 0.033, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.004]
+  seed=1: val_NLL=12.4857, ω=[0.960, 0.000, 0.002, 0.008, 0.021, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.009]
+  seed=2: val_NLL=12.4321, ω=[0.962, 0.000, 0.002, 0.007, 0.026, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.004]
+  seed=3: val_NLL=12.5830, ω=[0.960, 0.000, 0.001, 0.015, 0.016, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.007]
+  seed=4: val_NLL=12.4402, ω=[0.965, 0.000, 0.002, 0.007, 0.020, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.006]
+
+Best tau (by mean): 0.25 (NLL = 11.1875 ± 0.0027)
+Best overall: tau=0.05, seed=1, NLL=11.1351
+
+Saved multi-seed results to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d/
+
+Generating visualizations...
+✓ Saved NLL vs tau plot to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d/nll_vs_tau.png
+✓ Saved PDF to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d/nll_vs_tau.pdf
+Saved: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d/omega_bar_chart.png
+Saved: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d/kernel_distance_projection_2d.png
+Visualizations complete!
+
+All outputs saved to: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d
+
+Done!
+=== [3/8] sweep_knn_k_values (multi-split) ===
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_knn_k_values.py:50: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_knn_k_values.py:50: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_knn_k_values.py:50: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_knn_k_values.py:50: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_knn_k_values.py:50: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+
+================================================================================
+MULTI-SPLIT K-NN SWEEP
+================================================================================
+k values: [8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+Seeds: [0, 1, 2, 3, 4]
+================================================================================
+
+--- Split seed=0 ---
+  Train: 2211, Eval: 738
+  k=8... NLL = 12.7297
+  k=16... NLL = 11.2684
+  k=32... NLL = 11.4570
+  k=64... NLL = 11.7071
+  k=128... NLL = 11.8418
+  k=256... NLL = 12.0190
+  k=512... NLL = 12.2611
+  k=1024... NLL = 12.6386
+  k=2048... NLL = 13.2247
+
+--- Split seed=1 ---
+  Train: 2211, Eval: 738
+  k=8... NLL = 13.8283
+  k=16... NLL = 11.0953
+  k=32... NLL = 11.3141
+  k=64... NLL = 11.5893
+  k=128... NLL = 11.7661
+  k=256... NLL = 11.9502
+  k=512... NLL = 12.2059
+  k=1024... NLL = 12.6160
+  k=2048... NLL = 13.2027
+
+--- Split seed=2 ---
+  Train: 2211, Eval: 738
+  k=8... NLL = 12.2616
+  k=16... NLL = 11.2504
+  k=32... NLL = 11.4293
+  k=64... NLL = 11.6270
+  k=128... NLL = 11.7934
+  k=256... NLL = 11.9629
+  k=512... NLL = 12.2022
+  k=1024... NLL = 12.5779
+  k=2048... NLL = 13.1613
+
+--- Split seed=3 ---
+  Train: 2211, Eval: 738
+  k=8... NLL = 11.4275
+  k=16... NLL = 11.2388
+  k=32... NLL = 11.4712
+  k=64... NLL = 11.7533
+  k=128... NLL = 11.9280
+  k=256... NLL = 12.0766
+  k=512... NLL = 12.3062
+  k=1024... NLL = 12.6708
+  k=2048... NLL = 13.2275
+
+--- Split seed=4 ---
+  Train: 2211, Eval: 738
+  k=8... NLL = 12.2501
+  k=16... NLL = 11.2730
+  k=32... NLL = 11.4247
+  k=64... NLL = 11.6758
+  k=128... NLL = 11.8247
+  k=256... NLL = 11.9944
+  k=512... NLL = 12.2336
+  k=1024... NLL = 12.6132
+  k=2048... NLL = 13.1844
+
+Saved raw results to data/viz_artifacts/knn_k_sweep/multi_split_k_results.csv
+Saved statistics to data/viz_artifacts/knn_k_sweep/multi_split_k_stats.csv
+
+Per-k statistics:
+   k  nll_mean  nll_std   nll_min   nll_max
+   8 12.499429 0.878464 11.427483 13.828316
+  16 11.225181 0.073895 11.095313 11.273021
+  32 11.419270 0.061855 11.314136 11.471185
+  64 11.670510 0.064642 11.589253 11.753316
+ 128 11.830813 0.061623 11.766145 11.928030
+ 256 12.000611 0.050285 11.950202 12.076576
+ 512 12.241805 0.043148 12.202192 12.306204
+1024 12.623298 0.034305 12.577914 12.670833
+2048 13.200129 0.027925 13.161251 13.227543
+
+Best k: 16 (mean NLL = 11.2252 +/- 0.0739)
+=== [4/8] generate_paper_figures ===
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/generate_paper_figures.py:2462: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/generate_paper_figures.py:2462: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/generate_paper_figures.py:2462: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+================================================================================
+PAPER FIGURE GENERATION
+================================================================================
+Output directory: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final
+================================================================================
+
+GENERATING FIGURES
+----------------------------------------
+
+[1/15] Kernel distance comparison (Learned vs k-NN)...
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig1_kernel_distance.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig1_kernel_distance.png
+
+[2/15] 3D ellipsoid comparison (Learned, k-NN, Global)...
+  k=16... NLL = 11.4899
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig2_ellipsoid_3d.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig2_ellipsoid_3d.png
+
+[2e/15] 3D ellipsoid comparison (extreme hour)...
+  k=16... NLL = 11.4899
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig2_ellipsoid_3d_extreme.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig2_ellipsoid_3d_extreme.png
+
+[3/15] NLL vs k sweep...
+  Multi-split data: 9 k values
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig3_nll_vs_k.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig3_nll_vs_k.png
+
+[4/15] NLL vs tau sweep...
+  Multi-seed data: 11 tau values
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig4_nll_vs_tau.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig4_nll_vs_tau.png
+
+[3b+4b] Hyperparameter sweeps with baselines (2-panel)...
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig3b_4b_hyperparameter_sweeps.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig3b_4b_hyperparameter_sweeps.png
+
+[6b/15] Global conformal calibration (no tolerance)...
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig6b_calibration_clean.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig6b_calibration_clean.png
+
+[6c/15] Global conformal calibration (points only)...
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig6c_calibration_points.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig6c_calibration_points.png
+
+[7/15] Global conformal correction vs alpha...
+    α=0.80: q_hat=0.449
+    α=0.85: q_hat=0.530
+    α=0.90: q_hat=0.626
+    α=0.95: q_hat=0.868
+    α=0.99: q_hat=1.584
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig7_corrections.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig7_corrections.png
+
+[7b/15] Normalized lower bound vs alpha...
+    α=0.80: 1.061 std below mean
+    α=0.85: 1.436 std below mean
+    α=0.90: 1.883 std below mean
+    α=0.95: 2.719 std below mean
+    α=0.99: 4.859 std below mean
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig7b_normalized_lower_bound.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig7b_normalized_lower_bound.png
+
+[7c/15] Lower bound decomposition (stacked bar)...
+    α=0.80: base=0.342, conformal=0.449, total=0.791
+    α=0.85: base=0.586, conformal=0.530, total=1.116
+    α=0.90: base=0.879, conformal=0.626, total=1.505
+    α=0.95: base=1.327, conformal=0.868, total=2.195
+    α=0.99: base=2.319, conformal=1.584, total=3.903
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig7c_lb_decomposition.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig7c_lb_decomposition.png
+
+[8/15] 2D ellipse grid (k=16, 512, Global)...
+  k=16... NLL = 11.1804
+  k=512... NLL = 12.2913
+  k=2211... NLL = 13.3004
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig8_ellipse_grid.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig8_ellipse_grid.png
+
+[8e/15] 2D ellipse grid (extreme hours)...
+  k=16... NLL = 11.1804
+  k=512... NLL = 12.2913
+  k=2211... NLL = 13.3004
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig8_ellipse_grid_extreme.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig8_ellipse_grid_extreme.png
+
+[10/15] 2D ellipse overlay...
+  k=16... NLL = 11.1804
+  k=512... NLL = 12.2913
+  k=2211... NLL = 13.3004
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig10_ellipse_overlay.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig10_ellipse_overlay.png
+
+[10e/15] 2D ellipse overlay (extreme hour)...
+  k=16... NLL = 11.1804
+  k=512... NLL = 12.2913
+  k=2211... NLL = 13.3004
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig10_ellipse_overlay_extreme.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig10_ellipse_overlay_extreme.png
+
+[11/15] Tau sweep (unconstrained, no reg, 16D)...
+  Warning: no rows with omega_constraint=none, omega_l2_reg=0
+
+[NLL-2D] NLL heatmap in feature space (focused_2d)...
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig_nll_heatmap_focused_2d.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig_nll_heatmap_focused_2d.png
+
+[NLL-16D] NLL heatmap in feature space (high_dim_16d)...
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig_nll_heatmap_high_dim_16d.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig_nll_heatmap_high_dim_16d.png
+
+[ΔNLL-16D] ΔNLL surface (high_dim_16d)...
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig_nll_delta_high_dim_16d.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figures/fig_nll_delta_high_dim_16d.png
+
+----------------------------------------
+GENERATING LATEX TABLES
+----------------------------------------
+
+[1/3] NLL vs tau table...
+  Saved LaTeX table: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/tables/tab_nll_vs_tau.tex
+
+[2/3] NLL vs k table...
+  Saved LaTeX table: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/tables/tab_nll_vs_k.tex
+
+[3/3] Omega weights table...
+  Saved LaTeX table: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/tables/tab_omega_weights.tex
+
+[4/4] NLL summary table (learned vs k-NN vs global)...
+  Learned ω (τ=0.25): 11.188
+  k-NN (k=16):        11.225
+  k-NN (k=512):       12.242
+  Global:              13.248
+  Saved LaTeX table: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/tables/tab_nll_summary.tex
+
+Saved metadata: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final/figure_metadata.json
+
+================================================================================
+GENERATION COMPLETE
+================================================================================
+
+Figures generated: 19
+  - fig1_kernel_distance
+  - fig2_ellipsoid_3d
+  - fig2_ellipsoid_3d_extreme
+  - fig3_nll_vs_k
+  - fig4_nll_vs_tau
+  - fig3b_4b_hyperparameter_sweeps
+  - fig6b_calibration_clean
+  - fig6c_calibration_points
+  - fig7_corrections
+  - fig7b_normalized_lower_bound
+  - fig7c_lb_decomposition
+  - fig8_ellipse_grid
+  - fig8_ellipse_grid_extreme
+  - fig10_ellipse_overlay
+  - fig10_ellipse_overlay_extreme
+  - fig11_tau_sweep_unconstrained
+  - fig_nll_heatmap_focused_2d
+  - fig_nll_heatmap_high_dim_16d
+  - fig_nll_delta_high_dim_16d
+
+Tables generated: 4
+  - tab_nll_vs_tau
+  - tab_nll_vs_k
+  - tab_omega_weights
+  - tab_nll_summary
+
+Output directory: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final
+  figures/
+  tables/
+  figure_metadata.json
+============ RESIDUALS MODE ============
+=== [5/8] sweep_and_viz focused_2d (residuals) ===
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_and_viz_feature_set.py:71: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_and_viz_feature_set.py:71: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_and_viz_feature_set.py:71: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+
+*** Using RESIDUALS as target (ACTUAL - MEAN_FORECAST) ***
+
+Created artifact directory: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals
+  - Config: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/feature_config.json
+  - README: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/README.md
+================================================================================
+Running sweep for feature set: focused_2d
+================================================================================
+Feature set: focused_2d
+  Description: 2D focused baseline (SYS_MEAN, SYS_STD)
+  Data shape: X=(2952, 2), Y=(2952, 3)
+  Features: ['SYS_MEAN', 'SYS_STD']
+  Targets: ['122_WIND_1', '309_WIND_1', '317_WIND_1']
+
+Train: 1476, Val: 738, Test: 738
+Split: Random 50%/25%/25% (seed=42)
+  - Val used for hyperparameter selection
+  - Test used ONCE for final unbiased evaluation
+
+scaler=standard, tau=0.010, reg=0.00/softmax => ω=[0.442, 0.558], NLL: 28.937 vs kernel(-)28.835 euclid(-)12.254 global(-)11.904 | win%: 47/40/57
+scaler=standard, tau=0.050, reg=0.00/softmax => ω=[0.753, 0.247], NLL: 12.037 vs kernel(+)12.100 euclid(+)12.254 global(-)11.904 | win%: 53/44/60
+scaler=standard, tau=0.100, reg=0.00/softmax => ω=[0.573, 0.427], NLL: 12.109 vs kernel(-)12.093 euclid(+)12.254 global(-)11.904 | win%: 52/41/58
+scaler=standard, tau=0.250, reg=0.00/softmax => ω=[0.348, 0.652], NLL: 12.091 vs kernel(+)12.093 euclid(+)12.254 global(-)11.904 | win%: 47/41/58
+scaler=standard, tau=0.500, reg=0.00/softmax => ω=[0.322, 0.678], NLL: 12.066 vs kernel(+)12.094 euclid(+)12.254 global(-)11.904 | win%: 47/41/57
+scaler=standard, tau=1.000, reg=0.00/softmax => ω=[0.288, 0.712], NLL: 12.095 vs kernel(+)12.095 euclid(+)12.254 global(-)11.904 | win%: 46/42/57
+scaler=standard, tau=2.500, reg=0.00/softmax => ω=[0.006, 0.994], NLL: 12.186 vs kernel(-)12.095 euclid(+)12.254 global(-)11.904 | win%: 47/45/57
+scaler=standard, tau=5.000, reg=0.00/softmax => ω=[0.003, 0.997], NLL: 12.207 vs kernel(-)12.095 euclid(+)12.254 global(-)11.904 | win%: 46/46/56
+scaler=standard, tau=7.500, reg=0.00/softmax => ω=[0.004, 0.996], NLL: 12.182 vs kernel(-)12.095 euclid(+)12.254 global(-)11.904 | win%: 46/46/56
+scaler=standard, tau=10.000, reg=0.00/softmax => ω=[0.004, 0.996], NLL: 12.179 vs kernel(-)12.095 euclid(+)12.254 global(-)11.904 | win%: 46/46/55
+scaler=standard, tau=20.000, reg=0.00/softmax => ω=[0.004, 0.996], NLL: 12.174 vs kernel(-)12.095 euclid(+)12.254 global(-)11.904 | win%: 46/46/56
+
+  Divergence filter: excluding 1 config(s) with val_nll > 23.8 (2x global baseline 11.9). Diverged taus: [0.01]
+
+Best configuration (selected on VALIDATION set):
+  scaler_type=standard, tau=0.05, omega_l2_reg=0.0, constraint=softmax
+  Learned omega: [0.75287116 0.24712887]
+  Validation NLL:
+    Learned:       12.0371
+    Uniform(ω=1/2): 12.1003
+    Euclidean kNN: 12.2536
+    Global:        11.9035
+
+--- Final Evaluation on TEST set (unbiased) ---
+  Test NLL (unbiased):
+    Learned:       12.0345
+    Uniform(ω=1/2): 12.0207
+    Euclidean kNN: 12.1781
+    Global:        11.8012
+  Test Improvement (positive = learned is better):
+    vs Uniform(ω=1/2): -0.0138
+    vs Euclidean kNN: 0.1436
+    vs Global:        -0.2333
+Saved sweep results: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/sweep_results.csv
+Saved best omega: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/best_omega.npy
+Saved best config summary: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/best_config_summary.json
+
+================================================================================
+MULTI-SEED VALIDATION (5 seeds x 11 taus)
+  constraint=softmax, l2_reg=0.0, scaler=standard
+================================================================================
+
+tau=0.01:
+  seed=0: val_NLL=12.0105, ω=[0.990, 0.010]
+  seed=1: val_NLL=12.0106, ω=[0.990, 0.010]
+  seed=2: val_NLL=12.0440, ω=[0.996, 0.004]
+  seed=3: val_NLL=12.0104, ω=[0.990, 0.010]
+  seed=4: val_NLL=28.8337, ω=[0.458, 0.542]
+
+tau=0.05:
+  seed=0: val_NLL=12.0226, ω=[0.767, 0.233]
+  seed=1: val_NLL=11.9969, ω=[0.768, 0.232]
+  seed=2: val_NLL=11.9939, ω=[0.770, 0.230]
+  seed=3: val_NLL=12.0148, ω=[0.764, 0.236]
+  seed=4: val_NLL=11.9307, ω=[0.872, 0.128]
+
+tau=0.1:
+  seed=0: val_NLL=12.1144, ω=[0.568, 0.432]
+  seed=1: val_NLL=12.0952, ω=[0.552, 0.448]
+  seed=2: val_NLL=12.1128, ω=[0.577, 0.423]
+  seed=3: val_NLL=12.1053, ω=[0.561, 0.439]
+  seed=4: val_NLL=12.1131, ω=[0.566, 0.434]
+
+tau=0.25:
+  seed=0: val_NLL=12.0864, ω=[0.336, 0.664]
+  seed=1: val_NLL=12.0883, ω=[0.365, 0.635]
+  seed=2: val_NLL=12.0751, ω=[0.375, 0.625]
+  seed=3: val_NLL=12.0795, ω=[0.359, 0.641]
+  seed=4: val_NLL=12.0794, ω=[0.362, 0.638]
+
+tau=0.5:
+  seed=0: val_NLL=12.0856, ω=[0.307, 0.693]
+  seed=1: val_NLL=12.0642, ω=[0.320, 0.680]
+  seed=2: val_NLL=12.0874, ω=[0.336, 0.664]
+  seed=3: val_NLL=12.0739, ω=[0.329, 0.671]
+  seed=4: val_NLL=12.0770, ω=[0.330, 0.670]
+
+tau=1.0:
+  seed=0: val_NLL=12.0824, ω=[0.260, 0.740]
+  seed=1: val_NLL=12.0859, ω=[0.307, 0.693]
+  seed=2: val_NLL=12.0879, ω=[0.308, 0.692]
+  seed=3: val_NLL=12.0965, ω=[0.268, 0.732]
+  seed=4: val_NLL=12.1030, ω=[0.277, 0.723]
+
+tau=2.5:
+  seed=0: val_NLL=12.1954, ω=[0.007, 0.993]
+  seed=1: val_NLL=12.1865, ω=[0.005, 0.995]
+  seed=2: val_NLL=12.1864, ω=[0.006, 0.994]
+  seed=3: val_NLL=12.2087, ω=[0.007, 0.993]
+  seed=4: val_NLL=12.1547, ω=[0.005, 0.995]
+
+tau=5.0:
+  seed=0: val_NLL=12.1617, ω=[0.004, 0.996]
+  seed=1: val_NLL=12.1913, ω=[0.004, 0.996]
+  seed=2: val_NLL=12.1727, ω=[0.004, 0.996]
+  seed=3: val_NLL=12.2070, ω=[0.003, 0.997]
+  seed=4: val_NLL=12.2146, ω=[0.003, 0.997]
+
+tau=7.5:
+  seed=0: val_NLL=12.1810, ω=[0.004, 0.996]
+  seed=1: val_NLL=12.1928, ω=[0.004, 0.996]
+  seed=2: val_NLL=12.1862, ω=[0.004, 0.996]
+  seed=3: val_NLL=12.1879, ω=[0.003, 0.997]
+  seed=4: val_NLL=12.2105, ω=[0.003, 0.997]
+
+tau=10.0:
+  seed=0: val_NLL=12.2054, ω=[0.003, 0.997]
+  seed=1: val_NLL=12.1803, ω=[0.004, 0.996]
+  seed=2: val_NLL=12.1927, ω=[0.004, 0.996]
+  seed=3: val_NLL=12.1868, ω=[0.004, 0.996]
+  seed=4: val_NLL=12.2070, ω=[0.003, 0.997]
+
+tau=20.0:
+  seed=0: val_NLL=12.1723, ω=[0.005, 0.995]
+  seed=1: val_NLL=12.1614, ω=[0.004, 0.996]
+  seed=2: val_NLL=12.1723, ω=[0.005, 0.995]
+  seed=3: val_NLL=12.1641, ω=[0.005, 0.995]
+  seed=4: val_NLL=12.1800, ω=[0.004, 0.996]
+
+Best tau (by mean): 0.05 (NLL = 11.9918 ± 0.0362)
+Best overall: tau=0.05, seed=4, NLL=11.9307
+
+Saved multi-seed results to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/
+
+Generating visualizations...
+✓ Saved NLL vs tau plot to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/nll_vs_tau.png
+✓ Saved PDF to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/nll_vs_tau.pdf
+Saved: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/omega_bar_chart.png
+Saved: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals/kernel_distance_comparison.png
+Visualizations complete!
+
+All outputs saved to: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/focused_2d_residuals
+
+Done!
+=== [6/8] sweep_and_viz high_dim_16d (residuals) ===
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_and_viz_feature_set.py:71: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_and_viz_feature_set.py:71: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_and_viz_feature_set.py:71: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+
+*** Using RESIDUALS as target (ACTUAL - MEAN_FORECAST) ***
+
+Created artifact directory: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals
+  - Config: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/feature_config.json
+  - README: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/README.md
+================================================================================
+Running sweep for feature set: high_dim_16d
+================================================================================
+Feature set: high_dim_16d
+  Description: 16D comprehensive (8D base + temporal + ramp + spread)
+  Data shape: X=(2949, 16), Y=(2949, 3)
+  Features: ['SYS_MEAN', 'SYS_STD', 'WIND_122_MEAN', 'WIND_309_MEAN', 'WIND_317_MEAN', 'WIND_122_STD', 'WIND_309_STD', 'WIND_317_STD', 'HOUR_SIN', 'HOUR_COS', 'DOW_SIN', 'DOW_COS', 'SYS_MEAN_DELTA_3H', 'SYS_MEAN_DELTA_1H', 'SYS_STD_ROLLING_6H', 'FORECAST_SPREAD']
+  Targets: ['122_WIND_1', '309_WIND_1', '317_WIND_1']
+
+Train: 1474, Val: 737, Test: 738
+Split: Random 50%/25%/25% (seed=42)
+  - Val used for hyperparameter selection
+  - Test used ONCE for final unbiased evaluation
+
+scaler=standard, tau=0.010, reg=0.00/softmax => ω=[0.497, 0.002, 0.017, 0.192, 0.152, 0.000, 0.000, 0.000, 0.001, 0.001, 0.000, 0.000, 0.001, 0.001, 0.000, 0.134], NLL: 11.873 vs kernel(+)21057.278 euclid(-)11.177 global(-)11.846 | win%: 88/40/66
+scaler=standard, tau=0.050, reg=0.00/softmax => ω=[0.174, 0.025, 0.005, 0.136, 0.179, 0.039, 0.032, 0.010, 0.018, 0.011, 0.014, 0.074, 0.007, 0.003, 0.104, 0.167], NLL: 11.220 vs kernel(+)110.378 euclid(-)11.177 global(+)11.846 | win%: 45/52/74
+scaler=standard, tau=0.100, reg=0.00/softmax => ω=[0.056, 0.005, 0.166, 0.063, 0.036, 0.162, 0.094, 0.046, 0.046, 0.067, 0.041, 0.168, 0.013, 0.003, 0.020, 0.016], NLL: 11.168 vs kernel(+)11.643 euclid(+)11.177 global(+)11.846 | win%: 51/53/77
+scaler=standard, tau=0.250, reg=0.00/softmax => ω=[0.002, 0.000, 0.073, 0.061, 0.004, 0.192, 0.062, 0.102, 0.090, 0.055, 0.087, 0.114, 0.046, 0.001, 0.063, 0.051], NLL: 11.129 vs kernel(+)11.161 euclid(+)11.177 global(+)11.846 | win%: 54/44/76
+scaler=standard, tau=0.500, reg=0.00/softmax => ω=[0.028, 0.013, 0.025, 0.017, 0.060, 0.246, 0.106, 0.219, 0.085, 0.005, 0.047, 0.067, 0.005, 0.005, 0.021, 0.051], NLL: 11.371 vs kernel(-)11.231 euclid(-)11.177 global(+)11.846 | win%: 52/40/71
+scaler=standard, tau=1.000, reg=0.00/softmax => ω=[0.002, 0.004, 0.000, 0.001, 0.112, 0.268, 0.175, 0.365, 0.038, 0.000, 0.000, 0.000, 0.000, 0.000, 0.002, 0.031], NLL: 11.376 vs kernel(-)11.272 euclid(-)11.177 global(+)11.846 | win%: 46/36/69
+scaler=standard, tau=2.500, reg=0.00/softmax => ω=[0.000, 0.008, 0.000, 0.000, 0.000, 0.306, 0.208, 0.476, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000], NLL: 11.581 vs kernel(-)11.298 euclid(-)11.177 global(+)11.846 | win%: 43/36/64
+scaler=standard, tau=5.000, reg=0.00/softmax => ω=[0.000, 0.030, 0.000, 0.000, 0.000, 0.232, 0.045, 0.690, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000], NLL: 11.631 vs kernel(-)11.306 euclid(-)11.177 global(+)11.846 | win%: 43/35/65
+scaler=standard, tau=7.500, reg=0.00/softmax => ω=[0.000, 0.033, 0.000, 0.000, 0.000, 0.127, 0.021, 0.816, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000], NLL: 11.768 vs kernel(-)11.309 euclid(-)11.177 global(+)11.846 | win%: 42/35/64
+scaler=standard, tau=10.000, reg=0.00/softmax => ω=[0.000, 0.042, 0.000, 0.000, 0.000, 0.011, 0.017, 0.928, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000], NLL: 11.656 vs kernel(-)11.311 euclid(-)11.177 global(+)11.846 | win%: 43/35/63
+scaler=standard, tau=20.000, reg=0.00/softmax => ω=[0.000, 0.055, 0.000, 0.000, 0.000, 0.001, 0.011, 0.931, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000], NLL: 11.728 vs kernel(-)11.313 euclid(-)11.177 global(+)11.846 | win%: 38/32/60
+
+Best configuration (selected on VALIDATION set):
+  scaler_type=standard, tau=0.25, omega_l2_reg=0.0, constraint=softmax
+  Learned omega: [0.00229524 0.00049733 0.0730577  0.06050711 0.00360007 0.19159068
+ 0.06182696 0.101639   0.08956201 0.05460627 0.08662593 0.11368302
+ 0.04561474 0.00098617 0.06272214 0.05118554]
+  Validation NLL:
+    Learned:       11.1286
+    Uniform(ω=1/16): 11.1606
+    Euclidean kNN: 11.1774
+    Global:        11.8461
+
+--- Final Evaluation on TEST set (unbiased) ---
+  Test NLL (unbiased):
+    Learned:       11.2472
+    Uniform(ω=1/16): 11.2425
+    Euclidean kNN: 11.3079
+    Global:        11.8960
+  Test Improvement (positive = learned is better):
+    vs Uniform(ω=1/16): -0.0047
+    vs Euclidean kNN: 0.0607
+    vs Global:        0.6488
+Saved sweep results: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/sweep_results.csv
+Saved best omega: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/best_omega.npy
+Saved best config summary: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/best_config_summary.json
+
+================================================================================
+MULTI-SEED VALIDATION (5 seeds x 11 taus)
+  constraint=softmax, l2_reg=0.0, scaler=standard
+================================================================================
+
+tau=0.01:
+  seed=0: val_NLL=11.4449, ω=[0.225, 0.001, 0.001, 0.107, 0.088, 0.002, 0.001, 0.001, 0.001, 0.001, 0.001, 0.540, 0.000, 0.000, 0.001, 0.031]
+  seed=1: val_NLL=11.4475, ω=[0.036, 0.001, 0.001, 0.030, 0.018, 0.011, 0.001, 0.001, 0.000, 0.000, 0.304, 0.580, 0.000, 0.000, 0.004, 0.011]
+  seed=2: val_NLL=11.3268, ω=[0.048, 0.001, 0.011, 0.100, 0.056, 0.003, 0.000, 0.008, 0.002, 0.001, 0.000, 0.750, 0.000, 0.000, 0.000, 0.018]
+  seed=3: val_NLL=11.7010, ω=[0.314, 0.003, 0.001, 0.605, 0.024, 0.004, 0.002, 0.002, 0.001, 0.002, 0.003, 0.004, 0.001, 0.000, 0.001, 0.033]
+  seed=4: val_NLL=11.5772, ω=[0.056, 0.000, 0.006, 0.896, 0.014, 0.021, 0.000, 0.001, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.005]
+
+tau=0.05:
+  seed=0: val_NLL=11.2562, ω=[0.173, 0.008, 0.031, 0.111, 0.266, 0.042, 0.021, 0.003, 0.020, 0.013, 0.011, 0.084, 0.005, 0.003, 0.127, 0.081]
+  seed=1: val_NLL=11.2523, ω=[0.216, 0.004, 0.012, 0.134, 0.164, 0.048, 0.027, 0.006, 0.019, 0.015, 0.013, 0.085, 0.008, 0.003, 0.090, 0.159]
+  seed=2: val_NLL=11.2694, ω=[0.104, 0.006, 0.019, 0.213, 0.265, 0.043, 0.028, 0.024, 0.028, 0.012, 0.013, 0.076, 0.007, 0.004, 0.039, 0.119]
+  seed=3: val_NLL=11.3080, ω=[0.230, 0.036, 0.005, 0.264, 0.101, 0.058, 0.028, 0.016, 0.025, 0.024, 0.014, 0.057, 0.008, 0.006, 0.009, 0.118]
+  seed=4: val_NLL=11.2426, ω=[0.121, 0.035, 0.004, 0.142, 0.211, 0.030, 0.037, 0.012, 0.020, 0.009, 0.015, 0.071, 0.013, 0.002, 0.109, 0.169]
+
+tau=0.1:
+  seed=0: val_NLL=11.4707, ω=[0.025, 0.001, 0.195, 0.106, 0.013, 0.162, 0.085, 0.049, 0.046, 0.065, 0.051, 0.163, 0.015, 0.000, 0.023, 0.002]
+  seed=1: val_NLL=11.4684, ω=[0.029, 0.000, 0.195, 0.104, 0.008, 0.162, 0.086, 0.049, 0.046, 0.065, 0.051, 0.164, 0.015, 0.000, 0.023, 0.004]
+  seed=2: val_NLL=11.1830, ω=[0.025, 0.000, 0.172, 0.084, 0.046, 0.162, 0.093, 0.049, 0.046, 0.067, 0.041, 0.167, 0.013, 0.003, 0.018, 0.014]
+  seed=3: val_NLL=11.4564, ω=[0.039, 0.000, 0.191, 0.095, 0.008, 0.162, 0.088, 0.047, 0.045, 0.065, 0.049, 0.166, 0.016, 0.001, 0.023, 0.005]
+  seed=4: val_NLL=11.2117, ω=[0.054, 0.005, 0.040, 0.059, 0.083, 0.165, 0.141, 0.059, 0.044, 0.061, 0.031, 0.181, 0.017, 0.004, 0.023, 0.032]
+
+tau=0.25:
+  seed=0: val_NLL=11.1300, ω=[0.004, 0.000, 0.073, 0.059, 0.007, 0.192, 0.062, 0.102, 0.090, 0.055, 0.087, 0.114, 0.046, 0.000, 0.063, 0.048]
+  seed=1: val_NLL=11.1302, ω=[0.003, 0.000, 0.073, 0.060, 0.003, 0.192, 0.062, 0.102, 0.090, 0.055, 0.087, 0.114, 0.046, 0.000, 0.063, 0.051]
+  seed=2: val_NLL=11.1288, ω=[0.001, 0.000, 0.073, 0.060, 0.005, 0.192, 0.062, 0.102, 0.090, 0.055, 0.087, 0.114, 0.046, 0.001, 0.063, 0.051]
+  seed=3: val_NLL=11.1287, ω=[0.003, 0.001, 0.073, 0.059, 0.002, 0.192, 0.062, 0.101, 0.089, 0.055, 0.087, 0.114, 0.045, 0.001, 0.063, 0.053]
+  seed=4: val_NLL=11.1286, ω=[0.001, 0.001, 0.073, 0.061, 0.003, 0.192, 0.062, 0.102, 0.090, 0.055, 0.087, 0.114, 0.046, 0.001, 0.063, 0.053]
+
+tau=0.5:
+  seed=0: val_NLL=11.4165, ω=[0.010, 0.002, 0.019, 0.007, 0.143, 0.238, 0.107, 0.227, 0.085, 0.001, 0.052, 0.069, 0.001, 0.001, 0.025, 0.014]
+  seed=1: val_NLL=11.4231, ω=[0.008, 0.001, 0.020, 0.003, 0.140, 0.238, 0.108, 0.227, 0.084, 0.000, 0.052, 0.069, 0.001, 0.001, 0.025, 0.022]
+  seed=2: val_NLL=11.4033, ω=[0.006, 0.002, 0.020, 0.008, 0.135, 0.237, 0.107, 0.226, 0.084, 0.002, 0.052, 0.069, 0.001, 0.002, 0.025, 0.025]
+  seed=3: val_NLL=11.4123, ω=[0.008, 0.002, 0.018, 0.005, 0.147, 0.238, 0.107, 0.226, 0.084, 0.001, 0.052, 0.069, 0.001, 0.002, 0.025, 0.014]
+  seed=4: val_NLL=11.3915, ω=[0.003, 0.001, 0.018, 0.003, 0.149, 0.238, 0.108, 0.226, 0.084, 0.002, 0.052, 0.069, 0.002, 0.001, 0.025, 0.019]
+
+tau=1.0:
+  seed=0: val_NLL=11.3635, ω=[0.003, 0.004, 0.000, 0.002, 0.122, 0.268, 0.175, 0.366, 0.038, 0.000, 0.000, 0.001, 0.000, 0.000, 0.002, 0.019]
+  seed=1: val_NLL=11.3800, ω=[0.003, 0.002, 0.000, 0.001, 0.108, 0.268, 0.176, 0.366, 0.038, 0.000, 0.001, 0.001, 0.000, 0.000, 0.002, 0.034]
+  seed=2: val_NLL=11.3790, ω=[0.001, 0.002, 0.001, 0.001, 0.124, 0.268, 0.176, 0.366, 0.037, 0.000, 0.000, 0.001, 0.000, 0.000, 0.003, 0.020]
+  seed=3: val_NLL=11.3790, ω=[0.003, 0.004, 0.000, 0.001, 0.120, 0.268, 0.175, 0.365, 0.038, 0.000, 0.000, 0.000, 0.000, 0.001, 0.002, 0.022]
+  seed=4: val_NLL=11.3876, ω=[0.001, 0.003, 0.000, 0.001, 0.114, 0.268, 0.175, 0.366, 0.038, 0.000, 0.000, 0.000, 0.000, 0.000, 0.002, 0.030]
+
+tau=2.5:
+  seed=0: val_NLL=11.5835, ω=[0.000, 0.012, 0.000, 0.000, 0.000, 0.305, 0.203, 0.475, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.002, 0.000]
+  seed=1: val_NLL=11.5807, ω=[0.000, 0.009, 0.000, 0.000, 0.000, 0.306, 0.205, 0.477, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+  seed=2: val_NLL=11.5746, ω=[0.000, 0.007, 0.000, 0.000, 0.000, 0.306, 0.209, 0.475, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.002, 0.000]
+  seed=3: val_NLL=11.5836, ω=[0.000, 0.010, 0.000, 0.000, 0.000, 0.306, 0.208, 0.473, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+  seed=4: val_NLL=11.5818, ω=[0.000, 0.009, 0.000, 0.000, 0.000, 0.306, 0.207, 0.475, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+
+tau=5.0:
+  seed=0: val_NLL=11.6441, ω=[0.000, 0.027, 0.000, 0.000, 0.000, 0.231, 0.045, 0.694, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+  seed=1: val_NLL=11.6376, ω=[0.000, 0.024, 0.000, 0.000, 0.000, 0.231, 0.051, 0.690, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+  seed=2: val_NLL=11.6078, ω=[0.000, 0.019, 0.000, 0.000, 0.000, 0.231, 0.062, 0.684, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.002, 0.000]
+  seed=3: val_NLL=11.6293, ω=[0.000, 0.032, 0.000, 0.000, 0.000, 0.232, 0.047, 0.686, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+  seed=4: val_NLL=11.6354, ω=[0.000, 0.023, 0.000, 0.000, 0.000, 0.232, 0.046, 0.696, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+
+tau=7.5:
+  seed=0: val_NLL=11.7787, ω=[0.000, 0.030, 0.000, 0.000, 0.000, 0.124, 0.025, 0.819, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+  seed=1: val_NLL=11.7763, ω=[0.000, 0.024, 0.000, 0.000, 0.000, 0.125, 0.026, 0.823, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+  seed=2: val_NLL=11.7465, ω=[0.000, 0.020, 0.000, 0.000, 0.000, 0.127, 0.027, 0.822, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+  seed=3: val_NLL=11.7515, ω=[0.000, 0.045, 0.000, 0.000, 0.000, 0.126, 0.021, 0.805, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+  seed=4: val_NLL=11.7523, ω=[0.000, 0.032, 0.000, 0.000, 0.000, 0.124, 0.023, 0.818, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+
+tau=10.0:
+  seed=0: val_NLL=11.6607, ω=[0.000, 0.039, 0.000, 0.000, 0.000, 0.009, 0.020, 0.930, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+  seed=1: val_NLL=11.6565, ω=[0.000, 0.032, 0.000, 0.000, 0.000, 0.009, 0.022, 0.934, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+  seed=2: val_NLL=11.6260, ω=[0.000, 0.026, 0.000, 0.000, 0.000, 0.014, 0.022, 0.935, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+  seed=3: val_NLL=11.6749, ω=[0.000, 0.040, 0.000, 0.000, 0.000, 0.012, 0.012, 0.934, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+  seed=4: val_NLL=11.6459, ω=[0.000, 0.041, 0.000, 0.000, 0.000, 0.010, 0.018, 0.928, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+
+tau=20.0:
+  seed=0: val_NLL=11.7639, ω=[0.000, 0.046, 0.000, 0.000, 0.000, 0.001, 0.013, 0.939, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+  seed=1: val_NLL=11.6979, ω=[0.000, 0.046, 0.000, 0.000, 0.000, 0.001, 0.016, 0.935, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+  seed=2: val_NLL=11.7191, ω=[0.000, 0.033, 0.000, 0.000, 0.000, 0.002, 0.014, 0.949, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+  seed=3: val_NLL=11.6906, ω=[0.000, 0.065, 0.000, 0.000, 0.000, 0.001, 0.010, 0.923, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+  seed=4: val_NLL=11.7147, ω=[0.000, 0.051, 0.000, 0.000, 0.000, 0.001, 0.011, 0.934, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000]
+
+Best tau (by mean): 0.25 (NLL = 11.1293 ± 0.0008)
+Best overall: tau=0.25, seed=4, NLL=11.1286
+
+Saved multi-seed results to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/
+
+Generating visualizations...
+✓ Saved NLL vs tau plot to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/nll_vs_tau.png
+✓ Saved PDF to /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/nll_vs_tau.pdf
+Saved: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/omega_bar_chart.png
+Saved: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals/kernel_distance_projection_2d.png
+Visualizations complete!
+
+All outputs saved to: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/high_dim_16d_residuals
+
+Done!
+=== [7/8] sweep_knn_k_values (residuals, multi-split) ===
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_knn_k_values.py:50: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_knn_k_values.py:50: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_knn_k_values.py:50: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_knn_k_values.py:50: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+/Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/sweep_knn_k_values.py:50: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  quad = float(r.T @ x)
+
+================================================================================
+MULTI-SPLIT K-NN SWEEP
+================================================================================
+k values: [8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+Seeds: [0, 1, 2, 3, 4]
+================================================================================
+
+--- Split seed=0 ---
+  Train: 2211, Eval: 738
+  k=8... NLL = 11.7538
+  k=16... NLL = 11.2181
+  k=32... NLL = 11.4567
+  k=64... NLL = 11.6690
+  k=128... NLL = 11.8434
+  k=256... NLL = 12.0338
+  k=512... NLL = 12.2619
+  k=1024... NLL = 12.6153
+  k=2048... NLL = 13.1730
+
+--- Split seed=1 ---
+  Train: 2211, Eval: 738
+  k=8... NLL = 13.0185
+  k=16... NLL = 11.3245
+  k=32... NLL = 11.4791
+  k=64... NLL = 11.6926
+  k=128... NLL = 11.8727
+  k=256... NLL = 12.0421
+  k=512... NLL = 12.2681
+  k=1024... NLL = 12.6519
+  k=2048... NLL = 13.2351
+
+--- Split seed=2 ---
+  Train: 2211, Eval: 738
+  k=8... NLL = 12.4770
+  k=16... NLL = 11.3297
+  k=32... NLL = 11.4800
+  k=64... NLL = 11.7158
+  k=128... NLL = 11.9006
+  k=256... NLL = 12.0429
+  k=512... NLL = 12.2635
+  k=1024... NLL = 12.6254
+  k=2048... NLL = 13.1976
+
+--- Split seed=3 ---
+  Train: 2211, Eval: 738
+  k=8... NLL = 12.0239
+  k=16... NLL = 11.2818
+  k=32... NLL = 11.4931
+  k=64... NLL = 11.7705
+  k=128... NLL = 11.9432
+  k=256... NLL = 12.1085
+  k=512... NLL = 12.3370
+  k=1024... NLL = 12.7036
+  k=2048... NLL = 13.2650
+
+--- Split seed=4 ---
+  Train: 2211, Eval: 738
+  k=8... NLL = 11.8768
+  k=16... NLL = 11.3445
+  k=32... NLL = 11.5144
+  k=64... NLL = 11.7371
+  k=128... NLL = 11.9110
+  k=256... NLL = 12.0654
+  k=512... NLL = 12.2777
+  k=1024... NLL = 12.6289
+  k=2048... NLL = 13.1757
+
+Saved raw results to data/viz_artifacts/knn_k_sweep_residuals/multi_split_k_results.csv
+Saved statistics to data/viz_artifacts/knn_k_sweep_residuals/multi_split_k_stats.csv
+
+Per-k statistics:
+   k  nll_mean  nll_std   nll_min   nll_max
+   8 12.230003 0.518836 11.753779 13.018484
+  16 11.299733 0.051232 11.218112 11.344460
+  32 11.484685 0.021167 11.456702 11.514446
+  64 11.716998 0.039284 11.669003 11.770541
+ 128 11.894181 0.038002 11.843359 11.943248
+ 256 12.058553 0.030306 12.033825 12.108543
+ 512 12.281636 0.031531 12.261914 12.336961
+1024 12.645011 0.035364 12.615326 12.703577
+2048 13.209299 0.039858 13.173012 13.265026
+
+Best k: 16 (mean NLL = 11.2997 +/- 0.0512)
+=== [8/8] generate_paper_figures (residuals) ===
+================================================================================
+PAPER FIGURE GENERATION
+================================================================================
+Output directory: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals
+================================================================================
+
+GENERATING FIGURES
+----------------------------------------
+
+[1/15] Kernel distance comparison (Learned vs k-NN)...
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig1_kernel_distance.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig1_kernel_distance.png
+
+[2/15] 3D ellipsoid comparison (Learned, k-NN, Global)...
+  k=16... NLL = 11.1774
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig2_ellipsoid_3d.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig2_ellipsoid_3d.png
+
+[2e/15] 3D ellipsoid comparison (extreme hour)...
+  k=16... NLL = 11.1774
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig2_ellipsoid_3d_extreme.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig2_ellipsoid_3d_extreme.png
+
+[3/15] NLL vs k sweep...
+  Multi-split data: 9 k values
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig3_nll_vs_k.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig3_nll_vs_k.png
+
+[4/15] NLL vs tau sweep...
+  Multi-seed data: 11 tau values
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig4_nll_vs_tau.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig4_nll_vs_tau.png
+
+[3b+4b] Hyperparameter sweeps with baselines (2-panel)...
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig3b_4b_hyperparameter_sweeps.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig3b_4b_hyperparameter_sweeps.png
+
+[6b/15] Global conformal calibration (no tolerance)...
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig6b_calibration_clean.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig6b_calibration_clean.png
+
+[6c/15] Global conformal calibration (points only)...
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig6c_calibration_points.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig6c_calibration_points.png
+
+[7/15] Global conformal correction vs alpha...
+    α=0.80: q_hat=0.408
+    α=0.85: q_hat=0.538
+    α=0.90: q_hat=0.638
+    α=0.95: q_hat=0.798
+    α=0.99: q_hat=1.820
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig7_corrections.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig7_corrections.png
+
+[7b/15] Normalized lower bound vs alpha...
+    α=0.80: 8.947 std below mean
+    α=0.85: 9.392 std below mean
+    α=0.90: 9.878 std below mean
+    α=0.95: 10.629 std below mean
+    α=0.99: 13.192 std below mean
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig7b_normalized_lower_bound.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig7b_normalized_lower_bound.png
+
+[7c/15] Lower bound decomposition (stacked bar)...
+    α=0.80: base=8.293, conformal=0.408, total=8.701
+    α=0.85: base=8.529, conformal=0.538, total=9.067
+    α=0.90: base=8.855, conformal=0.638, total=9.493
+    α=0.95: base=9.349, conformal=0.798, total=10.147
+    α=0.99: base=10.273, conformal=1.820, total=12.093
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig7c_lb_decomposition.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig7c_lb_decomposition.png
+
+[8/15] 2D ellipse grid (k=16, 512, Global)...
+  k=16... NLL = 10.9776
+  k=512... NLL = 11.5893
+  k=2211... NLL = 11.8934
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig8_ellipse_grid.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig8_ellipse_grid.png
+
+[8e/15] 2D ellipse grid (extreme hours)...
+  k=16... NLL = 10.9776
+  k=512... NLL = 11.5893
+  k=2211... NLL = 11.8934
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig8_ellipse_grid_extreme.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig8_ellipse_grid_extreme.png
+
+[10/15] 2D ellipse overlay...
+  k=16... NLL = 10.9776
+  k=512... NLL = 11.5893
+  k=2211... NLL = 11.8934
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig10_ellipse_overlay.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig10_ellipse_overlay.png
+
+[10e/15] 2D ellipse overlay (extreme hour)...
+  k=16... NLL = 10.9776
+  k=512... NLL = 11.5893
+  k=2211... NLL = 11.8934
+  Saved PDF: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig10_ellipse_overlay_extreme.pdf
+  Saved PNG: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figures/fig10_ellipse_overlay_extreme.png
+
+[11/15] Tau sweep (unconstrained, no reg, 16D)...
+  Warning: no rows with omega_constraint=none, omega_l2_reg=0
+
+[NLL-2D] NLL heatmap in feature space (focused_2d)...
+  Error: 'focused_2d_residuals'
+
+[NLL-16D] NLL heatmap in feature space (high_dim_16d)...
+  Error: 'high_dim_16d_residuals'
+
+[ΔNLL-16D] ΔNLL surface (high_dim_16d)...
+  Error: 'high_dim_16d_residuals'
+
+----------------------------------------
+GENERATING LATEX TABLES
+----------------------------------------
+
+[1/3] NLL vs tau table...
+  Saved LaTeX table: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/tables/tab_nll_vs_tau.tex
+
+[2/3] NLL vs k table...
+  Saved LaTeX table: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/tables/tab_nll_vs_k.tex
+
+[3/3] Omega weights table...
+  Saved LaTeX table: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/tables/tab_omega_weights.tex
+
+[4/4] NLL summary table (learned vs k-NN vs global)...
+  Learned ω (τ=0.25): 11.188
+  k-NN (k=16):        11.300
+  k-NN (k=512):       12.282
+  Global:              13.248
+  Saved LaTeX table: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/tables/tab_nll_summary.tex
+
+Saved metadata: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals/figure_metadata.json
+
+================================================================================
+GENERATION COMPLETE
+================================================================================
+
+Figures generated: 16
+  - fig1_kernel_distance
+  - fig2_ellipsoid_3d
+  - fig2_ellipsoid_3d_extreme
+  - fig3_nll_vs_k
+  - fig4_nll_vs_tau
+  - fig3b_4b_hyperparameter_sweeps
+  - fig6b_calibration_clean
+  - fig6c_calibration_points
+  - fig7_corrections
+  - fig7b_normalized_lower_bound
+  - fig7c_lb_decomposition
+  - fig8_ellipse_grid
+  - fig8_ellipse_grid_extreme
+  - fig10_ellipse_overlay
+  - fig10_ellipse_overlay_extreme
+  - fig11_tau_sweep_unconstrained
+
+Tables generated: 4
+  - tab_nll_vs_tau
+  - tab_nll_vs_k
+  - tab_omega_weights
+  - tab_nll_summary
+
+Output directory: /Users/alexwasilkoff/PycharmProjects/RTS/uncertainty_sets_refactored/data/viz_artifacts/paper_final_residuals
+  figures/
+  tables/
+  figure_metadata.json
+=== Done! Outputs: paper_final/ and paper_final_residuals/ ===

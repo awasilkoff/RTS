@@ -57,16 +57,16 @@ def test_random_split_works():
             binning="y_pred",
             n_bins=5,
             alpha_target=0.95,
-            split_method="random",  # ← NEW PARAMETER
+            split_method="random",  # <- NEW PARAMETER
             random_seed=42,
         )
-        print("✓ Random split works!")
+        print("(ok) Random split works!")
         print(f"  Split sizes: train={metrics['n_train']}, cal={metrics['n_cal']}, test={metrics['n_test']}")
         print(f"  Split method: {metrics['split_method']}")
         print(f"  Coverage: {metrics['coverage']:.4f} (target: 0.95)")
         return True
     except Exception as e:
-        print(f"✗ ERROR: {e}")
+        print(f"(x) ERROR: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -110,10 +110,10 @@ def test_reproducibility():
     print(f"Difference: {cov_diff:.6f}")
 
     if cov_diff < 1e-10:
-        print("\n✓ Results are reproducible with same seed")
+        print("\n(ok) Results are reproducible with same seed")
         return True
     else:
-        print("\n✗ Results differ (not reproducible)")
+        print("\n(x) Results differ (not reproducible)")
         return False
 
 
@@ -155,7 +155,7 @@ def test_different_seeds():
     print(f"Difference: {cov_diff:.6f}")
 
     if cov_diff > 1e-6:
-        print("\n✓ Different seeds give different results (as expected)")
+        print("\n(ok) Different seeds give different results (as expected)")
         return True
     else:
         print("\n⚠️  Seeds give very similar results (unusual but OK)")
@@ -204,7 +204,7 @@ def test_time_ordered_vs_random():
     gap_random = abs(metrics_random['coverage'] - alpha_target)
 
     if gap_time < 0.05 and gap_random < 0.05:
-        print("\n✓ Both methods achieve coverage gap < 5%")
+        print("\n(ok) Both methods achieve coverage gap < 5%")
         return True
     else:
         print(f"\n⚠️  Coverage gaps: time={gap_time:.3f}, random={gap_random:.3f}")
@@ -229,7 +229,7 @@ def run_all_tests():
     print("=" * 70)
 
     for test_name, passed in results.items():
-        status = "✓" if passed else "✗"
+        status = "(ok)" if passed else "(x)"
         print(f"  {status} {test_name}")
 
     all_passed = all(results.values())

@@ -2,13 +2,13 @@
 Run DARUC and ARUC with identical parameters, then compare.
 
 Single script that:
-  1. Runs DARUC (two-step: DAM → robust reliability) — DAM comes for free
+  1. Runs DARUC (two-step: DAM -> robust reliability) — DAM comes for free
   2. Runs ARUC-LDR (one-shot robust) with the same horizon/rho/network settings
   3. Saves all outputs to a single comparison directory
   4. Generates comparison figures + text summary
 
 Defaults tuned for visible differences between the two formulations:
-  - July summer peak (high load → binding constraints → structural differences matter)
+  - July summer peak (high load -> binding constraints -> structural differences matter)
   - rho=3.0 (large enough uncertainty set to force meaningful hedging)
   - 12h horizon (enough structure, fast solve)
   - Copperplate (no line limits) — keeps focus on commitment/dispatch differences
@@ -155,7 +155,7 @@ def main():
     # Step 1: Run DARUC (includes DAM as step 1)
     # ==================================================================
     print("\n" + "=" * 70)
-    print("RUNNING DARUC (two-step: DAM → robust reliability)")
+    print("RUNNING DARUC (two-step: DAM -> robust reliability)")
     print("=" * 70)
 
     daruc_outputs = run_rts_daruc(

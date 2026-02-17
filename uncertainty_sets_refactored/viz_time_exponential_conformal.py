@@ -322,12 +322,12 @@ def plot_time_exponential_analysis(
     # Save
     output_path = output_dir / "time_exponential_conformal_analysis.png"
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"\n✓ Saved 4-panel analysis to {output_path}")
+    print(f"\n(ok) Saved 4-panel analysis to {output_path}")
 
     # Also save PDF for paper
     output_path_pdf = output_dir / "time_exponential_conformal_analysis.pdf"
     plt.savefig(output_path_pdf, dpi=300, bbox_inches="tight")
-    print(f"✓ Saved PDF to {output_path_pdf}")
+    print(f"(ok) Saved PDF to {output_path_pdf}")
 
     plt.close()
 
@@ -453,11 +453,11 @@ def plot_comparison_across_hours(
     # Save
     output_path = output_dir / "time_exponential_hourly_patterns.png"
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"✓ Saved hourly patterns to {output_path}")
+    print(f"(ok) Saved hourly patterns to {output_path}")
 
     output_path_pdf = output_dir / "time_exponential_hourly_patterns.pdf"
     plt.savefig(output_path_pdf, dpi=300, bbox_inches="tight")
-    print(f"✓ Saved PDF to {output_path_pdf}")
+    print(f"(ok) Saved PDF to {output_path_pdf}")
 
     plt.close()
 
@@ -500,7 +500,7 @@ def save_summary_statistics(
 
     output_path = output_dir / "time_exponential_summary.csv"
     df_summary.to_csv(output_path, index=False)
-    print(f"✓ Saved summary statistics to {output_path}")
+    print(f"(ok) Saved summary statistics to {output_path}")
 
     return df_summary
 
@@ -528,7 +528,7 @@ def run_time_exponential_visualization(
         Minimum lag (1.0 = day-ahead constraint)
     safety_margin : float
         Adjustment to target coverage (negative reduces conservatism)
-        E.g., -0.02 with alpha=0.95 → effectively targets 0.93 quantile
+        E.g., -0.02 with alpha=0.95 -> effectively targets 0.93 quantile
         Use negative values if experiencing over-coverage
     output_subdir : str
         Subdirectory name for outputs
@@ -591,7 +591,7 @@ def run_time_exponential_visualization(
     print(df_summary.to_string(index=False))
     print("=" * 80)
 
-    print("\n✓ Time-exponential visualization complete!")
+    print("\n(ok) Time-exponential visualization complete!")
     print(f"\nOutputs saved to: {output_dir}/")
     print("  - time_exponential_conformal_analysis.png (4-panel)")
     print("  - time_exponential_conformal_analysis.pdf (for paper)")

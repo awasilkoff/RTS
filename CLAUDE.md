@@ -19,7 +19,7 @@ python run_rts_dam.py
 # Adaptive robust unit commitment with LDR
 python run_rts_aruc.py
 
-# Two-step DARUC: DAM → robust reliability commitments
+# Two-step DARUC: DAM -> robust reliability commitments
 python run_rts_daruc.py
 
 # ARUC vs DARUC comparison (single scenario)
@@ -28,7 +28,7 @@ python run_comparison.py --hours 6 --start-month 7 --start-day 15 --rho 2.0
 # Price of robustness sweep (rho values, long-running)
 python run_price_of_robustness.py --hours 12 --start-month 7 --start-day 15
 
-# Alpha sweep: conformal alpha → uncertainty sets → DARUC/ARUC (long-running)
+# Alpha sweep: conformal alpha -> uncertainty sets -> DARUC/ARUC (long-running)
 python run_alpha_sweep.py --hours 12 --start-month 7 --start-day 15
 
 # Generate all IEEE paper figures (~3-5 min)
@@ -45,20 +45,20 @@ cd uncertainty_sets_refactored && python generate_uncertainty_sets.py
 ### Data Flow Pipeline
 
 ```
-RTS_Data/SourceData/*.csv  →  io_rts.py  →  DAMData (Pydantic model)
-                                              ↓
+RTS_Data/SourceData/*.csv  ->  io_rts.py  ->  DAMData (Pydantic model)
+                                              v
                               dam_model.py (deterministic) or
                               aruc_model.py (robust with Sigma, rho)
-                                              ↓
-                              Gurobi optimization  →  results
+                                              v
+                              Gurobi optimization  ->  results
 ```
 
 For robust models, time-varying (Sigma, rho) come from the uncertainty set pipeline:
 ```
-SPP wind data (parquet)  →  covariance_optimization.py (learn omega, predict Sigma)
-                          →  conformal_prediction.py (calibrate rho via alpha)
-                          →  NPZ file (mu, Sigma, rho per hour)
-                          →  aruc_model.py / run_rts_aruc.py
+SPP wind data (parquet)  ->  covariance_optimization.py (learn omega, predict Sigma)
+                          ->  conformal_prediction.py (calibrate rho via alpha)
+                          ->  NPZ file (mu, Sigma, rho per hour)
+                          ->  aruc_model.py / run_rts_aruc.py
 ```
 
 ### Root-Level Modules
@@ -66,17 +66,17 @@ SPP wind data (parquet)  →  covariance_optimization.py (learn omega, predict S
 | Module | Purpose |
 |--------|---------|
 | `models.py` | `DAMData` Pydantic class — canonical data container for UC models |
-| `io_rts.py` | ETL: RTS-GMLC CSV files → `DAMData` object |
+| `io_rts.py` | ETL: RTS-GMLC CSV files -> `DAMData` object |
 | `network_ptdf.py` | DC power flow PTDF matrix computation |
 | `dam_model.py` | Deterministic DAM UC model builder (Gurobi) |
 | `aruc_model.py` | Adaptive robust UC with linear decision rules |
 | `run_rts_dam.py` | End-to-end deterministic DAM pipeline |
 | `run_rts_aruc.py` | End-to-end robust ARUC pipeline |
-| `run_rts_daruc.py` | Two-step DARUC: deterministic DAM → robust reliability commitments |
+| `run_rts_daruc.py` | Two-step DARUC: deterministic DAM -> robust reliability commitments |
 | `run_comparison.py` | DARUC vs ARUC comparison orchestrator |
 | `compare_aruc_vs_daruc.py` | Comparison figures: commitment heatmaps, dispatch bars, curtailment |
 | `run_price_of_robustness.py` | Rho sweep: cost/curtailment vs uncertainty budget |
-| `run_alpha_sweep.py` | Alpha sweep: conformal alpha → NPZ → DARUC/ARUC cost/curtailment |
+| `run_alpha_sweep.py` | Alpha sweep: conformal alpha -> NPZ -> DARUC/ARUC cost/curtailment |
 | `debugging.py` | Infeasibility diagnosis (IIS extraction, progressive relaxation) |
 
 ### Uncertainty Set Pipeline (`uncertainty_sets_refactored/`)
@@ -105,7 +105,7 @@ Regenerate v2 parquets: `cd uncertainty_sets_refactored && python mapping.py`
 
 **Wind block capacity fix:** Wind generators in gen.csv have `Output_pct_1/2/3 = 0` (no heat rate curve), which previously caused `block_cap = [0,0,0]` and forced zero dispatch. `io_rts.py` now sets `block_cap[i,0] = Pmax[i]` for wind generators with zero marginal cost.
 
-**Ramp rate units fix:** gen.csv stores `Ramp Rate MW/Min` but the ramp constraints in `dam_model.py` and `aruc_model.py` apply `RU * dt_ramp` where `dt_ramp` is in hours. `io_rts.py` now multiplies by 60 at read time (MW/min → MW/h). Without this, ramp rates were 60× too tight, forcing thermals to stay elevated overnight and causing ~54% wind curtailment in DAM.
+**Ramp rate units fix:** gen.csv stores `Ramp Rate MW/Min` but the ramp constraints in `dam_model.py` and `aruc_model.py` apply `RU * dt_ramp` where `dt_ramp` is in hours. `io_rts.py` now multiplies by 60 at read time (MW/min -> MW/h). Without this, ramp rates were 60x too tight, forcing thermals to stay elevated overnight and causing ~54% wind curtailment in DAM.
 
 ## Runner Scripts
 
@@ -130,7 +130,7 @@ python run_price_of_robustness.py --hours 12 --start-month 7 --start-day 15
 
 Outputs (in `price_of_robustness/`): `sweep_results.csv`, cost vs rho figure, curtailment vs rho figure.
 
-### Alpha Sweep (Conformal Alpha → Cost)
+### Alpha Sweep (Conformal Alpha -> Cost)
 
 `run_alpha_sweep.py` sweeps conformal alpha values end-to-end: pre-computes covariance (once), generates per-alpha NPZ uncertainty sets, then runs DARUC + ARUC for each.
 
@@ -164,9 +164,9 @@ Outputs in `data/viz_artifacts/paper_final/figures/` and `tables/`. Runtime: ~3-
 The `DAMData` Pydantic model (in `models.py`) is the canonical interface between ETL and optimization:
 
 - **Indices:** `gen_ids`, `bus_ids`, `line_ids`, `time`
-- **Generator params:** `Pmin`, `Pmax` (can be I×T for wind), `RU`, `RD`, `MUT`, `MDT`, costs
-- **Network:** `PTDF` (L×N matrix), `Fmax` (line limits)
-- **Load:** `d` (N×T nodal demand array)
+- **Generator params:** `Pmin`, `Pmax` (can be IxT for wind), `RU`, `RD`, `MUT`, `MDT`, costs
+- **Network:** `PTDF` (LxN matrix), `Fmax` (line limits)
+- **Load:** `d` (NxT nodal demand array)
 - **Initial conditions:** `u_init`, `init_up_time`, `init_down_time`
 
 Generator types: `"THERMAL"`, `"WIND"`, `"SOLAR"`, `"HYDRO"` (stored in `gen_type` list)
@@ -194,7 +194,7 @@ Filtering happens at the earliest point in `io_rts.py` (extending the existing `
 
 ### Variable-Duration Periods
 
-When `day2_interval_hours > 1`, the 48-hour horizon uses hourly periods for day 1 (24 periods) and multi-hour blocks for day 2. For example, `day2_interval_hours=2` gives T=36 periods: 24×1h + 12×2h.
+When `day2_interval_hours > 1`, the 48-hour horizon uses hourly periods for day 1 (24 periods) and multi-hour blocks for day 2. For example, `day2_interval_hours=2` gives T=36 periods: 24x1h + 12x2h.
 
 - **`period_duration`** (on `DAMData`): Optional `(T,)` array of period durations in hours. `None` = all 1.0 (backward compatible).
 - **`data.dt`** property: Returns period durations (always available, defaults to ones).
@@ -214,8 +214,8 @@ When `day1_only_robust=True`, the ARUC/DARUC model only creates Z variables and 
 
 When `robust_ramp=True` (`--robust-ramp` CLI flag), ramp constraints account for worst-case dispatch deviations under uncertainty:
 
-- **Ramp up:** `p0[i,t] + ρ_t·‖Z_{i,t} L_t‖ - p0[i,t-1] + ρ_{t-1}·‖Z_{i,t-1} L_{t-1}‖ ≤ RU_i · dt_ramp · (u[i,t-1] + v[i,t])`
-- **Ramp down:** `p0[i,t-1] + ρ_{t-1}·‖Z_{i,t-1} L_{t-1}‖ - p0[i,t] + ρ_t·‖Z_{i,t} L_t‖ ≤ RD_i · dt_ramp · (u[i,t] + w[i,t])`
+- **Ramp up:** `p0[i,t] + rho_t * ||Z_{i,t} L_t|| - p0[i,t-1] + rho_{t-1} * ||Z_{i,t-1} L_{t-1}|| <= RU_i * dt_ramp * (u[i,t-1] + v[i,t])`
+- **Ramp down:** `p0[i,t-1] + rho_{t-1} * ||Z_{i,t-1} L_{t-1}|| - p0[i,t] + rho_t * ||Z_{i,t} L_t|| <= RD_i * dt_ramp * (u[i,t] + w[i,t])`
 
 The norm terms reuse the existing `z_gen[i,t]` SOC variables (no new SOC constraints needed). Only applied when both periods `t` and `t-1` are robust (per `robust_mask`); otherwise falls back to nominal ramp constraints. Default is `False` (nominal ramps only) for backward compatibility.
 

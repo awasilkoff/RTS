@@ -324,7 +324,7 @@ def generate_dayahead_valid_figures(
             output_path=fig_correction_path,
         )
         plt.close(fig_correction)
-        print(f"    ✓ Saved correction summary")
+        print(f"    (ok) Saved correction summary")
 
         # Timeseries overlay
         df_eval = df_test_viz.copy()
@@ -343,7 +343,7 @@ def generate_dayahead_valid_figures(
             max_points=24,
             title=f"Day-Ahead Wind Forecast vs Conformal Bound (α={alpha_viz:.2f})",
         )
-        print(f"    ✓ Saved timeseries (24h window)")
+        print(f"    (ok) Saved timeseries (24h window)")
 
         # Store results
         viz_results[alpha_viz] = {
@@ -407,7 +407,7 @@ def generate_dayahead_valid_figures(
     print("=" * 80)
     print("\nGenerated figures (DAY-AHEAD VALID):")
     for name, path in paths.items():
-        status = "✓" if path.exists() else "✗"
+        status = "(ok)" if path.exists() else "(x)"
         print(f"  {status} {name}: {path}")
 
     print("\n" + "=" * 80)
@@ -454,11 +454,11 @@ if __name__ == "__main__":
         output_dir=OUTPUT_DIR,
         alpha_values=[0.8, 0.85, 0.90, 0.95, 0.99],  # Calibration curve
         viz_alphas=[0.90, 0.95, 0.99],  # Detailed visualizations
-        n_bins=1,  # ← ADJUST THIS to test different bin counts (e.g., 3, 5, 10, 30)
-        bin_strategy="quantile",  # ← ADJUST THIS: "equal_width" or "quantile"
-        binning_strategy="y_actual",  # ← ADJUST THIS: "y_pred", "y_actual", "ens_std", or any feature
-        safety_margin=0.000,  # ← ADJUST THIS for conservativeness (e.g., 0.0, 0.005, 0.01, 0.02)
-        max_value_filter=None,  # ← ADJUST THIS to filter suspicious high values (or None to disable)
+        n_bins=1,  # <- ADJUST THIS to test different bin counts (e.g., 3, 5, 10, 30)
+        bin_strategy="quantile",  # <- ADJUST THIS: "equal_width" or "quantile"
+        binning_strategy="y_actual",  # <- ADJUST THIS: "y_pred", "y_actual", "ens_std", or any feature
+        safety_margin=0.000,  # <- ADJUST THIS for conservativeness (e.g., 0.0, 0.005, 0.01, 0.02)
+        max_value_filter=None,  # <- ADJUST THIS to filter suspicious high values (or None to disable)
     )
 
     print("\n" + "=" * 80)
@@ -473,7 +473,7 @@ if __name__ == "__main__":
     print(f"\nCalibration curve (all alphas):")
     for res in meta["calibration_results"]:
         gap = abs(res["coverage"] - res["alpha_target"])
-        status = "✓" if gap < 0.05 else "⚠"
+        status = "(ok)" if gap < 0.05 else "⚠"
         print(
             f"  {status} α={res['alpha_target']:.2f}: {res['coverage']:.1%} (gap: {gap:.2%})"
         )
@@ -482,7 +482,7 @@ if __name__ == "__main__":
     for alpha_str, metrics_viz in meta["visualization_results"].items():
         alpha = float(alpha_str)
         gap = metrics_viz["coverage_gap"]
-        status = "✓" if gap < 0.05 else "⚠"
+        status = "(ok)" if gap < 0.05 else "⚠"
         print(
             f"  {status} α={alpha:.2f}: {metrics_viz['coverage']:.1%} "
             f"(gap: {gap:.2%}, improvement: {metrics_viz['improvement']:.1%})"

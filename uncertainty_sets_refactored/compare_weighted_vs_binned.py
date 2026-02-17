@@ -80,7 +80,7 @@ def sweep_alpha_tau(
     current = 0
 
     print(f"\n{'='*70}")
-    print(f"Parameter Sweep: {len(alpha_values)} alphas × {len(tau_values)} taus")
+    print(f"Parameter Sweep: {len(alpha_values)} alphas x {len(tau_values)} taus")
     print(f"Total configurations: {total_configs}")
     print(f"{'='*70}\n")
 
@@ -125,7 +125,7 @@ def sweep_alpha_tau(
             print(f"    Progress: {current}/{total_configs}\n")
 
         except Exception as e:
-            print(f"    ✗ Failed: {e}\n")
+            print(f"    (x) Failed: {e}\n")
 
         # Train weighted conformal for each tau
         for tau in tau_values:
@@ -172,7 +172,7 @@ def sweep_alpha_tau(
                 print(f"    Progress: {current}/{total_configs}\n")
 
             except Exception as e:
-                print(f"    ✗ Failed: {e}\n")
+                print(f"    (x) Failed: {e}\n")
 
     df_results = pd.DataFrame(results)
     return df_results
@@ -597,7 +597,7 @@ def plot_comparison_results(df_results: pd.DataFrame, output_dir: Path):
     # Save figure
     output_path = output_dir / "weighted_vs_binned_comprehensive.png"
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"✓ Saved comprehensive visualization to {output_path}")
+    print(f"(ok) Saved comprehensive visualization to {output_path}")
 
     plt.close()
 
@@ -645,12 +645,12 @@ def print_summary_table(df_results: pd.DataFrame):
         if not df_w.empty and not df_b.empty:
             if best_w["gap"] < binned["gap"]:
                 improvement = binned["gap"] - best_w["gap"]
-                print(f"  → Weighted wins by {improvement:.3f} coverage gap ✓")
+                print(f"  -> Weighted wins by {improvement:.3f} coverage gap (ok)")
             elif binned["gap"] < best_w["gap"]:
                 improvement = best_w["gap"] - binned["gap"]
-                print(f"  → Binned wins by {improvement:.3f} coverage gap")
+                print(f"  -> Binned wins by {improvement:.3f} coverage gap")
             else:
-                print(f"  → Tie")
+                print(f"  -> Tie")
 
         print()
 
@@ -724,7 +724,7 @@ def run_comprehensive_comparison(
     output_dir.mkdir(exist_ok=True)
     results_path = output_dir / "weighted_vs_binned_sweep.csv"
     df_results.to_csv(results_path, index=False)
-    print(f"\n✓ Saved sweep results to {results_path}")
+    print(f"\n(ok) Saved sweep results to {results_path}")
 
     # Generate visualizations
     plot_comparison_results(df_results, output_dir)
@@ -733,7 +733,7 @@ def run_comprehensive_comparison(
     print_summary_table(df_results)
 
     print("\n" + "=" * 70)
-    print("✓ Comprehensive comparison complete!")
+    print("(ok) Comprehensive comparison complete!")
     print("=" * 70 + "\n")
 
     return df_results

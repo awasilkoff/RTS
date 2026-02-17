@@ -92,7 +92,7 @@ def main():
     save_path = Path("data/viz_artifacts/test_scaler_comparison.png")
     save_path.parent.mkdir(exist_ok=True, parents=True)
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
-    print(f"✓ Saved: {save_path}")
+    print(f"(ok) Saved: {save_path}")
     print()
 
     # Print statistics

@@ -247,10 +247,10 @@ def build_aruc_ldr_model(
 
     if rho_lines is not rho:
         if time_varying:
-            print(f"  [ARUC] rho_lines_frac={rho_lines_frac} → rho_lines range "
+            print(f"  [ARUC] rho_lines_frac={rho_lines_frac} -> rho_lines range "
                   f"[{rho_lines.min():.3f}, {rho_lines.max():.3f}]")
         else:
-            print(f"  [ARUC] rho_lines_frac={rho_lines_frac} → rho_lines={rho_lines:.3f}")
+            print(f"  [ARUC] rho_lines_frac={rho_lines_frac} -> rho_lines={rho_lines:.3f}")
 
     # Map bus -> list of generators
     gens_at_bus = [[] for _ in range(N)]

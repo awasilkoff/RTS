@@ -53,7 +53,7 @@ def test_global_baseline():
         assert np.allclose(Mu_global_eval[i], Mu_global), f"Row {i} mean mismatch"
         assert np.allclose(Sigma_global_eval[i], Sigma_global_ridge), f"Row {i} cov mismatch"
 
-    print("✓ All predictions are identical (as expected)")
+    print("(ok) All predictions are identical (as expected)")
     print()
 
     # Compute NLL (simplified version)
@@ -81,20 +81,20 @@ def test_global_baseline():
     try:
         # Without ridge (might fail if singular)
         np.linalg.cholesky(Sigma_global)
-        print("  ✓ Original Sigma is PSD (Cholesky succeeded)")
+        print("  (ok) Original Sigma is PSD (Cholesky succeeded)")
     except np.linalg.LinAlgError:
-        print("  ✗ Original Sigma is not PSD (Cholesky failed)")
+        print("  (x) Original Sigma is not PSD (Cholesky failed)")
 
     try:
         # With ridge (should always work)
         np.linalg.cholesky(Sigma_global_ridge)
-        print("  ✓ Ridge Sigma is PSD (Cholesky succeeded)")
+        print("  (ok) Ridge Sigma is PSD (Cholesky succeeded)")
     except np.linalg.LinAlgError:
-        print("  ✗ Ridge Sigma is not PSD (Cholesky failed) - increase ridge!")
+        print("  (x) Ridge Sigma is not PSD (Cholesky failed) - increase ridge!")
 
     print()
     print("=" * 60)
-    print("✓ All tests passed!")
+    print("(ok) All tests passed!")
     print()
     print("Key properties verified:")
     print("  1. Global mean/cov computed correctly")

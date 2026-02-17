@@ -7,8 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a research project implementing **Adaptive Robust Unit Commitment (ARUC)** with Linear Decision Rules for the RTS-GMLC power system test case. It uses Gurobi for optimization and supports both deterministic day-ahead market (DAM) and robust unit commitment under wind uncertainty.
 
 The project has two main parts:
-1. **Unit Commitment models** (root directory) — DAM, ARUC, DARUC formulations solved via Gurobi
-2. **Uncertainty Set Calibration** (`uncertainty_sets_refactored/`) — Learned covariance estimation, conformal prediction, paper figures. See `uncertainty_sets_refactored/CLAUDE.md` for detailed documentation.
+1. **Unit Commitment models** (root directory) -- DAM, ARUC, DARUC formulations solved via Gurobi
+2. **Uncertainty Set Calibration** (`uncertainty_sets_refactored/`) -- Learned covariance estimation, conformal prediction, paper figures. See `uncertainty_sets_refactored/CLAUDE.md` for detailed documentation.
 
 ## Key Commands
 
@@ -65,7 +65,7 @@ SPP wind data (parquet)  ->  covariance_optimization.py (learn omega, predict Si
 
 | Module | Purpose |
 |--------|---------|
-| `models.py` | `DAMData` Pydantic class — canonical data container for UC models |
+| `models.py` | `DAMData` Pydantic class -- canonical data container for UC models |
 | `io_rts.py` | ETL: RTS-GMLC CSV files -> `DAMData` object |
 | `network_ptdf.py` | DC power flow PTDF matrix computation |
 | `dam_model.py` | Deterministic DAM UC model builder (Gurobi) |
@@ -143,7 +143,7 @@ Output dir is auto-named from params (e.g. `alpha_sweep/lines_rlf0.25_12h_m07d15
 
 CLI args for variable intervals: `--day2-interval 2`, `--day1-only-robust`.
 
-**Resume support:** If interrupted, re-run with the same args — completed alphas are read from `sweep_results.csv` and skipped. Results are flushed to CSV after every alpha point.
+**Resume support:** If interrupted, re-run with the same args -- completed alphas are read from `sweep_results.csv` and skipped. Results are flushed to CSV after every alpha point.
 
 **Per-alpha artifacts:** After each solve, full outputs are saved to `alpha_X.XXXX/{dam,daruc,aruc}/` subdirectories (commitment, dispatch, Z coefficients, Sigma, rho, deviation summary, Z analysis, summary JSON).
 
@@ -224,7 +224,7 @@ The norm terms reuse the existing `z_gen[i,t]` SOC variables (no new SOC constra
 - `u[i,t]`: Binary commitment status
 - `v[i,t]`, `w[i,t]`: Startup/shutdown indicators
 - `p0[i,t]`: Nominal dispatch (first stage)
-- `Z[i,t,k]`: LDR coefficients — dispatch adjusts as `p(r) = p0 + Z @ r`
+- `Z[i,t,k]`: LDR coefficients -- dispatch adjusts as `p(r) = p0 + Z @ r`
 - Uncertainty: ellipsoidal set `{r : r^T Sigma^{-1} r <= rho^2}`
 
 ### Configuration
@@ -254,7 +254,7 @@ Models can be saved/loaded via `utils.save_full_state()` and `utils.load_full_st
 
 ## Commit Policy
 
-After completing a major change (new feature, bug fix, multi-file refactor), **automatically commit and push** with a descriptive message. Do not wait for the user to ask — commit and push proactively at natural completion points. This keeps the history clean, prevents losing work across sessions, and maintains remote backups.
+After completing a major change (new feature, bug fix, multi-file refactor), **automatically commit and push** with a descriptive message. Do not wait for the user to ask -- commit and push proactively at natural completion points. This keeps the history clean, prevents losing work across sessions, and maintains remote backups.
 
 ## Execution Policy
 

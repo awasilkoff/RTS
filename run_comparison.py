@@ -68,8 +68,8 @@ def main():
                         help="Fraction of rho for line flow constraints, e.g. 0.25 (default: 1.0 = same as rho)")
     parser.add_argument("--mip-gap", type=float, default=0.005,
                         help="MIP optimality gap (default: 0.005 = 0.5%%)")
-    parser.add_argument("--incremental-obj", action="store_true",
-                        help="DARUC: only charge commitment costs for additional units, scale dispatch by --dispatch-cost-scale")
+    parser.add_argument("--incremental-obj", action=argparse.BooleanOptionalAction, default=True,
+                        help="DARUC: only charge commitment costs for additional units, scale dispatch by --dispatch-cost-scale (default: True)")
     parser.add_argument("--dispatch-cost-scale", type=float, default=0.1,
                         help="Dispatch cost scale factor for incremental objective (default: 0.01)")
     parser.add_argument("--day2-interval", type=int, default=1,

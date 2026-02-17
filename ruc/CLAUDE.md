@@ -130,6 +130,73 @@ ruc/
 - Generalizes across decision horizons
 - Future work: LMP/uplift analysis (Variation 3 framing), stochastic/CC extensions
 
-## Status
+## Implementation Status
 
-Paper outline established. Drafting in progress (`Paper_Files/paper.tex`).
+### Code: Core formulation complete, debugging CCG convergence at extreme rho
+
+**`ruc/ruc_model.py`** (~1050 lines) — fully implemented:
+- `compute_gating_sets()` — notification-time-based gating mask
+- `build_phase1_model()` — deterministic gated MIP with CCG scenario augmentation
+- `add_scenario_constraints()` — adds dispatch feasibility constraints for a worst-case scenario
+- `build_phase2_model()` — robust feasibility SOCP with fixed commitment
+- `extract_worst_case_scenario()` — worst-case direction from Phase 2 solution
+- `solve_ruc_ccg()` — full CCG orchestration loop
+
+**`ruc/run_ruc.py`** (~560 lines) — fully implemented:
+- `assign_notification_times()` — maps RTS-GMLC unit types to L_SU based on fuel/capacity
+- `run_ruc()` — end-to-end pipeline: DAM → commitment extraction → uncertainty loading → gating → CCG
+- `save_outputs()` — writes commitment, dispatch, Z coefficients, gating sets, CCG history, summary JSON
+- CLI with argparse (`--hours`, `--t-next`, `--notification-scale`, `--rho`, `--enforce-lines`, etc.)
+
+### Testing results
+
+| Scenario | Phase 1 | Phase 2 | CCG | Notes |
+|----------|---------|---------|-----|-------|
+| 6h copper-plate rho=0.5 | 0 extra units | Robust sufficient | 1 iter | DAM already sufficient |
+| 6h copper-plate rho=5.0 | 0 extra units | Robust sufficient | 1 iter | DAM already sufficient |
+| 6h lines rho=5.0 | 0 extra units | Robust sufficient | 1 iter | DAM already sufficient |
+| 12h lines rho=25.0 | 2 CC units (24 unit-hrs) | Infeasible (status 3) | 5 iters, no convergence | Phase 2 SOCP infeasible — see bugs below |
+
+### Bugs fixed
+
+1. **numpy/Gurobi operator precedence** — Phase 2 Pmin constraint: `numpy_float <= gurobi_expr` called numpy's `__le__` instead of Gurobi's. Fixed by flipping operand order.
+2. **Phase 2 barrier divergence** — Changed Gurobi params to `NumericFocus=2, BarHomogeneous=1, ScaleFlag=2`.
+3. **Crash reading `.X` from unsolved model** — Added `SolCount > 0` guard in `extract_worst_case_scenario`.
+4. **CCG scenario slack unpenalized** — Scenario slack variables in `add_scenario_constraints` had zero cost in objective, so Phase 1 never added commitments. Fixed: penalize scenario slack with `M_p * dt[t]`.
+5. **Phase 2 surplus slack** — Added `s_dn` (surplus/spill) slack to power balance so over-generation from Pmin doesn't cause infeasibility.
+6. **Phase 2 robustness slack** — Added `s_wind` and `s_line` slack to wind availability and line flow SOC constraints. At large rho, the wind SOC constraint `p0 - Pbar + rho*z_wind <= 0` can be infeasible even with Z=0 because `z_wind >= ||sqrt_Sigma_col||`. Slack ensures Phase 2 is always feasible; the total slack measures the robustness gap.
+
+### Current state (as of latest commit)
+
+Phase 2 now has slack on all constraint families (power balance, wind SOC, line SOC), so it should always be feasible. The CCG worst-case extraction uses wind slack to find diverse scenario directions instead of returning the same direction each iteration. **Needs retest at rho=25 to verify convergence.**
+
+### Not yet implemented
+
+- **DARUC comparison mode** — run both LD-RUC and standard DARUC on same scenario for Section 6.2
+- **ARUC comparison mode** — run LD-RUC vs integrated ARUC for Section 6.3
+- **Notification time sensitivity sweep** — vary L_SU scale factor for Section 6.5
+- **Robust ramp SOC** — Phase 2 uses nominal ramp constraints only (no SOC); paper formulation (eq 4.4e-f) includes robust ramp. Low priority — nominal ramp is common in practice.
+- **Paper Section 6 results** — case study sections are TODO placeholders pending working numerical experiments
+
+### Key commands
+
+```bash
+# Basic smoke test (copper-plate, small rho)
+python ruc/run_ruc.py --hours 6 --start-month 7 --start-day 15 --t-next 25 --rho 2.0
+
+# Full test with lines (moderate rho)
+python ruc/run_ruc.py --hours 12 --start-month 7 --start-day 15 --t-next 25 --rho 5.0 --enforce-lines
+
+# Stress test (large rho, CCG iterations)
+python ruc/run_ruc.py --hours 12 --start-month 7 --start-day 15 --t-next 25 --rho 25.0 --enforce-lines --max-ccg-iter 5
+
+# All outputs go to ruc/ruc_outputs/<run_tag>/
+```
+
+### Paper
+
+Sections 1–5 and 7 are fully drafted in `Paper_Files/paper.tex` (7 pages). Section 6 (Case Study) has structure and TODO comments awaiting numerical results. Compile with:
+
+```bash
+cd ruc/Paper_Files && pdflatex paper.tex
+```

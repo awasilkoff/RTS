@@ -75,61 +75,148 @@ def main():
     parser = argparse.ArgumentParser(
         description="Run DARUC + ARUC with identical parameters, then compare"
     )
-    parser.add_argument("--hours", type=int, default=12,
-                        help="Horizon hours (default: 12)")
-    parser.add_argument("--rho", type=float, default=3.0,
-                        help="Ellipsoid radius (default: 3.0 for visible differences)")
-    parser.add_argument("--start-month", type=int, default=7,
-                        help="Start month (default: 7 = July peak load)")
-    parser.add_argument("--start-day", type=int, default=15,
-                        help="Start day (default: 15)")
-    parser.add_argument("--start-hour", type=int, default=0,
-                        help="Start hour (default: 0)")
-    parser.add_argument("--enforce-lines", action="store_true",
-                        help="Enforce line flow limits (default: copperplate)")
-    parser.add_argument("--uncertainty-npz", type=str, default=None,
-                        help="Path to time-varying uncertainty NPZ")
-    parser.add_argument("--provider-start", type=int, default=0,
-                        help="Start index into NPZ time series")
-    parser.add_argument("--rho-lines-frac", type=float, default=None,
-                        help="Fraction of rho for line flow constraints, e.g. 0.25 (default: 1.0 = same as rho)")
-    parser.add_argument("--mip-gap", type=float, default=0.005,
-                        help="MIP optimality gap (default: 0.005 = 0.5%%)")
-    parser.add_argument("--incremental-obj", action=argparse.BooleanOptionalAction, default=True,
-                        help="DARUC: only charge commitment costs for additional units, scale dispatch by --dispatch-cost-scale (default: True)")
-    parser.add_argument("--dispatch-cost-scale", type=float, default=0.1,
-                        help="Dispatch cost scale factor for incremental objective (default: 0.01)")
-    parser.add_argument("--day2-interval", type=int, default=1,
-                        help="Day-2 interval hours (default: 1 = hourly, 2 = 2-hour blocks)")
-    parser.add_argument("--day1-only-robust", action="store_true",
-                        help="Only enforce robust constraints for day 1 (first 24 periods)")
-    parser.add_argument("--fix-wind-z", action="store_true",
-                        help="Fix wind Z diagonal to 1 (wind fully tracks own realization, no curtailment)")
-    parser.add_argument("--three-blocks", action="store_true",
-                        help="Use original 3-block piecewise cost (default: single block with weighted-average cost)")
-    parser.add_argument("--no-worst-case-cost", dest="worst_case_cost", action="store_false",
-                        help="Disable worst-case dispatch cost epigraph (use nominal dispatch cost only)")
+    parser.add_argument(
+        "--hours", type=int, default=48, help="Horizon hours (default: 48)"
+    )
+    parser.add_argument(
+        "--rho",
+        type=float,
+        default=3.0,
+        help="Ellipsoid radius (default: 3.0 for visible differences)",
+    )
+    parser.add_argument(
+        "--start-month",
+        type=int,
+        default=7,
+        help="Start month (default: 7 = July peak load)",
+    )
+    parser.add_argument(
+        "--start-day", type=int, default=15, help="Start day (default: 15)"
+    )
+    parser.add_argument(
+        "--start-hour", type=int, default=0, help="Start hour (default: 0)"
+    )
+    parser.add_argument(
+        "--enforce-lines",
+        action="store_true",
+        help="Enforce line flow limits (default: copperplate)",
+    )
+    parser.add_argument(
+        "--uncertainty-npz",
+        type=str,
+        default=None,
+        help="Path to time-varying uncertainty NPZ",
+    )
+    parser.add_argument(
+        "--provider-start",
+        type=int,
+        default=2448,
+        help="Start index into NPZ time series",
+    )
+    parser.add_argument(
+        "--rho-lines-frac",
+        type=float,
+        default=None,
+        help="Fraction of rho for line flow constraints, e.g. 0.25 (default: 1.0 = same as rho)",
+    )
+    parser.add_argument(
+        "--mip-gap",
+        type=float,
+        default=0.005,
+        help="MIP optimality gap (default: 0.005 = 0.5%%)",
+    )
+    parser.add_argument(
+        "--incremental-obj",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="DARUC: only charge commitment costs for additional units, scale dispatch by --dispatch-cost-scale (default: True)",
+    )
+    parser.add_argument(
+        "--dispatch-cost-scale",
+        type=float,
+        default=0.01,
+        help="Dispatch cost scale factor for incremental objective (default: 0.01)",
+    )
+    parser.add_argument(
+        "--day2-interval",
+        type=int,
+        default=2,
+        help="Day-2 interval hours (default: 1 = hourly, 2 = 2-hour blocks)",
+    )
+    parser.add_argument(
+        "--day1-only-robust",
+        action="store_true",
+        default=True,
+        help="Only enforce robust constraints for day 1 (first 24 periods)",
+    )
+    parser.add_argument(
+        "--fix-wind-z",
+        action="store_true",
+        help="Fix wind Z diagonal to 1 (wind fully tracks own realization, no curtailment)",
+    )
+    parser.add_argument(
+        "--three-blocks",
+        action="store_true",
+        help="Use original 3-block piecewise cost (default: single block with weighted-average cost)",
+    )
+    parser.add_argument(
+        "--no-worst-case-cost",
+        dest="worst_case_cost",
+        action="store_false",
+        help="Disable worst-case dispatch cost epigraph (use nominal dispatch cost only)",
+    )
     parser.set_defaults(worst_case_cost=True)
-    parser.add_argument("--include-renewables", action=argparse.BooleanOptionalAction, default=False,
-                        help="Include solar (PV/RTPV) and hydro generators (default: exclude)")
-    parser.add_argument("--include-nuclear", action=argparse.BooleanOptionalAction, default=False,
-                        help="Include nuclear generators (default: exclude)")
-    parser.add_argument("--include-zero-marginal", action=argparse.BooleanOptionalAction, default=None,
-                        help="Override: include/exclude all zero-marginal-cost non-wind generators")
-    parser.add_argument("--ramp-scale", type=float, default=1.0,
-                        help="Multiply all ramp rates (RU, RD) by this factor (default: 1.0)")
-    parser.add_argument("--pmin-scale", type=float, default=1.0,
-                        help="Multiply all Pmin by this factor (default: 1.0)")
-    parser.add_argument("--robust-ramp", action="store_true",
-                        help="Use robust (SOC-based) ramp constraints that account for worst-case dispatch deviations")
-    parser.add_argument("--with-reserve", action="store_true",
-                        help="Re-solve DAM with spinning reserve derived from uncertainty set (requires --uncertainty-npz)")
-    parser.add_argument("--out-dir", type=str, default=None,
-                        help="Output directory (auto-generated if not specified)")
+    parser.add_argument(
+        "--include-renewables",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Include solar (PV/RTPV) and hydro generators (default: exclude)",
+    )
+    parser.add_argument(
+        "--include-nuclear",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Include nuclear generators (default: exclude)",
+    )
+    parser.add_argument(
+        "--include-zero-marginal",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Override: include/exclude all zero-marginal-cost non-wind generators",
+    )
+    parser.add_argument(
+        "--ramp-scale",
+        type=float,
+        default=1.0,
+        help="Multiply all ramp rates (RU, RD) by this factor (default: 1.0)",
+    )
+    parser.add_argument(
+        "--pmin-scale",
+        type=float,
+        default=1.0,
+        help="Multiply all Pmin by this factor (default: 1.0)",
+    )
+    parser.add_argument(
+        "--robust-ramp",
+        action="store_true",
+        help="Use robust (SOC-based) ramp constraints that account for worst-case dispatch deviations",
+    )
+    parser.add_argument(
+        "--with-reserve",
+        action="store_true",
+        help="Re-solve DAM with spinning reserve derived from uncertainty set (requires --uncertainty-npz)",
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=str,
+        default=None,
+        help="Output directory (auto-generated if not specified)",
+    )
     args = parser.parse_args()
 
-    start_time = pd.Timestamp(year=2020, month=args.start_month,
-                              day=args.start_day, hour=args.start_hour)
+    start_time = pd.Timestamp(
+        year=2020, month=args.start_month, day=args.start_day, hour=args.start_hour
+    )
 
     # Build output directory name
     if args.out_dir:
@@ -240,7 +327,9 @@ def main():
         "rho_lines_frac": args.rho_lines_frac,
         "mip_gap": args.mip_gap,
         "incremental_obj": args.incremental_obj,
-        "dispatch_cost_scale": args.dispatch_cost_scale if args.incremental_obj else None,
+        "dispatch_cost_scale": args.dispatch_cost_scale
+        if args.incremental_obj
+        else None,
         "time_varying": daruc_outputs["time_varying"],
         "enforce_lines": args.enforce_lines,
         "start_time": str(start_time),
@@ -319,13 +408,17 @@ def main():
         Sigma = daruc_outputs["Sigma"]
         rho_val = daruc_outputs["rho"]
         R = compute_reserve_from_uncertainty(Sigma, rho_val)
-        print(f"  Reserve requirement R[t]: min={R.min():.1f}, max={R.max():.1f}, mean={R.mean():.1f} MW")
+        print(
+            f"  Reserve requirement R[t]: min={R.min():.1f}, max={R.max():.1f}, mean={R.mean():.1f} MW"
+        )
 
         reserve_dir.mkdir(exist_ok=True)
 
         print("\nBuilding DAM model with spinning reserve constraint...")
         reserve_model, reserve_vars = build_dam_model(
-            data, M_p=1e4, model_name="DAM_Reserve",
+            data,
+            M_p=1e4,
+            model_name="DAM_Reserve",
             enforce_lines=args.enforce_lines,
             reserve_requirement=R,
         )
@@ -334,8 +427,11 @@ def main():
         reserve_model.optimize()
 
         from gurobipy import GRB as _GRB
+
         if reserve_model.Status not in [_GRB.OPTIMAL, _GRB.SUBOPTIMAL]:
-            print(f"WARNING: DAM+Reserve did not solve optimally. Status: {reserve_model.Status}")
+            print(
+                f"WARNING: DAM+Reserve did not solve optimally. Status: {reserve_model.Status}"
+            )
         else:
             reserve_results = extract_dam_solution(data, reserve_model, reserve_vars)
             reserve_results["u"].to_csv(reserve_dir / "commitment_u.csv")
@@ -393,29 +489,60 @@ def main():
     # Figures
     print("\nGenerating figures...")
     fig_commitment_and_cost(
-        aruc_loaded, daruc_loaded, dam_loaded, common_times,
-        cost_aruc, cost_daruc, cost_dam, out_dir, data=data,
-        reserve=reserve_loaded, cost_reserve=cost_reserve,
+        aruc_loaded,
+        daruc_loaded,
+        dam_loaded,
+        common_times,
+        cost_aruc,
+        cost_daruc,
+        cost_dam,
+        out_dir,
+        data=data,
+        reserve=reserve_loaded,
+        cost_reserve=cost_reserve,
     )
     fig_z_heatmaps(aruc_loaded, daruc_loaded, common_times, out_dir)
     fig_wind_curtailment(
-        aruc_loaded, daruc_loaded, dam_loaded, common_times, data, out_dir,
+        aruc_loaded,
+        daruc_loaded,
+        dam_loaded,
+        common_times,
+        data,
+        out_dir,
         reserve=reserve_loaded,
     )
     fig_pmin_vs_dispatch(
-        aruc_loaded, daruc_loaded, dam_loaded, common_times, data, out_dir,
+        aruc_loaded,
+        daruc_loaded,
+        dam_loaded,
+        common_times,
+        data,
+        out_dir,
         reserve=reserve_loaded,
     )
     fig_worst_case_wind(
-        aruc_loaded, daruc_loaded, dam_loaded, common_times, data, out_dir,
+        aruc_loaded,
+        daruc_loaded,
+        dam_loaded,
+        common_times,
+        data,
+        out_dir,
     )
 
     # Text summary
     print()
     write_summary(
-        aruc_loaded, daruc_loaded, dam_loaded, common_times,
-        cost_aruc, cost_daruc, cost_dam, out_dir, data=data,
-        reserve=reserve_loaded, cost_reserve=cost_reserve,
+        aruc_loaded,
+        daruc_loaded,
+        dam_loaded,
+        common_times,
+        cost_aruc,
+        cost_daruc,
+        cost_dam,
+        out_dir,
+        data=data,
+        reserve=reserve_loaded,
+        cost_reserve=cost_reserve,
     )
 
     # Quick delta report
@@ -424,12 +551,18 @@ def main():
     print("=" * 70)
     print(f"  DAM objective:   {dam_results['obj']:>14,.2f}")
     if reserve_results is not None:
-        print(f"  DAM+Reserve obj: {reserve_results['obj']:>14,.2f}  "
-              f"(+{reserve_results['obj'] - dam_results['obj']:,.2f} vs DAM)")
-    print(f"  DARUC objective: {daruc_results['obj']:>14,.2f}  "
-          f"(+{daruc_results['obj'] - dam_results['obj']:,.2f} vs DAM)")
-    print(f"  ARUC objective:  {aruc_results['obj']:>14,.2f}  "
-          f"(+{aruc_results['obj'] - dam_results['obj']:,.2f} vs DAM)")
+        print(
+            f"  DAM+Reserve obj: {reserve_results['obj']:>14,.2f}  "
+            f"(+{reserve_results['obj'] - dam_results['obj']:,.2f} vs DAM)"
+        )
+    print(
+        f"  DARUC objective: {daruc_results['obj']:>14,.2f}  "
+        f"(+{daruc_results['obj'] - dam_results['obj']:,.2f} vs DAM)"
+    )
+    print(
+        f"  ARUC objective:  {aruc_results['obj']:>14,.2f}  "
+        f"(+{aruc_results['obj'] - dam_results['obj']:,.2f} vs DAM)"
+    )
 
     u_aruc = _round_commitment(aruc_loaded["u"][common_times])
     u_daruc = _round_commitment(daruc_loaded["u"][common_times])

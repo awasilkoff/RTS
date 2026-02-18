@@ -262,7 +262,7 @@ def main():
         default=Path(__file__).parent
         / "data"
         / "uncertainty_sets_rts4_v2_16d"
-        / "sigma_rho.npz",
+        / "sigma_rho_alpha90.npz",
         help="Path to NPZ file",
     )
     parser.add_argument(

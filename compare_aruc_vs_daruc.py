@@ -119,6 +119,27 @@ def load_results(result_dir: Path, label: str) -> dict:
     else:
         out["deviation"] = None
 
+    # Sigma covariance matrix (for worst-case wind computation)
+    sigma_path = result_dir / "Sigma.npy"
+    if sigma_path.exists():
+        out["Sigma"] = np.load(sigma_path)
+    else:
+        out["Sigma"] = None
+
+    # Rho ellipsoid radius
+    rho_path = result_dir / "rho.npy"
+    if rho_path.exists():
+        out["rho"] = np.load(rho_path)
+    else:
+        out["rho"] = None
+
+    # Z coefficients (MultiIndex: index=gen_ids, columns=(time, k))
+    z_path = result_dir / "Z_coefficients.csv"
+    if z_path.exists():
+        out["Z"] = pd.read_csv(z_path, header=[0, 1], index_col=0)
+    else:
+        out["Z"] = None
+
     return out
 
 
@@ -761,6 +782,217 @@ def compute_wind_curtailment(p0_df: pd.DataFrame, data, common_times: list[str])
         "timeseries": total_curtail_ts,
         "per_farm_timeseries": per_farm_ts,
     }
+
+
+# ---------------------------------------------------------------------------
+# Worst-case wind dispatch helper
+# ---------------------------------------------------------------------------
+
+
+def compute_worst_case_wind(res: dict, data, common_times: list[str]) -> dict | None:
+    """Compute worst-case (minimum) wind dispatch under the ellipsoidal uncertainty set.
+
+    For wind generator i at period t:
+        p_worst[i,t] = p0[i,t] - rho[t] * ||L[t]^T @ Z[i,t,:]||_2
+    where L[t] = cholesky(Sigma[t]).
+
+    Returns None if Z/Sigma/rho are missing (e.g. DAM results).
+    """
+    Z_df = res.get("Z")
+    Sigma = res.get("Sigma")
+    rho = res.get("rho")
+    if Z_df is None or Sigma is None or rho is None:
+        return None
+
+    # Identify wind generators
+    wind_mask = [gt.upper() == "WIND" for gt in data.gen_type]
+    wind_idx = [i for i, m in enumerate(wind_mask) if m]
+    wind_ids = [data.gen_ids[i] for i in wind_idx]
+    if not wind_ids:
+        return None
+
+    T = len(common_times)
+
+    # Normalize Sigma to (T, K, K)
+    if Sigma.ndim == 2:
+        Sigma = np.tile(Sigma[np.newaxis, :, :], (T, 1, 1))
+    K = Sigma.shape[1]
+
+    # Normalize rho to (T,)
+    rho = np.atleast_1d(rho)
+    if rho.shape[0] == 1:
+        rho = np.full(T, rho[0])
+
+    # Cholesky decomposition per period
+    L = np.zeros_like(Sigma)
+    for t in range(T):
+        try:
+            L[t] = np.linalg.cholesky(Sigma[t])
+        except np.linalg.LinAlgError:
+            # Add small regularization if not positive definite
+            eps = 1e-6 * np.eye(K)
+            L[t] = np.linalg.cholesky(Sigma[t] + eps)
+
+    # Get p0 dispatch for wind generators
+    p0_df = res["p0"]
+    pmax_2d = data.Pmax_2d()  # (I, T)
+
+    # Map common_times to column positions in the full time axis
+    time_list = [str(t) for t in data.time]
+    common_str = [str(t) for t in common_times]
+    time_pos = [time_list.index(t) for t in common_str]
+
+    # Z_df has MultiIndex columns: level 0 = time label, level 1 = k index
+    # Get time labels from Z columns
+    z_time_labels = Z_df.columns.get_level_values(0).unique().tolist()
+
+    # Aggregate across wind farms
+    forecast_ts = np.zeros(T)
+    nominal_ts = np.zeros(T)
+    worst_case_ts = np.zeros(T)
+
+    for wi, gid in zip(wind_idx, wind_ids):
+        # Forecast (Pmax)
+        for t_idx, tp in enumerate(time_pos):
+            forecast_ts[t_idx] += pmax_2d[wi, tp]
+
+        # Nominal dispatch
+        if gid in p0_df.index:
+            nominal_ts += p0_df.loc[gid, common_times].values.astype(float)
+
+        # Worst-case deviation from Z coefficients
+        if gid not in Z_df.index:
+            # No Z row for this generator -> worst_case = nominal (no deviation)
+            if gid in p0_df.index:
+                worst_case_ts += p0_df.loc[gid, common_times].values.astype(float)
+            continue
+
+        for t_idx in range(T):
+            t_label = common_str[t_idx]
+            # Find matching Z time label
+            if t_label in z_time_labels:
+                z_label = t_label
+            else:
+                # Try to match by position if labels don't match exactly
+                if t_idx < len(z_time_labels):
+                    z_label = z_time_labels[t_idx]
+                else:
+                    worst_case_ts[t_idx] += (
+                        p0_df.loc[gid, common_times[t_idx]] if gid in p0_df.index else 0.0
+                    )
+                    continue
+
+            # Get Z row for this generator and time
+            z_row = Z_df.loc[gid, z_label].values.astype(float)  # (K,) vector
+
+            # Compute ||L[t]^T @ z_row||_2
+            norm_val = np.linalg.norm(L[t_idx].T @ z_row)
+            deviation = rho[t_idx] * norm_val
+
+            p0_val = p0_df.loc[gid, common_times[t_idx]] if gid in p0_df.index else 0.0
+            worst_case_ts[t_idx] += float(p0_val) - deviation
+
+    uncertain_ts = nominal_ts - worst_case_ts
+
+    return {
+        "forecast_ts": forecast_ts,
+        "nominal_ts": nominal_ts,
+        "worst_case_ts": worst_case_ts,
+        "uncertain_ts": uncertain_ts,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Figure: Worst-case wind dispatch
+# ---------------------------------------------------------------------------
+
+
+def fig_worst_case_wind(
+    aruc: dict, daruc: dict, dam: dict | None,
+    common_times: list[str], data, out_dir: Path,
+):
+    """1x2 panel figure showing nominal vs worst-case wind dispatch for DARUC and ARUC."""
+    daruc_wc = compute_worst_case_wind(daruc, data, common_times)
+    aruc_wc = compute_worst_case_wind(aruc, data, common_times)
+
+    if daruc_wc is None and aruc_wc is None:
+        print("  Skipping worst-case wind — no Z/Sigma/rho data in either formulation.")
+        return
+
+    # DAM nominal wind dispatch (reference line)
+    dam_nominal = None
+    if dam is not None:
+        wind_mask = [gt.upper() == "WIND" for gt in data.gen_type]
+        wind_ids = [data.gen_ids[i] for i, m in enumerate(wind_mask) if m]
+        dam_nominal = np.zeros(len(common_times))
+        for gid in wind_ids:
+            if gid in dam["p0"].index:
+                dam_nominal += dam["p0"].loc[gid, common_times].values.astype(float)
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5), sharey=True)
+    x = np.arange(len(common_times))
+
+    panels = [
+        (0, "DARUC", daruc_wc, "#ff7f0e"),
+        (1, "ARUC", aruc_wc, "#1f77b4"),
+    ]
+
+    for idx, label, wc, color in panels:
+        ax = axes[idx]
+        if wc is None:
+            ax.text(0.5, 0.5, f"No Z data\nfor {label}", ha="center", va="center",
+                    transform=ax.transAxes, fontsize=12)
+            ax.set_title(f"{label}: Worst-Case Wind Dispatch", fontsize=10)
+            continue
+
+        # Forecast line (dashed gray)
+        ax.plot(x, wc["forecast_ts"], color="gray", linestyle="--", linewidth=1.2,
+                label="Forecast (Pmax)")
+
+        # Nominal dispatch line (solid)
+        ax.plot(x, wc["nominal_ts"], color=color, linestyle="-", linewidth=1.5,
+                label="Nominal dispatch")
+
+        # Worst-case dispatch line (dotted, darker shade)
+        from matplotlib.colors import to_rgba
+        darker = to_rgba(color, alpha=1.0)
+        darker_rgb = tuple(max(0, c * 0.7) for c in darker[:3])
+        ax.plot(x, wc["worst_case_ts"], color=darker_rgb, linestyle=":", linewidth=1.5,
+                label="Worst-case dispatch")
+
+        # Shaded band between nominal and worst-case
+        ax.fill_between(x, wc["worst_case_ts"], wc["nominal_ts"],
+                        color=color, alpha=0.2, label="Uncertain band")
+
+        # DAM reference line
+        if dam_nominal is not None:
+            ax.plot(x, dam_nominal, color="#2ca02c", linestyle="-", linewidth=0.8,
+                    alpha=0.7, label="DAM dispatch")
+
+        ax.legend(fontsize=7, loc="upper right")
+        ax.grid(True, alpha=0.3)
+        ax.set_title(f"{label}: Worst-Case Wind Dispatch", fontsize=10)
+        ax.set_xlabel("Hour", fontsize=9)
+
+        # X-axis tick labels
+        T = len(common_times)
+        tick_step = max(1, T // 8)
+        ax.set_xticks(range(0, T, tick_step))
+        ax.set_xticklabels(
+            [common_times[i].split(" ")[1][:5] if " " in common_times[i]
+             else str(i) for i in range(0, T, tick_step)],
+            fontsize=7, rotation=45,
+        )
+
+    axes[0].set_ylabel("Wind Power (MW)", fontsize=9)
+
+    fig.suptitle("Worst-Case Wind Dispatch Under Uncertainty", fontsize=12, y=0.98)
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+
+    for ext in ["pdf", "png"]:
+        fig.savefig(out_dir / f"fig_worst_case_wind.{ext}", dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  Saved fig_worst_case_wind.pdf/.png")
 
 
 # ---------------------------------------------------------------------------

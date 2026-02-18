@@ -42,6 +42,7 @@ from compare_aruc_vs_daruc import (
     fig_commitment_and_cost,
     fig_z_heatmaps,
     fig_wind_curtailment,
+    fig_worst_case_wind,
     fig_pmin_vs_dispatch,
     write_summary,
 )
@@ -404,6 +405,9 @@ def main():
     fig_pmin_vs_dispatch(
         aruc_loaded, daruc_loaded, dam_loaded, common_times, data, out_dir,
         reserve=reserve_loaded,
+    )
+    fig_worst_case_wind(
+        aruc_loaded, daruc_loaded, dam_loaded, common_times, data, out_dir,
     )
 
     # Text summary

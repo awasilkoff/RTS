@@ -69,6 +69,64 @@ def load_system_load(times, load_csv=None):
     return load_vals
 
 
+def score_days(mu, sigma, rho, times):
+    """Score all 24h windows for illustration quality.
+
+    Returns list of (start_idx, score, metrics_dict) sorted by score ascending.
+    Lower score = more "moderate" day = better for illustration.
+    """
+    T_total, K = mu.shape
+    ones = np.ones(K)
+
+    # Pre-compute per-hour system quantities
+    forecast = mu.sum(axis=1)  # (T_total,)
+    envelope = np.array(
+        [np.sqrt(ones @ sigma[t] @ ones) for t in range(T_total)]
+    )  # (T_total,) -- sqrt(1^T Sigma 1), the MW-scale std
+    shortfall = rho * envelope  # (T_total,) -- worst-case MW shortfall
+
+    # Compute dataset-wide medians for normalization
+    # Use per-day aggregates to get the median "day behavior"
+    day_starts = list(range(0, T_total - 23, 24))
+    day_wind_means = [forecast[i : i + 24].mean() for i in day_starts]
+    day_wind_stds = [forecast[i : i + 24].std() for i in day_starts]
+    day_unc_means = [shortfall[i : i + 24].mean() for i in day_starts]
+
+    med_wind = np.median(day_wind_means)
+    med_var = np.median(day_wind_stds)
+    med_unc = np.median(day_unc_means)
+    med_rho = np.median(rho)
+
+    results = []
+    for i in day_starts:
+        w = slice(i, i + 24)
+        wind_mean = forecast[w].mean()
+        wind_std = forecast[w].std()
+        unc_mean = shortfall[w].mean()
+        rho_std = rho[w].std()
+        wind_floor = forecast[w].min()
+
+        # Normalized deviations (lower = closer to median = better)
+        s_wind = abs(wind_mean - med_wind) / max(med_wind, 1)
+        s_var = abs(wind_std - med_var) / max(med_var, 1)
+        s_unc = abs(unc_mean - med_unc) / max(med_unc, 1)
+        s_rho = rho_std / max(med_rho, 1)
+
+        # Floor penalty: want wind > 200 MW at all hours
+        s_floor = 1.0 if wind_floor < 200 else 0.0
+
+        score = s_wind + s_var + s_unc + s_rho + s_floor
+        results.append((i, score, {
+            "wind_mean": wind_mean, "wind_std": wind_std,
+            "unc_mean": unc_mean, "rho_std": rho_std,
+            "wind_floor": wind_floor, "date": str(times[i])[:10],
+            "date_end": str(times[i + 23])[:10],
+        }))
+
+    results.sort(key=lambda x: x[1])
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Plot mean vs worst-case wind from NPZ uncertainty set",
@@ -100,6 +158,18 @@ def main():
         default=None,
         help="Path to DAY_AHEAD_regional_Load.csv (auto-detected by default)",
     )
+    parser.add_argument(
+        "--per-farm",
+        action="store_true",
+        default=False,
+        help="Show per-farm wind detail panel",
+    )
+    parser.add_argument(
+        "--find-day",
+        action="store_true",
+        default=False,
+        help="Scan all 24h windows and rank by illustration quality",
+    )
     args = parser.parse_args()
 
     # Load NPZ
@@ -116,6 +186,28 @@ def main():
         wind_ids = [f"Wind_{k}" for k in range(mu.shape[1])]
 
     T_total, K = mu.shape
+
+    # --- Find-day mode: sweep and rank, then optionally plot the winner ---
+    if args.find_day:
+        ranked = score_days(mu, sigma, rho, times)
+        print(f"\nTop 10 illustration days (out of {len(ranked)} windows):\n")
+        print(f"{'Rank':>4}  {'Start':>5}  {'Date':>12}  {'Wind Mean':>9}  "
+              f"{'Wind Std':>8}  {'Unc Mean':>8}  {'Floor':>6}  {'Score':>6}")
+        print("-" * 72)
+        for rank, (idx, sc, m) in enumerate(ranked[:10], 1):
+            print(f"{rank:4d}  {idx:5d}  {m['date']:>12}  {m['wind_mean']:9.0f}  "
+                  f"{m['wind_std']:8.0f}  {m['unc_mean']:8.0f}  {m['wind_floor']:6.0f}  "
+                  f"{sc:6.3f}")
+        best_idx = ranked[0][0]
+        print(f"\nBest day: --start {best_idx} --hours 24")
+
+        if not args.out:
+            return
+        # Auto-plot the best day
+        args.start = best_idx
+        args.hours = 24
+        print(f"\nAuto-plotting best day (start={best_idx}) ...")
+
     t0 = args.start
     t1 = min(t0 + args.hours, T_total)
     T = t1 - t0
@@ -133,17 +225,17 @@ def main():
     worst_case = np.array(
         [forecast[t] - rho[t] * np.sqrt(ones @ sigma[t] @ ones) for t in range(T)]
     )
-    uncertain = forecast - worst_case  # (T,)
 
-    # --- Per-farm worst case ---
-    per_farm_worst = np.array(
-        [
-            [mu[t, k] - rho[t] * np.sqrt(sigma[t, k, k]) for k in range(K)]
-            for t in range(T)
-        ]
-    )  # (T, K)
+    # --- Per-farm worst case (only needed with --per-farm) ---
+    if args.per_farm:
+        per_farm_worst = np.array(
+            [
+                [mu[t, k] - rho[t] * np.sqrt(sigma[t, k, k]) for k in range(K)]
+                for t in range(T)
+            ]
+        )  # (T, K)
 
-    # --- Load system load (graceful fallback to 2-panel if unavailable) ---
+    # --- Load system load (graceful fallback if unavailable) ---
     load_ts = load_system_load(times, load_csv=args.load_csv)
     has_load = load_ts is not None
 
@@ -163,15 +255,35 @@ def main():
         "#7f7f7f",
     ]
 
+    # Determine panel count
+    show_per_farm = args.per_farm
     if has_load:
-        # --- 3-panel layout: (a) load + wind, (b) net load, (c) per-farm ---
+        n_panels = 3 if show_per_farm else 2
+    else:
+        n_panels = 2 if show_per_farm else 1
+
+    # Create figure
+    if n_panels == 3:
         fig, axes = plt.subplots(
             3, 1, figsize=(12, 10), sharex=True,
             gridspec_kw={"height_ratios": [1, 1, 0.8]},
         )
+    elif n_panels == 2:
+        fig, axes = plt.subplots(
+            2, 1, figsize=(12, 7), sharex=True,
+            gridspec_kw={"height_ratios": [1.2, 1]},
+        )
+    else:
+        fig, axes = plt.subplots(1, 1, figsize=(12, 4))
+        axes = [axes]  # normalize to list
 
-        # --- (a) System Load + Wind ---
-        ax = axes[0]
+    panel_idx = 0
+    panel_label = ord("a")
+
+    # --- Panel: System Load + Wind (when load available) or Wind-only ---
+    ax = axes[panel_idx]
+    lbl = chr(panel_label)
+    if has_load:
         ax.plot(x, load_ts, color="black", linewidth=1.4, label="System Load")
         ax.plot(x, forecast, color="gray", linestyle="--", linewidth=1.2,
                 label="Wind Forecast (mean)")
@@ -180,49 +292,8 @@ def main():
         ax.fill_between(x, worst_case, forecast, color="#1f77b4", alpha=0.2,
                         label="Wind uncertain band")
         ax.set_ylabel("MW", fontsize=10)
-        ax.set_title("(a) System Load and Wind Generation", fontsize=11)
-        ax.legend(fontsize=8, loc="upper right")
-        ax.grid(True, alpha=0.3)
-
-        # --- (b) Net Load ---
-        net_load_nominal = load_ts - forecast
-        net_load_worst = load_ts - worst_case
-        ax = axes[1]
-        ax.plot(x, net_load_nominal, color="#d62728", linewidth=1.3,
-                label="Net Load (nominal wind)")
-        ax.plot(x, net_load_worst, color="#8b0000", linestyle=":", linewidth=1.5,
-                label="Net Load (worst-case wind)")
-        ax.fill_between(x, net_load_nominal, net_load_worst,
-                        color="#d62728", alpha=0.18, label="Additional thermal at risk")
-        ax.set_ylabel("MW", fontsize=10)
-        ax.set_title("(b) Net Load (Load minus Wind)", fontsize=11)
-        ax.legend(fontsize=8, loc="upper right")
-        ax.grid(True, alpha=0.3)
-
-        # --- (c) Per-farm wind ---
-        ax = axes[2]
-        for k in range(K):
-            c = farm_colors[k % len(farm_colors)]
-            ax.plot(x, mu[:, k], color=c, linestyle="--", linewidth=0.9, alpha=0.7)
-            ax.plot(x, per_farm_worst[:, k], color=c, linestyle=":", linewidth=0.9,
-                    alpha=0.7)
-            ax.fill_between(x, per_farm_worst[:, k], mu[:, k], color=c, alpha=0.12,
-                            label=wind_ids[k])
-        ax.set_ylabel("Wind (MW)", fontsize=10)
-        ax.set_xlabel("Time", fontsize=10)
-        ax.set_title("(c) Per-Farm: Mean Forecast vs Worst-Case", fontsize=11)
-        ax.legend(fontsize=7, loc="upper right", ncol=min(K, 4))
-        ax.grid(True, alpha=0.3)
-
+        ax.set_title(f"({lbl}) System Load and Wind Generation", fontsize=11)
     else:
-        # --- Fallback: 2-panel layout (wind only) ---
-        fig, axes = plt.subplots(
-            2, 1, figsize=(12, 8), sharex=True,
-            gridspec_kw={"height_ratios": [1.2, 1]},
-        )
-
-        # --- (a) System total ---
-        ax = axes[0]
         ax.plot(x, forecast, color="gray", linestyle="--", linewidth=1.2,
                 label="Forecast (mean)")
         ax.plot(x, worst_case, color="#1f77b4", linestyle=":", linewidth=1.5,
@@ -230,12 +301,35 @@ def main():
         ax.fill_between(x, worst_case, forecast, color="#1f77b4", alpha=0.2,
                         label="Uncertain band")
         ax.set_ylabel("Total Wind (MW)", fontsize=10)
-        ax.set_title("(a) System-Level: Mean Forecast vs Worst-Case", fontsize=11)
+        ax.set_title(f"({lbl}) System-Level: Mean Forecast vs Worst-Case", fontsize=11)
+    ax.legend(fontsize=8, loc="upper right")
+    ax.grid(True, alpha=0.3)
+    panel_idx += 1
+    panel_label += 1
+
+    # --- Panel: Net Load (only when load available) ---
+    if has_load:
+        net_load_nominal = load_ts - forecast
+        net_load_worst = load_ts - worst_case
+        lbl = chr(panel_label)
+        ax = axes[panel_idx]
+        ax.plot(x, net_load_nominal, color="#d62728", linewidth=1.3,
+                label="Net Load (nominal wind)")
+        ax.plot(x, net_load_worst, color="#8b0000", linestyle=":", linewidth=1.5,
+                label="Net Load (worst-case wind)")
+        ax.fill_between(x, net_load_nominal, net_load_worst,
+                        color="#d62728", alpha=0.18, label="Additional thermal at risk")
+        ax.set_ylabel("MW", fontsize=10)
+        ax.set_title(f"({lbl}) Net Load (Load minus Wind)", fontsize=11)
         ax.legend(fontsize=8, loc="upper right")
         ax.grid(True, alpha=0.3)
+        panel_idx += 1
+        panel_label += 1
 
-        # --- (b) Per-farm ---
-        ax = axes[1]
+    # --- Panel: Per-farm wind (opt-in) ---
+    if show_per_farm:
+        lbl = chr(panel_label)
+        ax = axes[panel_idx]
         for k in range(K):
             c = farm_colors[k % len(farm_colors)]
             ax.plot(x, mu[:, k], color=c, linestyle="--", linewidth=0.9, alpha=0.7)
@@ -244,10 +338,12 @@ def main():
             ax.fill_between(x, per_farm_worst[:, k], mu[:, k], color=c, alpha=0.12,
                             label=wind_ids[k])
         ax.set_ylabel("Wind (MW)", fontsize=10)
-        ax.set_xlabel("Time", fontsize=10)
-        ax.set_title("(b) Per-Farm: Mean Forecast vs Worst-Case", fontsize=11)
+        ax.set_title(f"({lbl}) Per-Farm: Mean Forecast vs Worst-Case", fontsize=11)
         ax.legend(fontsize=7, loc="upper right", ncol=min(K, 4))
         ax.grid(True, alpha=0.3)
+
+    # X-axis label on the bottom panel only
+    axes[-1].set_xlabel("Time", fontsize=10)
 
     for ax in axes:
         ax.set_xticks(tick_idx)

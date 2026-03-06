@@ -90,6 +90,12 @@ def main():
     parser.add_argument("--start-month", type=int, default=7)
     parser.add_argument("--start-day", type=int, default=15)
     parser.add_argument("--hours", type=int, default=48)
+    parser.add_argument(
+        "--day2-interval",
+        type=int,
+        default=2,
+        help="Day-2 interval hours (default: 1 = hourly, 2 = 2-hour blocks)",
+    )
     parser.add_argument("-o", "--output", type=Path, default=Path("branch_flows.csv"),
                         help="Output CSV path (default: branch_flows.csv)")
     parser.add_argument("--top-n", type=int, default=10,
@@ -109,6 +115,7 @@ def main():
         ts_dir=TS_DIR,
         start_time=start,
         horizon_hours=args.hours,
+        day2_interval_hours=args.day2_interval,
         include_renewables=args.include_renewables,
         include_nuclear=args.include_nuclear,
     )

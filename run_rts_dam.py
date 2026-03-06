@@ -224,7 +224,115 @@ def run_rts_dam(
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    outputs = run_rts_dam()
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Run DAM with identical parameters"
+    )
+    parser.add_argument(
+        "--hours", type=int, default=48, help="Horizon hours (default: 48)"
+    )
+
+    parser.add_argument(
+        "--start-month",
+        type=int,
+        default=7,
+        help="Start month (default: 7 = July peak load)",
+    )
+    parser.add_argument(
+        "--start-day", type=int, default=15, help="Start day (default: 15)"
+    )
+    parser.add_argument(
+        "--start-hour", type=int, default=0, help="Start hour (default: 0)"
+    )
+    parser.add_argument(
+        "--enforce-lines",
+        action="store_true",
+        help="Enforce line flow limits (default: copperplate)",
+        default=True,
+    )
+    parser.add_argument(
+        "--mip-gap",
+        type=float,
+        default=0.005,
+        help="MIP optimality gap (default: 0.005 = 0.5%%)",
+    )
+    parser.add_argument(
+        "--day2-interval",
+        type=int,
+        default=2,
+        help="Day-2 interval hours (default: 1 = hourly, 2 = 2-hour blocks)",
+    )
+
+    parser.add_argument(
+        "--three-blocks",
+        action="store_true",
+        help="Use original 3-block piecewise cost (default: single block with weighted-average cost)",
+    )
+    parser.add_argument(
+        "--include-renewables",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Include solar (PV/RTPV) and hydro generators (default: exclude)",
+    )
+    parser.add_argument(
+        "--include-nuclear",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Include nuclear generators (default: exclude)",
+    )
+    parser.add_argument(
+        "--include-zero-marginal",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Override: include/exclude all zero-marginal-cost non-wind generators",
+    )
+    parser.add_argument(
+        "--ramp-scale",
+        type=float,
+        default=1.0,
+        help="Multiply all ramp rates (RU, RD) by this factor (default: 1.0)",
+    )
+    parser.add_argument(
+        "--pmin-scale",
+        type=float,
+        default=1.0,
+        help="Multiply all Pmin by this factor (default: 1.0)",
+    )
+    parser.add_argument(
+        "--robust-ramp",
+        action="store_true",
+        help="Use robust (SOC-based) ramp constraints that account for worst-case dispatch deviations",
+    )
+    parser.add_argument(
+        "--with-reserve",
+        action="store_true",
+        help="Re-solve DAM with spinning reserve derived from uncertainty set (requires --uncertainty-npz)",
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=str,
+        default=None,
+        help="Output directory (auto-generated if not specified)",
+    )
+    args = parser.parse_args()
+
+    start_time = pd.Timestamp(
+        year=2020, month=args.start_month, day=args.start_day, hour=args.start_hour
+    )
+    outputs = run_rts_dam(
+        start_time=start_time,
+        horizon_hours=args.hours,
+        enforce_lines=args.enforce_lines,
+
+        day2_interval_hours=args.day2_interval,
+
+        single_block=not args.three_blocks,
+
+        include_renewables=args.include_renewables,
+        include_nuclear=args.include_nuclear,
+        include_zero_marginal=args.include_zero_marginal,
+        ramp_scale=args.ramp_scale,
+        pmin_scale=args.pmin_scale,)
 
     # Example: write dispatch and commitment to CSV for inspection
     results = outputs["results"]

@@ -204,6 +204,9 @@ def run_alpha_point(
     ramp_scale: float = 1.0,
     pmin_scale: float = 1.0,
     monitored_lines_threshold: float | None = None,
+    time_limit: float | None = None,
+    threads: int | None = None,
+    bar_qcp_conv_tol: float | None = None,
 ) -> dict | None:
     """Run DARUC + ARUC with a given NPZ and return metrics row."""
     print(f"\n{'#' * 70}")
@@ -237,6 +240,9 @@ def run_alpha_point(
             ramp_scale=ramp_scale,
             pmin_scale=pmin_scale,
             monitored_lines_threshold=monitored_lines_threshold,
+            time_limit=time_limit,
+            threads=threads,
+            bar_qcp_conv_tol=bar_qcp_conv_tol,
         )
         data = daruc_out["data"]
         daruc_res = daruc_out["daruc_results"]
@@ -287,6 +293,9 @@ def run_alpha_point(
             pmin_scale=pmin_scale,
             monitored_lines_threshold=monitored_lines_threshold,
             dam_dispatch_for_screening=dam_res["p"].values if monitored_lines_threshold is not None else None,
+            time_limit=time_limit,
+            threads=threads,
+            bar_qcp_conv_tol=bar_qcp_conv_tol,
         )
         aruc_res = aruc_out["results"]
         aruc_obj = aruc_res["obj"]
@@ -680,7 +689,45 @@ def main():
         default="uncertainty_sets_refactored/data",
         help="Data directory for uncertainty set generation",
     )
+    # Solver performance tuning
+    parser.add_argument(
+        "--time-limit",
+        type=float,
+        default=None,
+        help="Gurobi time limit in seconds (default: no limit)",
+    )
+    parser.add_argument(
+        "--threads",
+        type=int,
+        default=None,
+        help="Gurobi thread count (default: Gurobi auto)",
+    )
+    parser.add_argument(
+        "--bar-qcp-conv-tol",
+        type=float,
+        default=None,
+        help="Barrier QCP convergence tolerance (default: Gurobi default 1e-8; try 1e-4 for speed)",
+    )
+    parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="Enable performance defaults: fix-wind-z, day1-only-robust, "
+             "bar-qcp-conv-tol=1e-4, time-limit=600, line-monitor-threshold=0.5 (when lines enforced)",
+    )
     args = parser.parse_args()
+
+    # --fast: apply performance defaults for args not explicitly set
+    if args.fast:
+        if not args.fix_wind_z:
+            args.fix_wind_z = True
+        if not args.day1_only_robust:
+            args.day1_only_robust = True
+        if args.bar_qcp_conv_tol is None:
+            args.bar_qcp_conv_tol = 1e-4
+        if args.time_limit is None:
+            args.time_limit = 600.0
+        if args.line_monitor_threshold is None and args.enforce_lines:
+            args.line_monitor_threshold = 0.5
 
     # Auto-generate output dir name from run parameters if not specified
     if args.out_dir is None:
@@ -782,6 +829,9 @@ def main():
             ramp_scale=args.ramp_scale,
             pmin_scale=args.pmin_scale,
             monitored_lines_threshold=args.line_monitor_threshold,
+            time_limit=args.time_limit,
+            threads=args.threads,
+            bar_qcp_conv_tol=args.bar_qcp_conv_tol,
         )
         if row is not None:
             rows.append(row)

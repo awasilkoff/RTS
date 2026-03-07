@@ -77,6 +77,9 @@ def run_sweep(args) -> pd.DataFrame:
                 ramp_scale=args.ramp_scale,
                 pmin_scale=args.pmin_scale,
                 monitored_lines_threshold=args.line_monitor_threshold,
+                time_limit=args.time_limit,
+                threads=args.threads,
+                bar_qcp_conv_tol=args.bar_qcp_conv_tol,
             )
             data = daruc_out["data"]
             daruc_res = daruc_out["daruc_results"]
@@ -121,6 +124,9 @@ def run_sweep(args) -> pd.DataFrame:
                 pmin_scale=args.pmin_scale,
                 monitored_lines_threshold=args.line_monitor_threshold,
                 dam_dispatch_for_screening=dam_res["p"].values if args.line_monitor_threshold is not None else None,
+                time_limit=args.time_limit,
+                threads=args.threads,
+                bar_qcp_conv_tol=args.bar_qcp_conv_tol,
             )
             aruc_res = aruc_out["results"]
             aruc_obj = aruc_res["obj"]
@@ -239,7 +245,21 @@ def main():
     parser.add_argument("--pmin-scale", type=float, default=1.0, help="Multiply all Pmin by this factor (default: 1.0)")
     parser.add_argument("--line-monitor-threshold", type=float, default=None, help="DAM loading threshold for line filtering (e.g. 0.5 = keep lines loaded >=50%%)")
     parser.add_argument("--out-dir", type=str, default="price_of_robustness", help="Output directory (default: price_of_robustness/)")
+    # Solver performance tuning
+    parser.add_argument("--time-limit", type=float, default=None, help="Gurobi time limit in seconds (default: no limit)")
+    parser.add_argument("--threads", type=int, default=None, help="Gurobi thread count (default: Gurobi auto)")
+    parser.add_argument("--bar-qcp-conv-tol", type=float, default=None, help="Barrier QCP convergence tolerance (default: 1e-8; try 1e-4 for speed)")
+    parser.add_argument("--fast", action="store_true", help="Enable performance defaults: bar-qcp-conv-tol=1e-4, time-limit=600, line-monitor-threshold=0.5 (when lines enforced)")
     args = parser.parse_args()
+
+    # --fast: apply performance defaults for args not explicitly set
+    if args.fast:
+        if args.bar_qcp_conv_tol is None:
+            args.bar_qcp_conv_tol = 1e-4
+        if args.time_limit is None:
+            args.time_limit = 600.0
+        if args.line_monitor_threshold is None and args.enforce_lines:
+            args.line_monitor_threshold = 0.5
 
     out_dir = Path(args.out_dir)
 

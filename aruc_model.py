@@ -84,6 +84,9 @@ def build_aruc_ldr_model(
     fix_wind_z: bool = False,
     worst_case_cost: bool = True,
     robust_ramp: bool = False,
+    time_limit: Optional[float] = None,
+    threads: Optional[int] = None,
+    bar_qcp_conv_tol: Optional[float] = None,
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Adaptive robust UC with linear decision rules:
@@ -904,6 +907,21 @@ def build_aruc_ldr_model(
     # Spend more effort finding good feasible solutions early.
     m.Params.Heuristics = 0.2       # 20% of node time on heuristics (default 5%)
     m.Params.MIPFocus = 1           # Focus on finding feasible solutions quickly
+
+    # Presolve: aggressive + sparsify helps SOC-heavy models
+    m.Params.Presolve = 2
+    m.Params.PreSparsify = 1
+
+    # Memory: spill B&B tree to disk after 0.5 GB to prevent OOM
+    m.Params.NodefileStart = 0.5
+
+    # Optional MISOCP tuning knobs (exposed to callers)
+    if time_limit is not None:
+        m.Params.TimeLimit = time_limit
+    if threads is not None:
+        m.Params.Threads = threads
+    if bar_qcp_conv_tol is not None:
+        m.Params.BarQCPConvTol = bar_qcp_conv_tol
 
     vars_dict: Dict[str, object] = {
         "u": u,

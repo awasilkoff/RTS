@@ -218,7 +218,45 @@ def main():
         default=None,
         help="Output directory (auto-generated if not specified)",
     )
+    # Solver performance tuning
+    parser.add_argument(
+        "--time-limit",
+        type=float,
+        default=None,
+        help="Gurobi time limit in seconds (default: no limit)",
+    )
+    parser.add_argument(
+        "--threads",
+        type=int,
+        default=None,
+        help="Gurobi thread count (default: Gurobi auto)",
+    )
+    parser.add_argument(
+        "--bar-qcp-conv-tol",
+        type=float,
+        default=None,
+        help="Barrier QCP convergence tolerance (default: Gurobi default 1e-8; try 1e-4 for speed)",
+    )
+    parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="Enable performance defaults: fix-wind-z, day1-only-robust, "
+             "bar-qcp-conv-tol=1e-4, time-limit=600, line-monitor-threshold=0.5 (when --enforce-lines)",
+    )
     args = parser.parse_args()
+
+    # --fast: apply performance defaults for args not explicitly set
+    if args.fast:
+        if not args.fix_wind_z:
+            args.fix_wind_z = True
+        if not args.day1_only_robust:
+            args.day1_only_robust = True
+        if args.bar_qcp_conv_tol is None:
+            args.bar_qcp_conv_tol = 1e-4
+        if args.time_limit is None:
+            args.time_limit = 600.0
+        if args.line_monitor_threshold is None and args.enforce_lines:
+            args.line_monitor_threshold = 0.5
 
     start_time = pd.Timestamp(
         year=2020, month=args.start_month, day=args.start_day, hour=args.start_hour
@@ -250,6 +288,8 @@ def main():
 
     print("=" * 70)
     print(f"ARUC vs DARUC COMPARISON")
+    if args.fast:
+        print(f"  Mode:     FAST (performance defaults enabled)")
     print(f"  Start:    {start_time}")
     print(f"  Horizon:  {args.hours}h")
     if args.uncertainty_npz:
@@ -274,6 +314,10 @@ def main():
     print(f"  Network:  {'with line limits' if args.enforce_lines else 'copperplate'}")
     if args.line_monitor_threshold is not None:
         print(f"  Line monitor: threshold={args.line_monitor_threshold*100:.0f}%")
+    if args.time_limit is not None:
+        print(f"  Time limit: {args.time_limit:.0f}s")
+    if args.bar_qcp_conv_tol is not None:
+        print(f"  BarQCPConvTol: {args.bar_qcp_conv_tol:.0e}")
     print(f"  Output:   {out_dir}")
     print("=" * 70)
 
@@ -307,6 +351,9 @@ def main():
         pmin_scale=args.pmin_scale,
         robust_ramp=args.robust_ramp,
         monitored_lines_threshold=args.line_monitor_threshold,
+        time_limit=args.time_limit,
+        threads=args.threads,
+        bar_qcp_conv_tol=args.bar_qcp_conv_tol,
     )
 
     daruc_results = daruc_outputs["daruc_results"]
@@ -378,6 +425,9 @@ def main():
         robust_ramp=args.robust_ramp,
         monitored_lines_threshold=args.line_monitor_threshold,
         dam_dispatch_for_screening=dam_results["p"].values if args.line_monitor_threshold is not None else None,
+        time_limit=args.time_limit,
+        threads=args.threads,
+        bar_qcp_conv_tol=args.bar_qcp_conv_tol,
     )
 
     aruc_results = aruc_outputs["results"]

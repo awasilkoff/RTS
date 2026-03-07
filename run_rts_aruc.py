@@ -428,6 +428,9 @@ def run_rts_aruc(
     robust_ramp: bool = False,
     monitored_lines_threshold: Optional[float] = None,
     dam_dispatch_for_screening: Optional[np.ndarray] = None,
+    time_limit: Optional[float] = None,
+    threads: Optional[int] = None,
+    bar_qcp_conv_tol: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Full pipeline for ARUC-LDR:
@@ -564,6 +567,9 @@ def run_rts_aruc(
         fix_wind_z=fix_wind_z,
         worst_case_cost=worst_case_cost,
         robust_ramp=robust_ramp,
+        time_limit=time_limit,
+        threads=threads,
+        bar_qcp_conv_tol=bar_qcp_conv_tol,
     )
 
     # Warm start from a quick DAM solve (~5s) — provides binary commitment

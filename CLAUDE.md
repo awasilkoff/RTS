@@ -246,6 +246,27 @@ Expected cost ordering: DAM < DAM+Reserve < DARUC/ARUC.
 - `Z[i,t,k]`: LDR coefficients -- dispatch adjusts as `p(r) = p0 + Z @ r`
 - Uncertainty: ellipsoidal set `{r : r^T Sigma^{-1} r <= rho^2}`
 
+### Solver Performance Tuning
+
+The `--fast` meta-flag on `run_comparison.py`, `run_alpha_sweep.py`, and `run_price_of_robustness.py` enables a bundle of performance defaults:
+
+| Default | Value | Effect |
+|---------|-------|--------|
+| `fix_wind_z` | `True` | Eliminates wind availability SOC constraints |
+| `day1_only_robust` | `True` | Only day 1 gets SOC/Z constraints (48h horizon) |
+| `bar_qcp_conv_tol` | `1e-4` | Relaxed barrier convergence (default 1e-8) |
+| `time_limit` | `600s` | Safety backstop to prevent runaway solves |
+| `line_monitor_threshold` | `0.5` | Keep only lines loaded >=50% in DAM (when `--enforce-lines`) |
+
+Individual overrides still work (e.g. `--fast --time-limit 300`).
+
+Additional Gurobi params always applied in `aruc_model.py`:
+- `Presolve=2`, `PreSparsify=1` — aggressive presolve helps SOC-heavy models
+- `NodefileStart=0.5` — spill B&B tree to disk after 0.5 GB
+- `Heuristics=0.2`, `MIPFocus=1` — better incumbents for MISOCP
+
+Warm start (`aruc_warm_start.py`) now initializes continuous variables (p0 from DAM dispatch, Z diagonal=1 for wind) in addition to binary u/v/w, reducing barrier iterations.
+
 ### Configuration
 
 Edit constants at the top of runner scripts:

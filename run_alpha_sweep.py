@@ -203,6 +203,7 @@ def run_alpha_point(
     robust_ramp: bool = False,
     ramp_scale: float = 1.0,
     pmin_scale: float = 1.0,
+    monitored_lines_threshold: float | None = None,
 ) -> dict | None:
     """Run DARUC + ARUC with a given NPZ and return metrics row."""
     print(f"\n{'#' * 70}")
@@ -235,6 +236,7 @@ def run_alpha_point(
             robust_ramp=robust_ramp,
             ramp_scale=ramp_scale,
             pmin_scale=pmin_scale,
+            monitored_lines_threshold=monitored_lines_threshold,
         )
         data = daruc_out["data"]
         daruc_res = daruc_out["daruc_results"]
@@ -283,6 +285,8 @@ def run_alpha_point(
             robust_ramp=robust_ramp,
             ramp_scale=ramp_scale,
             pmin_scale=pmin_scale,
+            monitored_lines_threshold=monitored_lines_threshold,
+            dam_dispatch_for_screening=dam_res["p"].values if monitored_lines_threshold is not None else None,
         )
         aruc_res = aruc_out["results"]
         aruc_obj = aruc_res["obj"]
@@ -659,6 +663,12 @@ def main():
         help="Multiply all Pmin by this factor (default: 1.0)",
     )
     parser.add_argument(
+        "--line-monitor-threshold",
+        type=float,
+        default=None,
+        help="DAM loading threshold for line filtering (e.g. 0.5 = keep lines loaded >=50%%)",
+    )
+    parser.add_argument(
         "--out-dir",
         type=str,
         default=None,
@@ -771,6 +781,7 @@ def main():
             robust_ramp=args.robust_ramp,
             ramp_scale=args.ramp_scale,
             pmin_scale=args.pmin_scale,
+            monitored_lines_threshold=args.line_monitor_threshold,
         )
         if row is not None:
             rows.append(row)

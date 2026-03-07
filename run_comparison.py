@@ -207,6 +207,12 @@ def main():
         help="Re-solve DAM with spinning reserve derived from uncertainty set (requires --uncertainty-npz)",
     )
     parser.add_argument(
+        "--line-monitor-threshold",
+        type=float,
+        default=None,
+        help="DAM loading threshold for line filtering (e.g. 0.5 = keep lines loaded >=50%%)",
+    )
+    parser.add_argument(
         "--out-dir",
         type=str,
         default=None,
@@ -266,6 +272,8 @@ def main():
     if args.with_reserve:
         print(f"  DAM+Reserve: ON (spinning reserve from uncertainty set)")
     print(f"  Network:  {'with line limits' if args.enforce_lines else 'copperplate'}")
+    if args.line_monitor_threshold is not None:
+        print(f"  Line monitor: threshold={args.line_monitor_threshold*100:.0f}%")
     print(f"  Output:   {out_dir}")
     print("=" * 70)
 
@@ -298,6 +306,7 @@ def main():
         ramp_scale=args.ramp_scale,
         pmin_scale=args.pmin_scale,
         robust_ramp=args.robust_ramp,
+        monitored_lines_threshold=args.line_monitor_threshold,
     )
 
     daruc_results = daruc_outputs["daruc_results"]
@@ -367,6 +376,8 @@ def main():
         ramp_scale=args.ramp_scale,
         pmin_scale=args.pmin_scale,
         robust_ramp=args.robust_ramp,
+        monitored_lines_threshold=args.line_monitor_threshold,
+        dam_dispatch_for_screening=dam_results["p"].values if args.line_monitor_threshold is not None else None,
     )
 
     aruc_results = aruc_outputs["results"]

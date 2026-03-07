@@ -426,6 +426,8 @@ def run_rts_aruc(
     ramp_scale: float = 1.0,
     pmin_scale: float = 1.0,
     robust_ramp: bool = False,
+    monitored_lines_threshold: Optional[float] = None,
+    dam_dispatch_for_screening: Optional[np.ndarray] = None,
 ) -> Dict[str, Any]:
     """
     Full pipeline for ARUC-LDR:
@@ -492,6 +494,17 @@ def run_rts_aruc(
     print(f"    n_buses  = {data.n_buses}")
     print(f"    n_lines  = {data.n_lines}")
     print(f"    n_periods= {T} (total_hours={data.total_hours:.0f})")
+
+    # Optional: filter to monitored lines based on external DAM dispatch
+    data_full = None
+    if (monitored_lines_threshold is not None
+            and dam_dispatch_for_screening is not None and enforce_lines):
+        from compute_branch_flows import filter_monitored_lines
+        data_full = data
+        data = filter_monitored_lines(
+            data, dam_dispatch_for_screening, monitored_lines_threshold
+        )
+        print(f"    n_lines  = {data.n_lines} (after filtering)")
 
     # Build robust_mask
     robust_mask = None
@@ -577,6 +590,14 @@ def run_rts_aruc(
 
     results = extract_solution(data, model, vars_dict)
     print_brief_summary(results, data)
+
+    # Post-solve: validate flows against all lines (if filtered)
+    if data_full is not None:
+        from compute_branch_flows import compute_branch_flows, report_congestion
+        print("\n  Validating ARUC dispatch against ALL lines...")
+        p0_arr = results["p0"].values
+        flow_all = compute_branch_flows(data_full, p0_arr)
+        report_congestion(flow_all, data_full, top_n=5)
 
     # Analyze Z patterns
     analyze_Z_patterns(results["Z"], data)

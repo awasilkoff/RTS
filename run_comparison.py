@@ -239,9 +239,11 @@ def main():
     )
     parser.add_argument(
         "--fast",
-        action="store_true",
-        help="Enable performance defaults: fix-wind-z, day1-only-robust, "
-             "bar-qcp-conv-tol=1e-4, time-limit=600, line-monitor-threshold=0.5 (when --enforce-lines)",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Performance defaults ON by default: fix-wind-z, day1-only-robust, "
+             "bar-qcp-conv-tol=1e-4, time-limit=600, line-monitor-threshold=0.5 (when --enforce-lines). "
+             "Use --no-fast to disable.",
     )
     args = parser.parse_args()
 
@@ -288,8 +290,8 @@ def main():
 
     print("=" * 70)
     print(f"ARUC vs DARUC COMPARISON")
-    if args.fast:
-        print(f"  Mode:     FAST (performance defaults enabled)")
+    if not args.fast:
+        print(f"  Mode:     PRECISE (--no-fast, performance defaults disabled)")
     print(f"  Start:    {start_time}")
     print(f"  Horizon:  {args.hours}h")
     if args.uncertainty_npz:

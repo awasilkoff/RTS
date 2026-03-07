@@ -249,7 +249,7 @@ def main():
     parser.add_argument("--time-limit", type=float, default=None, help="Gurobi time limit in seconds (default: no limit)")
     parser.add_argument("--threads", type=int, default=None, help="Gurobi thread count (default: Gurobi auto)")
     parser.add_argument("--bar-qcp-conv-tol", type=float, default=None, help="Barrier QCP convergence tolerance (default: 1e-8; try 1e-4 for speed)")
-    parser.add_argument("--fast", action="store_true", help="Enable performance defaults: bar-qcp-conv-tol=1e-4, time-limit=600, line-monitor-threshold=0.5 (when lines enforced)")
+    parser.add_argument("--fast", action=argparse.BooleanOptionalAction, default=True, help="Performance defaults ON by default: bar-qcp-conv-tol=1e-4, time-limit=600, line-monitor-threshold=0.5 (when lines enforced). Use --no-fast to disable.")
     args = parser.parse_args()
 
     # --fast: apply performance defaults for args not explicitly set

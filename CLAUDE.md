@@ -248,7 +248,7 @@ Expected cost ordering: DAM < DAM+Reserve < DARUC/ARUC.
 
 ### Solver Performance Tuning
 
-The `--fast` meta-flag on `run_comparison.py`, `run_alpha_sweep.py`, and `run_price_of_robustness.py` enables a bundle of performance defaults:
+The `--fast` flag is **ON by default** on `run_comparison.py`, `run_alpha_sweep.py`, and `run_price_of_robustness.py`. Use `--no-fast` to disable. It applies these performance defaults:
 
 | Default | Value | Effect |
 |---------|-------|--------|

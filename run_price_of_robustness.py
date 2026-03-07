@@ -76,6 +76,7 @@ def run_sweep(args) -> pd.DataFrame:
                 include_zero_marginal=args.include_zero_marginal,
                 ramp_scale=args.ramp_scale,
                 pmin_scale=args.pmin_scale,
+                monitored_lines_threshold=args.line_monitor_threshold,
             )
             data = daruc_out["data"]
             daruc_res = daruc_out["daruc_results"]
@@ -118,6 +119,8 @@ def run_sweep(args) -> pd.DataFrame:
                 include_zero_marginal=args.include_zero_marginal,
                 ramp_scale=args.ramp_scale,
                 pmin_scale=args.pmin_scale,
+                monitored_lines_threshold=args.line_monitor_threshold,
+                dam_dispatch_for_screening=dam_res["p"].values if args.line_monitor_threshold is not None else None,
             )
             aruc_res = aruc_out["results"]
             aruc_obj = aruc_res["obj"]
@@ -234,6 +237,7 @@ def main():
     parser.add_argument("--include-zero-marginal", action=argparse.BooleanOptionalAction, default=None, help="Override: include/exclude all zero-marginal-cost non-wind generators")
     parser.add_argument("--ramp-scale", type=float, default=1.0, help="Multiply all ramp rates (RU, RD) by this factor (default: 1.0)")
     parser.add_argument("--pmin-scale", type=float, default=1.0, help="Multiply all Pmin by this factor (default: 1.0)")
+    parser.add_argument("--line-monitor-threshold", type=float, default=None, help="DAM loading threshold for line filtering (e.g. 0.5 = keep lines loaded >=50%%)")
     parser.add_argument("--out-dir", type=str, default="price_of_robustness", help="Output directory (default: price_of_robustness/)")
     args = parser.parse_args()
 

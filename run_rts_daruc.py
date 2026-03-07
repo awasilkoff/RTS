@@ -228,6 +228,7 @@ def run_rts_daruc(
     ramp_scale: float = 1.0,
     pmin_scale: float = 1.0,
     robust_ramp: bool = False,
+    monitored_lines_threshold: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Two-step DARUC pipeline (Setup 1):
@@ -297,6 +298,17 @@ def run_rts_daruc(
     dam_startups = dam_commitment["v"].sum()
     print(f"  Total DAM unit-hours: {dam_u_hours:.0f}")
     print(f"  Total DAM startups:   {dam_startups:.0f}")
+
+    # ==================================================================
+    # Optional: filter to monitored lines based on DAM flows
+    # ==================================================================
+    data_full = None
+    if monitored_lines_threshold is not None and enforce_lines:
+        from compute_branch_flows import filter_monitored_lines
+        data_full = data
+        data = filter_monitored_lines(
+            data, dam_results["p"].values, monitored_lines_threshold
+        )
 
     # ==================================================================
     # STEP 2: DARUC — Robust reliability commitments
@@ -388,6 +400,16 @@ def run_rts_daruc(
     analyze_Z_patterns(daruc_results["Z"], data)
 
     # ==================================================================
+    # Post-solve: validate flows against all lines (if filtered)
+    # ==================================================================
+    if data_full is not None:
+        from compute_branch_flows import compute_branch_flows, report_congestion
+        print("\n  Validating DARUC dispatch against ALL lines...")
+        p0_arr = daruc_results["p0"].values
+        flow_all = compute_branch_flows(data_full, p0_arr)
+        report_congestion(flow_all, data_full, top_n=5)
+
+    # ==================================================================
     # Deviation analysis
     # ==================================================================
     dev_df = analyze_deviations(data, model, vars_dict, dam_commitment)
@@ -407,6 +429,7 @@ def run_rts_daruc(
         "daruc_results": daruc_results,
         "deviation_summary": dev_df,
         "data": data,
+        "data_full": data_full,
         "model": model,
         "vars": vars_dict,
         "Sigma": Sigma,

@@ -82,6 +82,54 @@ def report_congestion(flow_df: pd.DataFrame, data: DAMData, top_n: int = 10) -> 
     return n_violations
 
 
+def filter_monitored_lines(
+    data: DAMData, p: np.ndarray, threshold: float = 0.8
+) -> DAMData:
+    """Return a copy of data with only lines loaded >= threshold.
+
+    Parameters
+    ----------
+    data : DAMData
+        Full system data with all lines.
+    p : np.ndarray
+        Dispatch array (I, T) used for screening (e.g. DAM solution).
+    threshold : float
+        Loading fraction cutoff (0.5 = 50%). Lines with max loading
+        across all periods >= threshold are kept.
+
+    Returns
+    -------
+    DAMData
+        Copy with filtered PTDF, Fmax, line_ids.
+    """
+    flow_df = compute_branch_flows(data, p)
+    flow = flow_df.values  # (L, T)
+    Fmax = data.Fmax
+
+    max_abs = np.max(np.abs(flow), axis=1)  # (L,)
+    loading = np.where(Fmax > 0, max_abs / Fmax, 0.0)
+    mask = loading >= threshold
+
+    n_kept = int(mask.sum())
+    n_total = len(mask)
+    print(f"\n  Monitored line filtering (threshold={threshold*100:.0f}%):")
+    print(f"    {n_kept}/{n_total} lines kept")
+
+    # Show top monitored lines
+    kept_idx = np.where(mask)[0]
+    top_order = np.argsort(-loading[kept_idx])[:5]
+    for rank, idx in enumerate(top_order):
+        l = kept_idx[idx]
+        print(f"    [{rank+1}] {data.line_ids[l]:<15} loading {loading[l]*100:.1f}%")
+
+    filtered_line_ids = [data.line_ids[l] for l in range(n_total) if mask[l]]
+    return data.copy(update={
+        "PTDF": data.PTDF[mask],
+        "Fmax": data.Fmax[mask],
+        "line_ids": filtered_line_ids,
+    })
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Compute DC branch flows from a dispatch CSV.")

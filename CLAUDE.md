@@ -12,24 +12,35 @@ The project has two main parts:
 
 ## Key Commands
 
+**Primary script — `run_comparison.py`** is the main entry point for all ARUC/DARUC analysis:
+
 ```bash
-# Deterministic day-ahead unit commitment
+# Basic comparison (uses --fast defaults: 48h, day2-interval=2, day1-only-robust, etc.)
+python run_comparison.py --rho 2.0 --start-month 7 --start-day 15
+
+# With time-varying uncertainty from NPZ
+python run_comparison.py --uncertainty-npz path/to/uncertainty.npz --start-month 7 --start-day 15
+
+# With line limits and DAM+Reserve baseline
+python run_comparison.py --enforce-lines --with-reserve --uncertainty-npz path/to/uncertainty.npz
+
+# Copperplate, custom horizon
+python run_comparison.py --hours 24 --rho 3.0 --start-month 1 --start-day 5
+```
+
+Other scripts (standalone or sweep):
+
+```bash
+# Standalone DAM / ARUC / DARUC (less commonly used)
 python run_rts_dam.py
-
-# Adaptive robust unit commitment with LDR
 python run_rts_aruc.py
-
-# Two-step DARUC: DAM -> robust reliability commitments
 python run_rts_daruc.py
-
-# ARUC vs DARUC comparison (single scenario)
-python run_comparison.py --hours 6 --start-month 7 --start-day 15 --rho 2.0
-
-# Price of robustness sweep (rho values, long-running)
-python run_price_of_robustness.py --hours 12 --start-month 7 --start-day 15
 
 # Alpha sweep: conformal alpha -> uncertainty sets -> DARUC/ARUC (long-running)
 python run_alpha_sweep.py --hours 12 --start-month 7 --start-day 15
+
+# Price of robustness sweep (rho values, long-running)
+python run_price_of_robustness.py --hours 12 --start-month 7 --start-day 15
 
 # Generate all IEEE paper figures (~3-5 min)
 cd uncertainty_sets_refactored && python generate_paper_figures.py
@@ -70,11 +81,11 @@ SPP wind data (parquet)  ->  covariance_optimization.py (learn omega, predict Si
 | `network_ptdf.py` | DC power flow PTDF matrix computation |
 | `dam_model.py` | Deterministic DAM UC model builder (Gurobi) |
 | `aruc_model.py` | Adaptive robust UC with linear decision rules |
-| `run_rts_dam.py` | End-to-end deterministic DAM pipeline |
-| `run_rts_aruc.py` | End-to-end robust ARUC pipeline |
-| `run_rts_daruc.py` | Two-step DARUC: deterministic DAM -> robust reliability commitments |
-| `run_comparison.py` | DARUC vs ARUC comparison orchestrator |
-| `compare_aruc_vs_daruc.py` | Comparison figures: commitment heatmaps, dispatch bars, curtailment |
+| `run_comparison.py` | **Primary script**: runs DARUC + ARUC, generates figures + summary |
+| `compare_aruc_vs_daruc.py` | Comparison figures and write_summary (used by run_comparison.py) |
+| `run_rts_dam.py` | Standalone deterministic DAM pipeline |
+| `run_rts_aruc.py` | Standalone robust ARUC pipeline |
+| `run_rts_daruc.py` | Standalone two-step DARUC pipeline |
 | `run_price_of_robustness.py` | Rho sweep: cost/curtailment vs uncertainty budget |
 | `run_alpha_sweep.py` | Alpha sweep: conformal alpha -> NPZ -> DARUC/ARUC cost/curtailment |
 | `debugging.py` | Infeasibility diagnosis (IIS extraction, progressive relaxation) |
@@ -109,18 +120,51 @@ Regenerate v2 parquets: `cd uncertainty_sets_refactored && python mapping.py`
 
 ## Runner Scripts
 
-### ARUC vs DARUC Comparison
+### `run_comparison.py` — Primary Script
+
+The main entry point for all single-scenario analysis. Runs DARUC (two-step: DAM -> robust reliability) and ARUC-LDR (one-shot robust) with identical parameters, then generates comparison figures and a text summary.
 
 ```bash
-python run_comparison.py --hours 6 --start-month 7 --start-day 15 --rho 2.0
-python run_comparison.py --hours 48 --day2-interval 2 --day1-only-robust --rho 2.0
+python run_comparison.py --rho 2.0 --start-month 7 --start-day 15
+python run_comparison.py --uncertainty-npz path/to/uncertainty.npz --enforce-lines --with-reserve
 ```
 
-Outputs (in `comparison_outputs/<run_tag>/`): commitment heatmaps, dispatch bars, Z coefficient heatmaps, wind curtailment figures, and text summary.
+**Output directory:** `comparison_outputs/<auto-tag>/` containing:
+- `aruc/` and `daruc/` subdirs with commitment CSVs, dispatch CSVs, Z coefficients, Sigma/rho arrays, summary JSON
+- `dam_reserve/` (when `--with-reserve`) with DAM+Reserve results
+- Figures: commitment heatmaps, dispatch bars, Z coefficient heatmaps, wind curtailment, Pmin vs dispatch, worst-case wind
+- `comparison_summary.txt` — full text report with day-1 cost breakdown, curtailment, commitment diffs
 
-CLI args for variable intervals: `--day2-interval 2` (2-hour blocks for day 2), `--day1-only-robust` (no Z/SOC for day 2).
+**CLI reference:**
 
-Generator filtering: `--include-renewables`, `--include-nuclear`, `--include-zero-marginal` (see Generator Filtering section).
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `--hours` | 48 | Horizon hours |
+| `--rho` | 3.0 | Ellipsoid radius (ignored if `--uncertainty-npz`) |
+| `--start-month` / `--start-day` / `--start-hour` | 7 / 15 / 0 | Simulation start |
+| `--enforce-lines` | off | Enable line flow limits (default: copperplate) |
+| `--uncertainty-npz` | None | Path to time-varying uncertainty NPZ (overrides `--rho`) |
+| `--provider-start` | 2448 | Start index into NPZ time series |
+| `--rho-lines-frac` | None | Fraction of rho for line constraints (e.g. 0.25) |
+| `--mip-gap` | 0.005 | MIP optimality gap (0.5%) |
+| `--day2-interval` | 2 | Day-2 period duration in hours (2 = 2h blocks) |
+| `--day1-only-robust` | True | Only day 1 gets SOC/Z constraints |
+| `--fix-wind-z` | off (True with `--fast`) | Fix wind Z diagonal to 1 |
+| `--three-blocks` | off | Use 3-block piecewise cost (default: single block) |
+| `--no-worst-case-cost` | off | Disable worst-case cost epigraph |
+| `--incremental-obj` / `--no-incremental-obj` | True | DARUC: charge only incremental commitment costs |
+| `--dispatch-cost-scale` | 0.01 | DARUC dispatch cost scale (with incremental obj) |
+| `--robust-ramp` | off | SOC-based robust ramp constraints |
+| `--with-reserve` | off | DAM+Reserve baseline (requires `--uncertainty-npz`) |
+| `--ramp-scale` | 1.0 | Multiply all ramp rates by this factor |
+| `--pmin-scale` | 1.0 | Multiply all Pmin by this factor |
+| `--line-monitor-threshold` | None (0.5 with `--fast`) | Per-hour line filtering threshold |
+| `--include-renewables` / `--include-nuclear` / `--include-zero-marginal` | off | Generator filtering (see section) |
+| `--fast` / `--no-fast` | True | Performance defaults bundle (see Solver Tuning) |
+| `--time-limit` | None (600 with `--fast`) | Gurobi time limit (seconds) |
+| `--threads` | None | Gurobi thread count |
+| `--bar-qcp-conv-tol` | None (1e-4 with `--fast`) | Barrier QCP convergence tolerance |
+| `--out-dir` | auto | Override output directory |
 
 ### Price of Robustness Sweep (rho)
 

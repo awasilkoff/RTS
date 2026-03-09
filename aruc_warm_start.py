@@ -27,13 +27,13 @@ def warm_start_aruc_from_dam(
     aruc_vars: Dict[str, Any],
     dam_vars: Dict[str, Any],
     data: DAMData,
+    set_continuous: bool = True,
 ) -> None:
     """
-    Warm start ARUC model using DAM commitment decisions (binaries only).
+    Warm start ARUC model using DAM commitment decisions.
 
-    Only sets u, v, w Start values.  Gurobi completes the partial MIP start
-    by solving for optimal continuous variables (p0, Z, auxiliaries) with the
-    binaries fixed — a continuous SOCP that solves in seconds.
+    Sets u, v, w binary Start values and optionally initializes continuous
+    variables (p0 and Z) to help the barrier solver converge faster.
 
     Parameters
     ----------
@@ -45,6 +45,10 @@ def warm_start_aruc_from_dam(
         Variable dictionary from build_dam_model (with solution values)
     data : DAMData
         The problem data
+    set_continuous : bool
+        If True, also set p0 and Z Start values (default: True).
+        p0 is initialized from DAM dispatch, Z for wind generators is
+        set to identity (wind tracks own realization), Z for thermals to 0.
     """
 
     I = data.n_gens
@@ -60,18 +64,47 @@ def warm_start_aruc_from_dam(
     aruc_v = aruc_vars["v"]
     aruc_w = aruc_vars["w"]
 
-    n_vars_set = 0
+    n_binary_set = 0
 
-    # Only set binary commitment variables — let Gurobi solve for
-    # optimal continuous variables (p0, Z, blocks, slack, auxiliaries)
+    # Set binary commitment variables
     for i in range(I):
         for t in range(T):
             aruc_u[i, t].Start = dam_u[i, t].X
             aruc_v[i, t].Start = dam_v[i, t].X
             aruc_w[i, t].Start = dam_w[i, t].X
-            n_vars_set += 3
+            n_binary_set += 3
 
-    print(f"Warm start: set {n_vars_set} binary start values from DAM solution")
+    n_continuous_set = 0
+    if set_continuous:
+        aruc_p0 = aruc_vars["p0"]
+        aruc_Z = aruc_vars["Z"]
+        dam_p = dam_vars["p"]
+
+        # Identify wind generators and build wind_k -> generator index mapping
+        is_wind = np.array([gt.upper() == "WIND" for gt in data.gen_type])
+        wind_idx = np.where(is_wind)[0]
+        wind_k_map = {int(wind_idx[k]): k for k in range(len(wind_idx))}
+
+        # Set p0 from DAM dispatch
+        for i in range(I):
+            for t in range(T):
+                if (i, t) in aruc_p0:
+                    aruc_p0[i, t].Start = dam_p[i, t].X
+                    n_continuous_set += 1
+
+        # Set Z: wind diagonal = 1, everything else = 0
+        for key in aruc_Z:
+            i, t, k = key
+            if is_wind[i] and wind_k_map.get(i) == k:
+                aruc_Z[key].Start = 1.0
+            else:
+                aruc_Z[key].Start = 0.0
+            n_continuous_set += 1
+
+    print(
+        f"Warm start: set {n_binary_set} binary + "
+        f"{n_continuous_set} continuous start values from DAM solution"
+    )
     aruc_model.update()
 
 

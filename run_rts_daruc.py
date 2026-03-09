@@ -229,6 +229,9 @@ def run_rts_daruc(
     pmin_scale: float = 1.0,
     robust_ramp: bool = False,
     monitored_lines_threshold: Optional[float] = None,
+    time_limit: Optional[float] = None,
+    threads: Optional[int] = None,
+    bar_qcp_conv_tol: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Two-step DARUC pipeline (Setup 1):
@@ -303,10 +306,11 @@ def run_rts_daruc(
     # Optional: filter to monitored lines based on DAM flows
     # ==================================================================
     data_full = None
+    line_mask = None
     if monitored_lines_threshold is not None and enforce_lines:
         from compute_branch_flows import filter_monitored_lines
         data_full = data
-        data = filter_monitored_lines(
+        data, line_mask = filter_monitored_lines(
             data, dam_results["p"].values, monitored_lines_threshold
         )
 
@@ -376,6 +380,10 @@ def run_rts_daruc(
         fix_wind_z=fix_wind_z,
         worst_case_cost=worst_case_cost,
         robust_ramp=robust_ramp,
+        time_limit=time_limit,
+        threads=threads,
+        bar_qcp_conv_tol=bar_qcp_conv_tol,
+        line_mask=line_mask,
     )
 
     # Warm start ARUC from DAM solution
@@ -436,6 +444,7 @@ def run_rts_daruc(
         "rho": rho_val,
         "rho_lines_frac": rho_lines_frac,
         "time_varying": time_varying,
+        "line_mask": line_mask,
     }
 
 

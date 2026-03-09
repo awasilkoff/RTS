@@ -82,10 +82,46 @@ def report_congestion(flow_df: pd.DataFrame, data: DAMData, top_n: int = 10) -> 
     return n_violations
 
 
+def compute_line_loading_mask(
+    data: DAMData, p: np.ndarray, threshold: float = 0.5
+) -> tuple[np.ndarray, np.ndarray]:
+    """Per-hour line monitoring mask based on dispatch loading.
+
+    Parameters
+    ----------
+    data : DAMData
+        System data with PTDF, Fmax, etc.
+    p : np.ndarray
+        Dispatch array (I, T) used for screening (e.g. DAM solution).
+    threshold : float
+        Loading fraction cutoff. A (line, period) pair is monitored
+        when ``|flow_l(t)| / Fmax_l >= threshold``.
+
+    Returns
+    -------
+    mask : np.ndarray of bool, shape (L, T)
+        True where line *l* should be enforced at period *t*.
+    loading : np.ndarray of float, shape (L, T)
+        Per-hour loading fractions for diagnostics.
+    """
+    flow = compute_branch_flows(data, p).values  # (L, T)
+    Fmax = data.Fmax[:, None]  # (L, 1) for broadcasting
+    loading = np.where(Fmax > 0, np.abs(flow) / Fmax, 0.0)  # (L, T)
+    mask = loading >= threshold  # (L, T) bool
+    return mask, loading
+
+
 def filter_monitored_lines(
     data: DAMData, p: np.ndarray, threshold: float = 0.8
-) -> DAMData:
-    """Return a copy of data with only lines loaded >= threshold.
+) -> tuple[DAMData, np.ndarray | None]:
+    """Return filtered data and per-hour monitoring mask.
+
+    Two-stage filter:
+    1. **Static pre-filter** — drop lines never above *threshold* at any
+       hour (reduces PTDF row count).
+    2. **Per-hour mask** — for the remaining lines, mark which ``(l, t)``
+       pairs exceed *threshold*.  Returned as ``(L_filtered, T)`` bool
+       array indexed by the filtered line indices.
 
     Parameters
     ----------
@@ -94,40 +130,50 @@ def filter_monitored_lines(
     p : np.ndarray
         Dispatch array (I, T) used for screening (e.g. DAM solution).
     threshold : float
-        Loading fraction cutoff (0.5 = 50%). Lines with max loading
-        across all periods >= threshold are kept.
+        Loading fraction cutoff (0.5 = 50 %).
 
     Returns
     -------
-    DAMData
-        Copy with filtered PTDF, Fmax, line_ids.
+    filtered_data : DAMData
+        Copy with rows dropped for lines never above *threshold*.
+    line_mask : np.ndarray of bool, shape (L_filtered, T)
+        Per-hour mask over the *filtered* line indices.
     """
-    flow_df = compute_branch_flows(data, p)
-    flow = flow_df.values  # (L, T)
-    Fmax = data.Fmax
+    mask_full, loading_full = compute_line_loading_mask(data, p, threshold)
 
-    max_abs = np.max(np.abs(flow), axis=1)  # (L,)
-    loading = np.where(Fmax > 0, max_abs / Fmax, 0.0)
-    mask = loading >= threshold
+    # Stage 1: static — keep lines that are above threshold at ANY hour
+    ever_active = mask_full.any(axis=1)  # (L,) bool
 
-    n_kept = int(mask.sum())
-    n_total = len(mask)
+    n_kept = int(ever_active.sum())
+    n_total = len(ever_active)
+
+    # Per-hour stats for kept lines
+    line_mask = mask_full[ever_active, :]  # (n_kept, T)
+    n_lt_pairs = int(line_mask.sum())
+    n_lt_total = n_kept * mask_full.shape[1]
+
     print(f"\n  Monitored line filtering (threshold={threshold*100:.0f}%):")
-    print(f"    {n_kept}/{n_total} lines kept")
+    print(f"    {n_kept}/{n_total} lines kept (static pre-filter)")
+    print(f"    {n_lt_pairs}/{n_lt_total} (line,period) pairs monitored "
+          f"({n_lt_pairs / max(n_lt_total, 1) * 100:.0f}%)")
 
-    # Show top monitored lines
-    kept_idx = np.where(mask)[0]
-    top_order = np.argsort(-loading[kept_idx])[:5]
+    # Show top monitored lines by max loading
+    kept_idx = np.where(ever_active)[0]
+    max_loading = np.max(loading_full, axis=1)
+    top_order = np.argsort(-max_loading[kept_idx])[:5]
     for rank, idx in enumerate(top_order):
         l = kept_idx[idx]
-        print(f"    [{rank+1}] {data.line_ids[l]:<15} loading {loading[l]*100:.1f}%")
+        n_hrs = int(mask_full[l].sum())
+        print(f"    [{rank+1}] {data.line_ids[l]:<15} peak {max_loading[l]*100:.1f}%  "
+              f"({n_hrs}/{mask_full.shape[1]} periods)")
 
-    filtered_line_ids = [data.line_ids[l] for l in range(n_total) if mask[l]]
-    return data.copy(update={
-        "PTDF": data.PTDF[mask],
-        "Fmax": data.Fmax[mask],
+    filtered_line_ids = [data.line_ids[l] for l in range(n_total) if ever_active[l]]
+    filtered_data = data.copy(update={
+        "PTDF": data.PTDF[ever_active],
+        "Fmax": data.Fmax[ever_active],
         "line_ids": filtered_line_ids,
     })
+    return filtered_data, line_mask
 
 
 def main():

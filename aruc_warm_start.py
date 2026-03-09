@@ -96,6 +96,22 @@ def warm_start_aruc_from_dam(
                     aruc_p0[i, t].Start = dam_p[i, t].X
                     n_continuous_set += 1
 
+        # Set p0_block from DAM block dispatch (more complete start)
+        aruc_p0_block = aruc_vars.get("p0_block")
+        dam_p_block = dam_vars.get("p_block")
+        if aruc_p0_block is not None and dam_p_block is not None:
+            for key in aruc_p0_block:
+                if key in dam_p_block:
+                    aruc_p0_block[key].Start = dam_p_block[key].X
+                    n_continuous_set += 1
+
+        # Set slack to 0 (DAM solution is feasible)
+        aruc_s_p = aruc_vars.get("s_p")
+        if aruc_s_p is not None:
+            for key in aruc_s_p:
+                aruc_s_p[key].Start = 0.0
+                n_continuous_set += 1
+
         # ------------------------------------------------------------------
         # Build Z start values that satisfy sum_i Z[i,t,k] = 0
         # ------------------------------------------------------------------
@@ -126,19 +142,62 @@ def warm_start_aruc_from_dam(
                     for i in thermal_idx:
                         thermal_z_share[i, t] = -1.0 / n_th
 
-        # Set Z Start values
+        # Set Z Start values and collect them for verification
+        z_start_vals = {}  # (i, t, k) -> start value
         for key in aruc_Z:
             i, t, k = key
             if is_wind[i]:
                 # Wind: identity matrix
                 k_wind = wind_k_map.get(i)
-                aruc_Z[key].Start = 1.0 if k == k_wind else 0.0
+                val = 1.0 if k == k_wind else 0.0
             elif is_thermal[i]:
                 # Thermal: share of -1 for each wind dimension k
-                aruc_Z[key].Start = float(thermal_z_share[i, t])
+                val = float(thermal_z_share[i, t])
             else:
-                aruc_Z[key].Start = 0.0
+                val = 0.0
+            aruc_Z[key].Start = val
+            z_start_vals[key] = val
             n_continuous_set += 1
+
+        # Verify bal_Z constraint: sum_i Z[i,t,k] == 0 for all (t,k)
+        # Collect which (t, k) pairs exist
+        tk_pairs = set()
+        for (i, t, k) in z_start_vals:
+            tk_pairs.add((t, k))
+        n_violations = 0
+        for (t, k) in sorted(tk_pairs):
+            z_sum = sum(
+                z_start_vals[(i, t, k)]
+                for i in range(I)
+                if (i, t, k) in z_start_vals
+            )
+            if abs(z_sum) > 1e-6:
+                n_violations += 1
+                if n_violations <= 3:
+                    # Print breakdown for first few violations
+                    wind_contrib = sum(
+                        z_start_vals[(i, t, k)]
+                        for i in wind_idx
+                        if (i, t, k) in z_start_vals
+                    )
+                    therm_contrib = sum(
+                        z_start_vals[(i, t, k)]
+                        for i in thermal_idx
+                        if (i, t, k) in z_start_vals
+                    )
+                    other_contrib = z_sum - wind_contrib - therm_contrib
+                    print(f"  WARNING: bal_Z_t{t}_k{k} violation = {z_sum:.6f} "
+                          f"(wind={wind_contrib:.4f}, thermal={therm_contrib:.4f}, "
+                          f"other={other_contrib:.4f})")
+                    # List individual contributors
+                    for i in range(I):
+                        if (i, t, k) in z_start_vals and abs(z_start_vals[(i, t, k)]) > 1e-8:
+                            gt = data.gen_type[i]
+                            print(f"    gen {i} ({gt}): Z={z_start_vals[(i, t, k)]:.6f}")
+        if n_violations > 0:
+            print(f"  WARNING: {n_violations} bal_Z constraints violated in warm start!")
+        else:
+            print(f"  Warm start Z verified: all {len(tk_pairs)} bal_Z constraints satisfied")
 
         # ------------------------------------------------------------------
         # Initialize SOC auxiliary variables consistently with Z starts

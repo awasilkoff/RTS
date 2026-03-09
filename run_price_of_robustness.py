@@ -53,6 +53,8 @@ def run_sweep(args) -> pd.DataFrame:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     rows = []
+    prev_daruc_results = None
+    prev_aruc_results = None
 
     for rho in args.rhos:
         print("\n" + "#" * 70)
@@ -80,6 +82,7 @@ def run_sweep(args) -> pd.DataFrame:
                 time_limit=args.time_limit,
                 threads=args.threads,
                 bar_qcp_conv_tol=args.bar_qcp_conv_tol,
+                prev_daruc_solution=prev_daruc_results,
             )
             data = daruc_out["data"]
             daruc_res = daruc_out["daruc_results"]
@@ -127,6 +130,7 @@ def run_sweep(args) -> pd.DataFrame:
                 time_limit=args.time_limit,
                 threads=args.threads,
                 bar_qcp_conv_tol=args.bar_qcp_conv_tol,
+                prev_aruc_solution=prev_aruc_results,
             )
             aruc_res = aruc_out["results"]
             aruc_obj = aruc_res["obj"]
@@ -159,6 +163,10 @@ def run_sweep(args) -> pd.DataFrame:
             "aruc_unit_hours": aruc_uhours,
             "elapsed_s": elapsed,
         }
+        # Capture solutions for next iteration's warm start
+        prev_daruc_results = daruc_res
+        prev_aruc_results = aruc_res
+
         rows.append(row)
         print(f"\n  rho={rho} done in {elapsed:.0f}s  "
               f"DAM={dam_obj:,.0f}  DARUC={daruc_obj:,.0f}  ARUC={aruc_obj:,.0f}")

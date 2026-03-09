@@ -431,6 +431,7 @@ def run_rts_aruc(
     time_limit: Optional[float] = None,
     threads: Optional[int] = None,
     bar_qcp_conv_tol: Optional[float] = None,
+    prev_aruc_solution: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Full pipeline for ARUC-LDR:
@@ -574,18 +575,21 @@ def run_rts_aruc(
         line_mask=line_mask,
     )
 
-    # Warm start from a quick DAM solve (~5s) — provides binary commitment
-    # values that give Gurobi a feasible incumbent immediately, avoiding
-    # hours of branch-and-bound with a massive optimality gap.
-    print("  Solving quick DAM for warm start...")
-    dam_model, dam_vars = build_dam_model(data, M_p=m_penalty,
-                                          enforce_lines=enforce_lines)
-    dam_model.Params.OutputFlag = 0
-    dam_model.optimize()
-    if dam_model.Status in [gp.GRB.OPTIMAL, gp.GRB.SUBOPTIMAL]:
-        warm_start_aruc_from_dam(model, vars_dict, dam_vars, data)
+    # Warm start: prefer previous ARUC solution (sweep mode) over DAM
+    if prev_aruc_solution is not None:
+        from aruc_warm_start import warm_start_aruc_from_prev_solution
+        warm_start_aruc_from_prev_solution(model, vars_dict, prev_aruc_solution, data)
     else:
-        print("  DAM warm start failed, proceeding without warm start")
+        # Fall back to quick DAM solve (~5s) for binary commitment hints
+        print("  Solving quick DAM for warm start...")
+        dam_model, dam_vars = build_dam_model(data, M_p=m_penalty,
+                                              enforce_lines=enforce_lines)
+        dam_model.Params.OutputFlag = 0
+        dam_model.optimize()
+        if dam_model.Status in [gp.GRB.OPTIMAL, gp.GRB.SUBOPTIMAL]:
+            warm_start_aruc_from_dam(model, vars_dict, dam_vars, data)
+        else:
+            print("  DAM warm start failed, proceeding without warm start")
 
     print("  Model built. Starting optimization...")
 

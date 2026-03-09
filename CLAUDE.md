@@ -155,7 +155,7 @@ python run_comparison.py --uncertainty-npz path/to/uncertainty.npz --enforce-lin
 | `--incremental-obj` / `--no-incremental-obj` | True | DARUC: charge only incremental commitment costs |
 | `--dispatch-cost-scale` | 0.01 | DARUC dispatch cost scale (with incremental obj) |
 | `--robust-ramp` | off | SOC-based robust ramp constraints |
-| `--with-reserve` | off | DAM+Reserve baseline (requires `--uncertainty-npz`) |
+| `--with-reserve` | off | DAM+Reserve baseline (works with `--uncertainty-npz` or scalar `--rho`) |
 | `--ramp-scale` | 1.0 | Multiply all ramp rates by this factor |
 | `--pmin-scale` | 1.0 | Multiply all Pmin by this factor |
 | `--line-monitor-threshold` | None (0.5 with `--fast`) | Per-hour line filtering threshold |
@@ -286,7 +286,7 @@ r[i,t] <= RU[i] * dt[t]                    (ramp capability)
 sum_{i in THERMAL} r[i,t] >= R[t]          (system requirement)
 ```
 
-Requires `--uncertainty-npz`. Results saved to `dam_reserve/` subdirectory and included as a fourth series in all comparison figures and summary.
+Works with both `--uncertainty-npz` (time-varying) and scalar `--rho` (static covariance). Results saved to `dam_reserve/` subdirectory and included as a fourth series in all comparison figures and summary.
 
 **Reserve ramp cap vs inter-period ramp:** The reserve constraint uses `r[i,t] <= RU[i] * dt[t]` (full period duration), not `dt_ramp = (dt[t-1]+dt[t])/2` (transition time). This is intentional: spinning reserve measures how much a unit can ramp **within** the current period, so the full `dt[t]` is the relevant time window. Inter-period ramp constraints use transition time `dt_ramp` because they span the boundary between two periods.
 

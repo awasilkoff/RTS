@@ -207,6 +207,8 @@ def run_alpha_point(
     time_limit: float | None = None,
     threads: int | None = None,
     bar_qcp_conv_tol: float | None = None,
+    prev_daruc_results: dict | None = None,
+    prev_aruc_results: dict | None = None,
 ) -> dict | None:
     """Run DARUC + ARUC with a given NPZ and return metrics row."""
     print(f"\n{'#' * 70}")
@@ -243,26 +245,25 @@ def run_alpha_point(
             time_limit=time_limit,
             threads=threads,
             bar_qcp_conv_tol=bar_qcp_conv_tol,
+            prev_daruc_solution=prev_daruc_results,
         )
         data = daruc_out["data"]
         daruc_res = daruc_out["daruc_results"]
         dam_res = daruc_out["dam_outputs"]["results"]
-        common_times = list(data.time)
-
-        dam_obj = dam_res["obj"]
-        daruc_obj = daruc_res["obj"]
+        # Use day-1 times only for metrics (day 2 is look-ahead)
+        d1_times = data.day1_times()
         dam_p0 = dam_res["p"]
         daruc_p0 = daruc_res["p0"]
 
-        dam_curtail = compute_wind_curtailment(dam_p0, data, common_times)
-        daruc_curtail = compute_wind_curtailment(daruc_p0, data, common_times)
-        dam_uhours = _unit_hours(dam_res["u"], common_times)
-        daruc_uhours = _unit_hours(daruc_res["u"], common_times)
+        dam_curtail = compute_wind_curtailment(dam_p0, data, d1_times)
+        daruc_curtail = compute_wind_curtailment(daruc_p0, data, d1_times)
+        dam_uhours = _unit_hours(dam_res["u"], d1_times)
+        daruc_uhours = _unit_hours(daruc_res["u"], d1_times)
         dam_cost = compute_cost_breakdown(
-            dam_res["u"][common_times], dam_p0[common_times], data
+            dam_res["u"][d1_times], dam_p0[d1_times], data
         )
         daruc_cost = compute_cost_breakdown(
-            daruc_res["u"][common_times], daruc_p0[common_times], data
+            daruc_res["u"][d1_times], daruc_p0[d1_times], data
         )
     except Exception as e:
         print(f"DARUC failed at alpha={alpha}: {e}")
@@ -296,14 +297,14 @@ def run_alpha_point(
             time_limit=time_limit,
             threads=threads,
             bar_qcp_conv_tol=bar_qcp_conv_tol,
+            prev_aruc_solution=prev_aruc_results,
         )
         aruc_res = aruc_out["results"]
-        aruc_obj = aruc_res["obj"]
         aruc_p0 = aruc_res["p0"]
-        aruc_curtail = compute_wind_curtailment(aruc_p0, data, common_times)
-        aruc_uhours = _unit_hours(aruc_res["u"], common_times)
+        aruc_curtail = compute_wind_curtailment(aruc_p0, data, d1_times)
+        aruc_uhours = _unit_hours(aruc_res["u"], d1_times)
         aruc_cost = compute_cost_breakdown(
-            aruc_res["u"][common_times], aruc_p0[common_times], data
+            aruc_res["u"][d1_times], aruc_p0[d1_times], data
         )
     except Exception as e:
         print(f"ARUC failed at alpha={alpha}: {e}")
@@ -324,9 +325,6 @@ def run_alpha_point(
         "alpha": alpha,
         "rho_mean": rho_mean,
         "rho_max": rho_max,
-        "dam_obj": dam_obj,
-        "daruc_obj": daruc_obj,
-        "aruc_obj": aruc_obj,
         "dam_cost_total": dam_cost["total"],
         "daruc_cost_total": daruc_cost["total"],
         "aruc_cost_total": aruc_cost["total"],
@@ -355,9 +353,12 @@ def run_alpha_point(
     }
     print(
         f"\n  alpha={alpha} done in {elapsed:.0f}s  "
-        f"DAM={dam_obj:,.0f}  DARUC={daruc_obj:,.0f}  ARUC={aruc_obj:,.0f}  "
-        f"rho_mean={rho_mean:.3f}"
+        f"DAM={dam_cost['total']:,.0f}  DARUC={daruc_cost['total']:,.0f}  "
+        f"ARUC={aruc_cost['total']:,.0f}  rho_mean={rho_mean:.3f}  (day-1 costs)"
     )
+    # Attach solutions for sweep warm-starting (not serialized to CSV)
+    row["_daruc_results"] = daruc_res
+    row["_aruc_results"] = aruc_res
     return row
 
 
@@ -371,7 +372,7 @@ def plot_price_of_robustness_alpha(df: pd.DataFrame, out_dir: Path):
     fig, ax = plt.subplots(figsize=(7, 4.5))
 
     ax.axhline(
-        df["dam_obj"].iloc[0],
+        df["dam_cost_total"].iloc[0],
         color="#2ca02c",
         linestyle="--",
         linewidth=1.2,
@@ -379,7 +380,7 @@ def plot_price_of_robustness_alpha(df: pd.DataFrame, out_dir: Path):
     )
     ax.plot(
         df["alpha"],
-        df["daruc_obj"],
+        df["daruc_cost_total"],
         "o-",
         color="#ff7f0e",
         linewidth=1.5,
@@ -388,7 +389,7 @@ def plot_price_of_robustness_alpha(df: pd.DataFrame, out_dir: Path):
     )
     ax.plot(
         df["alpha"],
-        df["aruc_obj"],
+        df["aruc_cost_total"],
         "s-",
         color="#1f77b4",
         linewidth=1.5,
@@ -398,8 +399,8 @@ def plot_price_of_robustness_alpha(df: pd.DataFrame, out_dir: Path):
 
     ax.fill_between(
         df["alpha"],
-        df["daruc_obj"],
-        df["aruc_obj"],
+        df["daruc_cost_total"],
+        df["aruc_cost_total"],
         alpha=0.15,
         color="#1f77b4",
     )
@@ -411,7 +412,7 @@ def plot_price_of_robustness_alpha(df: pd.DataFrame, out_dir: Path):
     ax.grid(True, alpha=0.3)
 
     # Secondary y-axis: % increase vs DAM
-    dam_base = df["dam_obj"].iloc[0]
+    dam_base = df["dam_cost_total"].iloc[0]
     if dam_base > 0:
         ax2 = ax.twinx()
         ax2.set_ylabel("% increase vs DAM", fontsize=9)
@@ -791,6 +792,10 @@ def main():
             print(f"\n  Resuming: {len(completed_alphas)} alpha(s) already done: "
                   f"{sorted(completed_alphas)}")
 
+    # Track previous solutions for sweep warm-starting
+    prev_daruc_results = None
+    prev_aruc_results = None
+
     for alpha in sorted(args.alphas):
         if alpha in completed_alphas:
             print(f"\n  Skipping alpha={alpha} (already in {csv_path.name})")
@@ -834,8 +839,13 @@ def main():
             time_limit=args.time_limit,
             threads=args.threads,
             bar_qcp_conv_tol=args.bar_qcp_conv_tol,
+            prev_daruc_results=prev_daruc_results,
+            prev_aruc_results=prev_aruc_results,
         )
         if row is not None:
+            # Extract solutions for next iteration's warm start
+            prev_daruc_results = row.pop("_daruc_results", None)
+            prev_aruc_results = row.pop("_aruc_results", None)
             rows.append(row)
             # Flush to CSV after each alpha so progress survives interruption
             pd.DataFrame(rows).to_csv(csv_path, index=False)

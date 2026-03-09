@@ -178,11 +178,11 @@ def print_deviation_summary(
     print("DARUC DEVIATION ANALYSIS (DARUC vs DAM)")
     print("=" * 70)
 
-    print(f"\nDAM objective:   {dam_obj:>14,.2f}")
-    print(f"DARUC objective: {daruc_obj:>14,.2f}")
+    print(f"\nDAM objective (full horizon):   {dam_obj:>14,.2f}")
+    print(f"DARUC objective (full horizon): {daruc_obj:>14,.2f}")
     diff = daruc_obj - dam_obj
     pct = 100 * diff / dam_obj if dam_obj != 0 else float("inf")
-    print(f"Cost increase:   {diff:>14,.2f}  ({pct:+.2f}%)")
+    print(f"Cost increase (full horizon):   {diff:>14,.2f}  ({pct:+.2f}%)")
 
     if dev_df.empty:
         print("\nNo additional commitments made by DARUC.")
@@ -232,6 +232,7 @@ def run_rts_daruc(
     time_limit: Optional[float] = None,
     threads: Optional[int] = None,
     bar_qcp_conv_tol: Optional[float] = None,
+    prev_daruc_solution: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Two-step DARUC pipeline (Setup 1):
@@ -386,13 +387,17 @@ def run_rts_daruc(
         line_mask=line_mask,
     )
 
-    # Warm start ARUC from DAM solution
-    dam_model = dam_outputs.get("model")
-    dam_vars = dam_outputs.get("vars")
-    if dam_model is not None and dam_vars is not None:
-        from gurobipy import GRB as _GRB
-        if dam_model.Status in [_GRB.OPTIMAL, _GRB.SUBOPTIMAL]:
-            warm_start_aruc_from_dam(model, vars_dict, dam_vars, data)
+    # Warm start: prefer previous DARUC solution (sweep mode) over DAM
+    if prev_daruc_solution is not None:
+        from aruc_warm_start import warm_start_aruc_from_prev_solution
+        warm_start_aruc_from_prev_solution(model, vars_dict, prev_daruc_solution, data)
+    else:
+        dam_model = dam_outputs.get("model")
+        dam_vars = dam_outputs.get("vars")
+        if dam_model is not None and dam_vars is not None:
+            from gurobipy import GRB as _GRB
+            if dam_model.Status in [_GRB.OPTIMAL, _GRB.SUBOPTIMAL]:
+                warm_start_aruc_from_dam(model, vars_dict, dam_vars, data)
 
     print("  Model built. Starting optimization...")
 

@@ -534,22 +534,29 @@ def main():
     common_times = _align_time(aruc_loaded, daruc_loaded, dam_loaded)
     print(f"  Common time periods: {len(common_times)}")
 
-    # Cost breakdown using the DAMData we already have in memory
+    # Day-1 times for metric reporting (day 2 is look-ahead only)
+    d1_times = data.day1_times()
+    # Intersect with common_times in case of mismatch
+    d1_set = set(str(t) for t in d1_times)
+    d1_common = [t for t in common_times if str(t) in d1_set]
+    print(f"  Day-1 periods for metrics: {len(d1_common)}")
+
+    # Cost breakdown using day-1 times only
     cost_aruc = compute_cost_breakdown(
-        aruc_loaded["u"][common_times], aruc_loaded["p0"][common_times], data
+        aruc_loaded["u"][d1_common], aruc_loaded["p0"][d1_common], data
     )
     cost_daruc = compute_cost_breakdown(
-        daruc_loaded["u"][common_times], daruc_loaded["p0"][common_times], data
+        daruc_loaded["u"][d1_common], daruc_loaded["p0"][d1_common], data
     )
     cost_dam = None
     if dam_loaded is not None:
         cost_dam = compute_cost_breakdown(
-            dam_loaded["u"][common_times], dam_loaded["p0"][common_times], data
+            dam_loaded["u"][d1_common], dam_loaded["p0"][d1_common], data
         )
     cost_reserve = None
     if reserve_loaded is not None:
         cost_reserve = compute_cost_breakdown(
-            reserve_loaded["u"][common_times], reserve_loaded["p0"][common_times], data
+            reserve_loaded["u"][d1_common], reserve_loaded["p0"][d1_common], data
         )
 
     # Figures
@@ -595,13 +602,13 @@ def main():
         out_dir,
     )
 
-    # Text summary
+    # Text summary (day-1 metrics)
     print()
     write_summary(
         aruc_loaded,
         daruc_loaded,
         dam_loaded,
-        common_times,
+        d1_common,
         cost_aruc,
         cost_daruc,
         cost_dam,
@@ -611,29 +618,29 @@ def main():
         cost_reserve=cost_reserve,
     )
 
-    # Quick delta report
+    # Quick delta report (day-1 costs)
     print("\n" + "=" * 70)
-    print("QUICK COMPARISON")
+    print("QUICK COMPARISON (day-1 costs)")
     print("=" * 70)
-    print(f"  DAM objective:   {dam_results['obj']:>14,.2f}")
-    if reserve_results is not None:
+    print(f"  DAM cost:        {cost_dam['total']:>14,.2f}" if cost_dam else "  DAM cost:        N/A")
+    if cost_reserve is not None:
         print(
-            f"  DAM+Reserve obj: {reserve_results['obj']:>14,.2f}  "
-            f"(+{reserve_results['obj'] - dam_results['obj']:,.2f} vs DAM)"
+            f"  DAM+Reserve:     {cost_reserve['total']:>14,.2f}  "
+            f"(+{cost_reserve['total'] - cost_dam['total']:,.2f} vs DAM)"
         )
     print(
-        f"  DARUC objective: {daruc_results['obj']:>14,.2f}  "
-        f"(+{daruc_results['obj'] - dam_results['obj']:,.2f} vs DAM)"
+        f"  DARUC cost:      {cost_daruc['total']:>14,.2f}  "
+        f"(+{cost_daruc['total'] - (cost_dam['total'] if cost_dam else 0):,.2f} vs DAM)"
     )
     print(
-        f"  ARUC objective:  {aruc_results['obj']:>14,.2f}  "
-        f"(+{aruc_results['obj'] - dam_results['obj']:,.2f} vs DAM)"
+        f"  ARUC cost:       {cost_aruc['total']:>14,.2f}  "
+        f"(+{cost_aruc['total'] - (cost_dam['total'] if cost_dam else 0):,.2f} vs DAM)"
     )
 
-    u_aruc = _round_commitment(aruc_loaded["u"][common_times])
-    u_daruc = _round_commitment(daruc_loaded["u"][common_times])
+    u_aruc = _round_commitment(aruc_loaded["u"][d1_common])
+    u_daruc = _round_commitment(daruc_loaded["u"][d1_common])
     diff_count = (u_aruc.values != u_daruc.values).sum()
-    print(f"\n  Commitment differences: {diff_count} (gen,hour) entries differ")
+    print(f"\n  Commitment differences (day 1): {diff_count} (gen,hour) entries differ")
     print(f"\n  All outputs: {out_dir}/")
     print("=" * 70)
 

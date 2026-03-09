@@ -324,29 +324,34 @@ def analyze_Z_patterns(Z_df: pd.DataFrame, data: DAMData) -> None:
 def print_brief_summary(results: Dict[str, Any], data: DAMData) -> None:
     """
     Print a small human-readable summary to the console.
+    Reports day-1 metrics only (day 2 is look-ahead).
     """
     u_df = results["u"]
     p0_df = results["p0"]
     obj = results["obj"]
 
+    d1_times = data.day1_times()
+    d1_mask = data.day1_period_mask()
+    d1_dt = data.dt[d1_mask]
+
     print("\n=== ARUC-LDR UC Summary ===")
-    print(f"Objective value: {obj:,.2f}")
+    print(f"Objective value (full horizon): {obj:,.2f}")
     print(f"Number of generators: {len(data.gen_ids)}")
-    print(f"Number of buses:      {len(data.bus_ids)}")
-    print(f"Number of lines:      {len(data.line_ids)}")
-    print(f"Number of periods:    {len(data.time)}")
+    print(f"Number of periods:    {len(data.time)} ({len(d1_times)} day-1)")
 
-    # Total nominal generation vs total load
-    total_gen = p0_df.to_numpy().sum()
-    total_load = data.d.sum()
+    # Day-1 nominal generation vs load
+    d1_gen = p0_df[d1_times].to_numpy()
+    d1_load = data.d[:, d1_mask]
+    total_gen_mwh = float((d1_gen * d1_dt[None, :]).sum())
+    total_load_mwh = float((d1_load * d1_dt[None, :]).sum())
 
-    print(f"Total nominal generation (MWh): {total_gen:,.2f}")
-    print(f"Total load (MWh):               {total_load:,.2f}")
+    print(f"Day-1 generation (MWh): {total_gen_mwh:,.2f}")
+    print(f"Day-1 load (MWh):       {total_load_mwh:,.2f}")
 
-    # Show which units are ever committed
-    committed_any = u_df.sum(axis=1) > 0.5
+    # Show which units are ever committed (day 1)
+    committed_any = u_df[d1_times].sum(axis=1) > 0.5
     committed_units = committed_any[committed_any].index.tolist()
-    print(f"Units committed at least once: {len(committed_units)}")
+    print(f"Units committed (day 1): {len(committed_units)}")
     if len(committed_units) <= 20:
         print("  " + ", ".join(committed_units))
 
@@ -431,6 +436,7 @@ def run_rts_aruc(
     time_limit: Optional[float] = None,
     threads: Optional[int] = None,
     bar_qcp_conv_tol: Optional[float] = None,
+    prev_aruc_solution: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Full pipeline for ARUC-LDR:
@@ -574,18 +580,21 @@ def run_rts_aruc(
         line_mask=line_mask,
     )
 
-    # Warm start from a quick DAM solve (~5s) — provides binary commitment
-    # values that give Gurobi a feasible incumbent immediately, avoiding
-    # hours of branch-and-bound with a massive optimality gap.
-    print("  Solving quick DAM for warm start...")
-    dam_model, dam_vars = build_dam_model(data, M_p=m_penalty,
-                                          enforce_lines=enforce_lines)
-    dam_model.Params.OutputFlag = 0
-    dam_model.optimize()
-    if dam_model.Status in [gp.GRB.OPTIMAL, gp.GRB.SUBOPTIMAL]:
-        warm_start_aruc_from_dam(model, vars_dict, dam_vars, data)
+    # Warm start: prefer previous ARUC solution (sweep mode) over DAM
+    if prev_aruc_solution is not None:
+        from aruc_warm_start import warm_start_aruc_from_prev_solution
+        warm_start_aruc_from_prev_solution(model, vars_dict, prev_aruc_solution, data)
     else:
-        print("  DAM warm start failed, proceeding without warm start")
+        # Fall back to quick DAM solve (~5s) for binary commitment hints
+        print("  Solving quick DAM for warm start...")
+        dam_model, dam_vars = build_dam_model(data, M_p=m_penalty,
+                                              enforce_lines=enforce_lines)
+        dam_model.Params.OutputFlag = 0
+        dam_model.optimize()
+        if dam_model.Status in [gp.GRB.OPTIMAL, gp.GRB.SUBOPTIMAL]:
+            warm_start_aruc_from_dam(model, vars_dict, dam_vars, data)
+        else:
+            print("  DAM warm start failed, proceeding without warm start")
 
     print("  Model built. Starting optimization...")
 

@@ -211,6 +211,112 @@ def warm_start_aruc_from_dam(
     aruc_model.update()
 
 
+def warm_start_aruc_from_prev_solution(
+    aruc_model: gp.Model,
+    aruc_vars: Dict[str, Any],
+    prev_results: Dict[str, Any],
+    data: DAMData,
+) -> None:
+    """
+    Warm start ARUC from a previous sweep point's extracted solution.
+
+    This sets Start hints for all variables (u, v, w, p0, Z) from the
+    previous solve's DataFrames, which is much better than the DAM-derived
+    warm start when sweeping adjacent rho or alpha values.
+
+    Parameters
+    ----------
+    aruc_model : gp.Model
+        The ARUC model to warm start
+    aruc_vars : dict
+        Variable dictionary from build_aruc_ldr_model
+    prev_results : dict
+        Previous solve results with keys "u", "p0", "Z" (DataFrames)
+        as returned by extract_solution().
+    data : DAMData
+        Current problem data (must have same generators/periods)
+    """
+    I = data.n_gens
+    T = data.n_periods
+
+    u_prev = prev_results["u"].values  # (I, T)
+    p0_prev = prev_results["p0"].values  # (I, T)
+
+    aruc_u = aruc_vars["u"]
+    aruc_v = aruc_vars["v"]
+    aruc_w = aruc_vars["w"]
+    aruc_p0 = aruc_vars["p0"]
+    aruc_Z = aruc_vars["Z"]
+
+    n_set = 0
+
+    # Set binary variables: u from previous, derive v/w
+    for i in range(I):
+        for t in range(T):
+            u_val = round(u_prev[i, t])
+            aruc_u[i, t].Start = u_val
+            # v[i,t] = max(u[i,t] - u[i,t-1], 0), w[i,t] = max(u[i,t-1] - u[i,t], 0)
+            if t == 0:
+                u_prev_t = round(data.u_init[i]) if data.u_init is not None else 0
+            else:
+                u_prev_t = round(u_prev[i, t - 1])
+            aruc_v[i, t].Start = max(u_val - u_prev_t, 0)
+            aruc_w[i, t].Start = max(u_prev_t - u_val, 0)
+            n_set += 3
+
+    # Set p0 from previous dispatch
+    for i in range(I):
+        for t in range(T):
+            if (i, t) in aruc_p0:
+                aruc_p0[i, t].Start = p0_prev[i, t]
+                n_set += 1
+
+    # Set p0_block if available
+    aruc_p0_block = aruc_vars.get("p0_block")
+    if aruc_p0_block is not None:
+        # p0_block stores per-block dispatch; approximate from total p0
+        # For single-block mode, p0_block[i,t,0] = p0[i,t]
+        for key in aruc_p0_block:
+            i, t, b = key
+            if b == 0:
+                aruc_p0_block[key].Start = p0_prev[i, t]
+            else:
+                aruc_p0_block[key].Start = 0.0
+            n_set += 1
+
+    # Set Z from previous solution
+    Z_prev = prev_results["Z"].values  # (I, T*K)
+    K = 0
+    for key in aruc_Z:
+        K = max(K, key[2] + 1)
+
+    for key in aruc_Z:
+        i, t, k = key
+        col_idx = t * K + k
+        if col_idx < Z_prev.shape[1]:
+            aruc_Z[key].Start = Z_prev[i, col_idx]
+            n_set += 1
+
+    # Set slack to 0
+    aruc_s_p = aruc_vars.get("s_p")
+    if aruc_s_p is not None:
+        for key in aruc_s_p:
+            aruc_s_p[key].Start = 0.0
+            n_set += 1
+
+    # Set SOC auxiliaries z_gen from Z values
+    z_gen = aruc_vars.get("z_gen", {})
+    for key in z_gen:
+        # z_gen[i,t] is the norm bound; approximate as 0 (will be corrected by solver)
+        z_gen[key].Start = 0.0
+        n_set += 1
+
+    print(
+        f"Sweep warm start: set {n_set} Start values from previous solution"
+    )
+    aruc_model.update()
+
+
 def _init_soc_auxiliaries(
     aruc_vars: Dict[str, Any],
     data: DAMData,

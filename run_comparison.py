@@ -100,11 +100,12 @@ def main():
         "--enforce-lines",
         action="store_true",
         help="Enforce line flow limits (default: copperplate)",
+        default=True,
     )
     parser.add_argument(
         "--uncertainty-npz",
         type=str,
-        default=None,
+        default="uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha90.npz",
         help="Path to time-varying uncertainty NPZ",
     )
     parser.add_argument(
@@ -134,7 +135,7 @@ def main():
     parser.add_argument(
         "--dispatch-cost-scale",
         type=float,
-        default=0.01,
+        default=0.1,
         help="Dispatch cost scale factor for incremental objective (default: 0.01)",
     )
     parser.add_argument(
@@ -153,6 +154,7 @@ def main():
         "--fix-wind-z",
         action="store_true",
         help="Fix wind Z diagonal to 1 (wind fully tracks own realization, no curtailment)",
+        default=True,
     )
     parser.add_argument(
         "--three-blocks",
@@ -200,6 +202,7 @@ def main():
         "--robust-ramp",
         action="store_true",
         help="Use robust (SOC-based) ramp constraints that account for worst-case dispatch deviations",
+        default=True,
     )
     parser.add_argument(
         "--with-reserve",
@@ -209,7 +212,7 @@ def main():
     parser.add_argument(
         "--line-monitor-threshold",
         type=float,
-        default=None,
+        default=0.8,
         help="DAM loading threshold for line filtering (e.g. 0.5 = keep lines loaded >=50%%)",
     )
     parser.add_argument(
@@ -256,7 +259,7 @@ def main():
         if args.bar_qcp_conv_tol is None:
             args.bar_qcp_conv_tol = 1e-4
         if args.time_limit is None:
-            args.time_limit = 600.0
+            args.time_limit = 6000.0
         if args.line_monitor_threshold is None and args.enforce_lines:
             args.line_monitor_threshold = 0.5
 

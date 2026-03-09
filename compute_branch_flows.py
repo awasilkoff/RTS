@@ -192,7 +192,7 @@ def main():
     )
     parser.add_argument("-o", "--output", type=Path, default=Path("branch_flows.csv"),
                         help="Output CSV path (default: branch_flows.csv)")
-    parser.add_argument("--top-n", type=int, default=10,
+    parser.add_argument("--top-n", type=int, default=30,
                         help="Number of congested lines to report")
     parser.add_argument("--include-renewables", action="store_true", default=False)
     parser.add_argument("--include-nuclear", action="store_true", default=False)

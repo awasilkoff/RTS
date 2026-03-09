@@ -1226,7 +1226,7 @@ def write_summary(
     text = "\n".join(lines)
     print(text)
 
-    with open(out_dir / "comparison_summary.txt", "w") as f:
+    with open(out_dir / "comparison_summary.txt", "w", encoding="utf-8") as f:
         f.write(text)
     print(f"\n  Saved comparison_summary.txt")
 

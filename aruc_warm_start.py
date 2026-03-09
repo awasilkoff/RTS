@@ -1,15 +1,15 @@
 """
 Warm-starting ARUC-LDR model from deterministic DAM solution.
 
-Strategy: provide ONLY the binary commitment variables (u, v, w) as a MIP
-start.  Gurobi then fixes those binaries and solves the resulting continuous
-SOCP to find optimal p0, Z, and auxiliary variables — producing a feasible,
-high-quality incumbent in seconds rather than hours.
+Strategy: set binary commitment variables (u, v, w) AND consistent continuous
+variable hints (p0, Z, SOC auxiliaries) so Gurobi accepts the MIP start.
 
-Previous approach (setting p0, Z=0, blocks, slack) was rejected by Gurobi
-because Z=0 makes the wind availability SOC constraints infeasible:
-  (p0 - Pbar) + rho * ||sqrt_Sigma[:, k]|| <= 0
-cannot hold when p0 = Pbar (from DAM) and rho > 0.
+Key constraint that must be satisfied by Z hints:
+    sum_i Z[i,t,k] = 0   for all t, k   (power balance response)
+
+With wind Z diagonal = identity (Z[wind_j,t,k] = 1 if k==j else 0),
+thermal Z values must offset: sum_thermal Z[i,t,k] = -1 for each k.
+We distribute this proportionally to committed thermal Pmax.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ def warm_start_aruc_from_dam(
     Warm start ARUC model using DAM commitment decisions.
 
     Sets u, v, w binary Start values and optionally initializes continuous
-    variables (p0 and Z) to help the barrier solver converge faster.
+    variables (p0, Z, and SOC auxiliaries) with constraint-consistent hints.
 
     Parameters
     ----------
@@ -47,8 +47,8 @@ def warm_start_aruc_from_dam(
         The problem data
     set_continuous : bool
         If True, also set p0 and Z Start values (default: True).
-        p0 is initialized from DAM dispatch, Z for wind generators is
-        set to identity (wind tracks own realization), Z for thermals to 0.
+        Z is initialized to satisfy power balance: wind diagonal = 1,
+        thermals distribute -1 proportional to committed Pmax.
     """
 
     I = data.n_gens
@@ -80,10 +80,14 @@ def warm_start_aruc_from_dam(
         aruc_Z = aruc_vars["Z"]
         dam_p = dam_vars["p"]
 
-        # Identify wind generators and build wind_k -> generator index mapping
+        # Identify generator types
         is_wind = np.array([gt.upper() == "WIND" for gt in data.gen_type])
+        is_thermal = np.array([gt.upper() == "THERMAL" for gt in data.gen_type])
         wind_idx = np.where(is_wind)[0]
-        wind_k_map = {int(wind_idx[k]): k for k in range(len(wind_idx))}
+        thermal_idx = np.where(is_thermal)[0]
+        n_wind = len(wind_idx)
+        wind_k_map = {int(wind_idx[k]): k for k in range(n_wind)}
+        Pmax_2d = data.Pmax_2d()
 
         # Set p0 from DAM dispatch
         for i in range(I):
@@ -92,20 +96,99 @@ def warm_start_aruc_from_dam(
                     aruc_p0[i, t].Start = dam_p[i, t].X
                     n_continuous_set += 1
 
-        # Set Z: wind diagonal = 1, everything else = 0
+        # ------------------------------------------------------------------
+        # Build Z start values that satisfy sum_i Z[i,t,k] = 0
+        # ------------------------------------------------------------------
+        # Wind: Z[wind_j, t, k] = 1 if k == j, else 0  (identity)
+        # Thermal: Z[thermal_i, t, k] = -Pmax[i,t]*u[i,t] / sum_committed_Pmax
+        #   so that sum_thermal Z[i,t,k] = -1 for each k
+        # ------------------------------------------------------------------
+
+        # Pre-compute thermal Z shares per (t, k)
+        # For each time period, get committed thermal capacity
+        thermal_z_share = np.zeros((I, T))  # only filled for thermals
+        for t in range(T):
+            committed_pmax_sum = 0.0
+            for i in thermal_idx:
+                u_val = round(dam_u[i, t].X)
+                if u_val > 0.5:
+                    committed_pmax_sum += Pmax_2d[i, t]
+
+            if committed_pmax_sum > 1e-6:
+                for i in thermal_idx:
+                    u_val = round(dam_u[i, t].X)
+                    if u_val > 0.5:
+                        thermal_z_share[i, t] = -Pmax_2d[i, t] / committed_pmax_sum
+            else:
+                # No thermals committed — distribute equally (fallback)
+                n_th = len(thermal_idx)
+                if n_th > 0:
+                    for i in thermal_idx:
+                        thermal_z_share[i, t] = -1.0 / n_th
+
+        # Set Z Start values
         for key in aruc_Z:
             i, t, k = key
-            if is_wind[i] and wind_k_map.get(i) == k:
-                aruc_Z[key].Start = 1.0
+            if is_wind[i]:
+                # Wind: identity matrix
+                k_wind = wind_k_map.get(i)
+                aruc_Z[key].Start = 1.0 if k == k_wind else 0.0
+            elif is_thermal[i]:
+                # Thermal: share of -1 for each wind dimension k
+                aruc_Z[key].Start = float(thermal_z_share[i, t])
             else:
                 aruc_Z[key].Start = 0.0
             n_continuous_set += 1
+
+        # ------------------------------------------------------------------
+        # Initialize SOC auxiliary variables consistently with Z starts
+        # ------------------------------------------------------------------
+        _init_soc_auxiliaries(aruc_vars, data, thermal_z_share, n_wind)
 
     print(
         f"Warm start: set {n_binary_set} binary + "
         f"{n_continuous_set} continuous start values from DAM solution"
     )
     aruc_model.update()
+
+
+def _init_soc_auxiliaries(
+    aruc_vars: Dict[str, Any],
+    data: DAMData,
+    thermal_z_share: np.ndarray,
+    n_wind: int,
+) -> None:
+    """
+    Set Start hints for z_gen auxiliary variables based on Z start values.
+
+    For thermal generators with Z[i,t,k] = thermal_z_share[i,t] for all k,
+    the norm ||L^T @ Z[i,t]|| can be computed analytically.  We don't set
+    y_gen/y_line hints (Gurobi infers them from equality constraints).
+    We do set z_gen since it appears in inequality constraints.
+    """
+    z_gen = aruc_vars.get("z_gen", {})
+    if not z_gen:
+        return
+
+    is_thermal = np.array([gt.upper() == "THERMAL" for gt in data.gen_type])
+    thermal_idx = np.where(is_thermal)[0]
+
+    # For each thermal generator, Z[i,t,:] = [s, s, s, ...] where s = thermal_z_share[i,t]
+    # y_gen[i,t,k] = sum_j L[j,k] * Z[i,t,j] = s * sum_j L[j,k]
+    # ||y_gen[i,t]||^2 = s^2 * sum_k (sum_j L[j,k])^2
+    # z_gen[i,t] >= ||y_gen||  => set z_gen = ||y_gen|| + small epsilon
+
+    # We don't have L (sqrt_Sigma) here, but z_gen >= 0 and a slightly
+    # overestimated value is safe.  Use |s| * K as a loose upper bound on
+    # the norm (since ||L^T x|| <= ||L^T|| * ||x|| and ||x|| = |s|*sqrt(K)).
+    # A loose hint is still better than no hint.
+    K = n_wind
+    for key in z_gen:
+        i, t = key
+        s = thermal_z_share[i, t]
+        # Conservative estimate: |s| * sqrt(K) * max_singular_value_of_L
+        # Since we don't have L, use |s| * K as a safe upper bound
+        z_gen[key].Start = abs(s) * K
 
 
 def build_aruc_with_warm_start(

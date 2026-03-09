@@ -267,7 +267,7 @@ Additional Gurobi params always applied in `aruc_model.py`:
 - `NodefileStart=0.5` — spill B&B tree to disk after 0.5 GB
 - `Heuristics=0.2`, `MIPFocus=1` — better incumbents for MISOCP
 
-Warm start (`aruc_warm_start.py`) now initializes continuous variables (p0 from DAM dispatch, Z diagonal=1 for wind) in addition to binary u/v/w, reducing barrier iterations.
+Warm start (`aruc_warm_start.py`) initializes binary u/v/w from DAM, p0 from DAM dispatch, and Z with constraint-consistent values. Z satisfies `sum_i Z[i,t,k] = 0` (power balance response): wind diagonal = identity, thermals distribute `-1` proportional to committed Pmax. SOC auxiliaries (z_gen) are also hinted. This avoids the previous infeasibility where Z[thermal]=0 + Z[wind]=identity violated power balance.
 
 ### Configuration
 

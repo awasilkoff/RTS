@@ -165,6 +165,7 @@ def main():
         "--no-worst-case-cost",
         dest="worst_case_cost",
         action="store_false",
+        default=True,
         help="Disable worst-case dispatch cost epigraph (use nominal dispatch cost only)",
     )
     parser.set_defaults(worst_case_cost=True)
@@ -212,7 +213,7 @@ def main():
     parser.add_argument(
         "--line-monitor-threshold",
         type=float,
-        default=0.8,
+        default=0.7,
         help="DAM loading threshold for line filtering (e.g. 0.5 = keep lines loaded >=50%%)",
     )
     parser.add_argument(

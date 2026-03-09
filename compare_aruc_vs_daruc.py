@@ -1090,40 +1090,39 @@ def write_summary(
     """Write comparison summary to console and file."""
     lines = []
     lines.append("=" * 70)
-    lines.append("ARUC vs DARUC COMPARISON SUMMARY")
+    lines.append("ARUC vs DARUC COMPARISON SUMMARY (day-1 metrics)")
     lines.append("=" * 70)
 
-    # Objective values
-    aruc_obj = aruc["summary"]["objective"] if aruc.get("summary") else None
-    daruc_obj = (daruc["summary"].get("daruc_objective") or daruc["summary"].get("objective")) \
-        if daruc.get("summary") else None
-    dam_obj = daruc["summary"].get("dam_objective") if daruc.get("summary") else None
-    reserve_obj = reserve["summary"]["objective"] if (reserve and reserve.get("summary")) else None
+    # Day-1 cost totals from cost breakdowns
+    dam_total = cost_dam["total"] if cost_dam else None
+    reserve_total = cost_reserve["total"] if cost_reserve else None
+    daruc_total = cost_daruc["total"] if cost_daruc else None
+    aruc_total = cost_aruc["total"] if cost_aruc else None
 
-    lines.append("\n--- Objective Values ---")
-    if dam_obj is not None:
-        lines.append(f"  DAM (deterministic):  {dam_obj:>14,.2f}")
-    if reserve_obj is not None:
-        lines.append(f"  DAM+Reserve:          {reserve_obj:>14,.2f}")
-    if daruc_obj is not None:
-        lines.append(f"  DARUC (two-step):     {daruc_obj:>14,.2f}")
-    if aruc_obj is not None:
-        lines.append(f"  ARUC-LDR (one-shot):  {aruc_obj:>14,.2f}")
-    if daruc_obj is not None and aruc_obj is not None:
-        diff = aruc_obj - daruc_obj
-        pct = 100 * diff / daruc_obj if daruc_obj else 0
+    lines.append("\n--- Day-1 Costs ---")
+    if dam_total is not None:
+        lines.append(f"  DAM (deterministic):  {dam_total:>14,.2f}")
+    if reserve_total is not None:
+        lines.append(f"  DAM+Reserve:          {reserve_total:>14,.2f}")
+    if daruc_total is not None:
+        lines.append(f"  DARUC (two-step):     {daruc_total:>14,.2f}")
+    if aruc_total is not None:
+        lines.append(f"  ARUC-LDR (one-shot):  {aruc_total:>14,.2f}")
+    if daruc_total is not None and aruc_total is not None:
+        diff = aruc_total - daruc_total
+        pct = 100 * diff / daruc_total if daruc_total else 0
         lines.append(f"  ARUC − DARUC:         {diff:>14,.2f}  ({pct:+.2f}%)")
-    if dam_obj is not None and reserve_obj is not None:
-        diff = reserve_obj - dam_obj
-        pct = 100 * diff / dam_obj if dam_obj else 0
+    if dam_total is not None and reserve_total is not None:
+        diff = reserve_total - dam_total
+        pct = 100 * diff / dam_total if dam_total else 0
         lines.append(f"  DAM+Res − DAM:        {diff:>14,.2f}  ({pct:+.2f}%)")
-    if dam_obj is not None and daruc_obj is not None:
-        diff = daruc_obj - dam_obj
-        pct = 100 * diff / dam_obj if dam_obj else 0
+    if dam_total is not None and daruc_total is not None:
+        diff = daruc_total - dam_total
+        pct = 100 * diff / dam_total if dam_total else 0
         lines.append(f"  DARUC − DAM:          {diff:>14,.2f}  ({pct:+.2f}%)")
-    if dam_obj is not None and aruc_obj is not None:
-        diff = aruc_obj - dam_obj
-        pct = 100 * diff / dam_obj if dam_obj else 0
+    if dam_total is not None and aruc_total is not None:
+        diff = aruc_total - dam_total
+        pct = 100 * diff / dam_total if dam_total else 0
         lines.append(f"  ARUC − DAM:           {diff:>14,.2f}  ({pct:+.2f}%)")
 
     # Cost breakdown

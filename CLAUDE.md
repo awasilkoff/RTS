@@ -159,6 +159,16 @@ Outputs in `data/viz_artifacts/paper_final/figures/` and `tables/`. Runtime: ~3-
 
 ## Key Concepts
 
+### Day-1 Metric Reporting
+
+All metric reporting (costs, curtailment, unit-hours) uses **day-1 periods only**. Day 2 is treated as a look-ahead horizon that prevents end-of-horizon effects but is not reported.
+
+- **`data.day1_times()`**: Returns time labels for the first 24 hours (uses cumulative period durations for variable-interval support)
+- **`data.day1_period_mask()`**: Boolean mask `(T,)` selecting day-1 periods
+- **Affected scripts**: `run_alpha_sweep.py`, `run_price_of_robustness.py`, `run_comparison.py`, `run_rts_aruc.py`, `run_rts_daruc.py`
+- **CSV columns**: `dam_cost_total`, `daruc_cost_total`, `aruc_cost_total` are day-1 cost breakdowns (no separate `*_obj` columns for full-horizon Gurobi objectives)
+- **Figures**: Visualizations (commitment heatmaps, dispatch bars, Z heatmaps) still show the full horizon for context
+
 ### DAMData Structure
 
 The `DAMData` Pydantic model (in `models.py`) is the canonical interface between ETL and optimization:

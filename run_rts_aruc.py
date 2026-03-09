@@ -324,29 +324,34 @@ def analyze_Z_patterns(Z_df: pd.DataFrame, data: DAMData) -> None:
 def print_brief_summary(results: Dict[str, Any], data: DAMData) -> None:
     """
     Print a small human-readable summary to the console.
+    Reports day-1 metrics only (day 2 is look-ahead).
     """
     u_df = results["u"]
     p0_df = results["p0"]
     obj = results["obj"]
 
+    d1_times = data.day1_times()
+    d1_mask = data.day1_period_mask()
+    d1_dt = data.dt[d1_mask]
+
     print("\n=== ARUC-LDR UC Summary ===")
-    print(f"Objective value: {obj:,.2f}")
+    print(f"Objective value (full horizon): {obj:,.2f}")
     print(f"Number of generators: {len(data.gen_ids)}")
-    print(f"Number of buses:      {len(data.bus_ids)}")
-    print(f"Number of lines:      {len(data.line_ids)}")
-    print(f"Number of periods:    {len(data.time)}")
+    print(f"Number of periods:    {len(data.time)} ({len(d1_times)} day-1)")
 
-    # Total nominal generation vs total load
-    total_gen = p0_df.to_numpy().sum()
-    total_load = data.d.sum()
+    # Day-1 nominal generation vs load
+    d1_gen = p0_df[d1_times].to_numpy()
+    d1_load = data.d[:, d1_mask]
+    total_gen_mwh = float((d1_gen * d1_dt[None, :]).sum())
+    total_load_mwh = float((d1_load * d1_dt[None, :]).sum())
 
-    print(f"Total nominal generation (MWh): {total_gen:,.2f}")
-    print(f"Total load (MWh):               {total_load:,.2f}")
+    print(f"Day-1 generation (MWh): {total_gen_mwh:,.2f}")
+    print(f"Day-1 load (MWh):       {total_load_mwh:,.2f}")
 
-    # Show which units are ever committed
-    committed_any = u_df.sum(axis=1) > 0.5
+    # Show which units are ever committed (day 1)
+    committed_any = u_df[d1_times].sum(axis=1) > 0.5
     committed_units = committed_any[committed_any].index.tolist()
-    print(f"Units committed at least once: {len(committed_units)}")
+    print(f"Units committed (day 1): {len(committed_units)}")
     if len(committed_units) <= 20:
         print("  " + ", ".join(committed_units))
 

@@ -88,23 +88,20 @@ def run_sweep(args) -> pd.DataFrame:
             daruc_res = daruc_out["daruc_results"]
             dam_res = daruc_out["dam_outputs"]["results"]
 
-            # Build common_times from data
-            common_times = list(data.time)
-
-            dam_obj = dam_res["obj"]
-            daruc_obj = daruc_res["obj"]
+            # Use day-1 times only for metrics (day 2 is look-ahead)
+            d1_times = data.day1_times()
 
             # DAM dispatch uses "p" key, not "p0"
             dam_p0 = dam_res["p"]
             daruc_p0 = daruc_res["p0"]
 
-            dam_curtail = compute_wind_curtailment(dam_p0, data, common_times)
-            daruc_curtail = compute_wind_curtailment(daruc_p0, data, common_times)
-            dam_uhours = _unit_hours(dam_res["u"], common_times)
-            daruc_uhours = _unit_hours(daruc_res["u"], common_times)
+            dam_curtail = compute_wind_curtailment(dam_p0, data, d1_times)
+            daruc_curtail = compute_wind_curtailment(daruc_p0, data, d1_times)
+            dam_uhours = _unit_hours(dam_res["u"], d1_times)
+            daruc_uhours = _unit_hours(daruc_res["u"], d1_times)
 
-            dam_cost = compute_cost_breakdown(dam_res["u"][common_times], dam_p0[common_times], data)
-            daruc_cost = compute_cost_breakdown(daruc_res["u"][common_times], daruc_p0[common_times], data)
+            dam_cost = compute_cost_breakdown(dam_res["u"][d1_times], dam_p0[d1_times], data)
+            daruc_cost = compute_cost_breakdown(daruc_res["u"][d1_times], daruc_p0[d1_times], data)
         except Exception as e:
             print(f"DARUC failed at rho={rho}: {e}")
             continue
@@ -133,11 +130,10 @@ def run_sweep(args) -> pd.DataFrame:
                 prev_aruc_solution=prev_aruc_results,
             )
             aruc_res = aruc_out["results"]
-            aruc_obj = aruc_res["obj"]
             aruc_p0 = aruc_res["p0"]
-            aruc_curtail = compute_wind_curtailment(aruc_p0, data, common_times)
-            aruc_uhours = _unit_hours(aruc_res["u"], common_times)
-            aruc_cost = compute_cost_breakdown(aruc_res["u"][common_times], aruc_p0[common_times], data)
+            aruc_curtail = compute_wind_curtailment(aruc_p0, data, d1_times)
+            aruc_uhours = _unit_hours(aruc_res["u"], d1_times)
+            aruc_cost = compute_cost_breakdown(aruc_res["u"][d1_times], aruc_p0[d1_times], data)
         except Exception as e:
             print(f"ARUC failed at rho={rho}: {e}")
             continue
@@ -146,9 +142,6 @@ def run_sweep(args) -> pd.DataFrame:
 
         row = {
             "rho": rho,
-            "dam_obj": dam_obj,
-            "daruc_obj": daruc_obj,
-            "aruc_obj": aruc_obj,
             "dam_cost_total": dam_cost["total"],
             "daruc_cost_total": daruc_cost["total"],
             "aruc_cost_total": aruc_cost["total"],
@@ -169,7 +162,8 @@ def run_sweep(args) -> pd.DataFrame:
 
         rows.append(row)
         print(f"\n  rho={rho} done in {elapsed:.0f}s  "
-              f"DAM={dam_obj:,.0f}  DARUC={daruc_obj:,.0f}  ARUC={aruc_obj:,.0f}")
+              f"DAM={dam_cost['total']:,.0f}  DARUC={daruc_cost['total']:,.0f}  "
+              f"ARUC={aruc_cost['total']:,.0f}  (day-1 costs)")
 
     df = pd.DataFrame(rows)
     csv_path = out_dir / "sweep_results.csv"
@@ -182,21 +176,21 @@ def plot_price_of_robustness(df: pd.DataFrame, out_dir: Path):
     """Cost vs rho figure with DAM baseline, DARUC, ARUC."""
     fig, ax = plt.subplots(figsize=(7, 4.5))
 
-    ax.axhline(df["dam_obj"].iloc[0], color="#2ca02c", linestyle="--", linewidth=1.2, label="DAM (baseline)")
-    ax.plot(df["rho"], df["daruc_obj"], "o-", color="#ff7f0e", linewidth=1.5, markersize=5, label="DARUC")
-    ax.plot(df["rho"], df["aruc_obj"], "s-", color="#1f77b4", linewidth=1.5, markersize=5, label="ARUC")
+    ax.axhline(df["dam_cost_total"].iloc[0], color="#2ca02c", linestyle="--", linewidth=1.2, label="DAM (baseline)")
+    ax.plot(df["rho"], df["daruc_cost_total"], "o-", color="#ff7f0e", linewidth=1.5, markersize=5, label="DARUC")
+    ax.plot(df["rho"], df["aruc_cost_total"], "s-", color="#1f77b4", linewidth=1.5, markersize=5, label="ARUC")
 
     # Shade region between DARUC and ARUC
-    ax.fill_between(df["rho"], df["daruc_obj"], df["aruc_obj"], alpha=0.15, color="#1f77b4")
+    ax.fill_between(df["rho"], df["daruc_cost_total"], df["aruc_cost_total"], alpha=0.15, color="#1f77b4")
 
     ax.set_xlabel(r"Uncertainty radius $\rho$", fontsize=10)
-    ax.set_ylabel("Objective cost ($)", fontsize=10)
+    ax.set_ylabel("Day-1 cost ($)", fontsize=10)
     ax.set_title("Price of Robustness", fontsize=12)
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.3)
 
     # Secondary y-axis: % increase vs DAM
-    dam_base = df["dam_obj"].iloc[0]
+    dam_base = df["dam_cost_total"].iloc[0]
     if dam_base > 0:
         ax2 = ax.twinx()
         ax2.set_ylabel("% increase vs DAM", fontsize=9)

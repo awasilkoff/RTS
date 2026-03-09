@@ -178,11 +178,11 @@ def print_deviation_summary(
     print("DARUC DEVIATION ANALYSIS (DARUC vs DAM)")
     print("=" * 70)
 
-    print(f"\nDAM objective:   {dam_obj:>14,.2f}")
-    print(f"DARUC objective: {daruc_obj:>14,.2f}")
+    print(f"\nDAM objective (full horizon):   {dam_obj:>14,.2f}")
+    print(f"DARUC objective (full horizon): {daruc_obj:>14,.2f}")
     diff = daruc_obj - dam_obj
     pct = 100 * diff / dam_obj if dam_obj != 0 else float("inf")
-    print(f"Cost increase:   {diff:>14,.2f}  ({pct:+.2f}%)")
+    print(f"Cost increase (full horizon):   {diff:>14,.2f}  ({pct:+.2f}%)")
 
     if dev_df.empty:
         print("\nNo additional commitments made by DARUC.")

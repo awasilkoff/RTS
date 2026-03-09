@@ -236,6 +236,27 @@ class DAMData(BaseModel):
         """Total horizon length in hours (sum of all period durations)."""
         return float(self.dt.sum())
 
+    def day1_period_mask(self, day1_hours: float = 24.0) -> np.ndarray:
+        """
+        Boolean mask selecting periods whose cumulative hours fall within
+        the first ``day1_hours`` of the horizon.
+
+        Uses cumulative period durations, so variable-duration periods
+        (e.g. 24x1h + 12x2h) are handled correctly.
+
+        Returns shape (T,) bool array.
+        """
+        cum = np.cumsum(self.dt)
+        # Include periods where the start of the period is < day1_hours
+        # i.e. cumulative hours at end of *previous* period < day1_hours
+        starts = np.concatenate([[0.0], cum[:-1]])
+        return starts < day1_hours
+
+    def day1_times(self, day1_hours: float = 24.0) -> list:
+        """Return time labels for the first ``day1_hours`` of the horizon."""
+        mask = self.day1_period_mask(day1_hours)
+        return [self.time[t] for t in range(self.n_periods) if mask[t]]
+
     # ---------- Convenience masks for generator types ----------
     @property
     def thermal_mask(self) -> np.ndarray:

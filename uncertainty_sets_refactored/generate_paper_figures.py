@@ -25,6 +25,8 @@ Outputs saved to: data/viz_artifacts/paper_final/
         fig8_ellipse_grid.pdf       - 2D ellipse grid with consistent axes
         fig9_omega_bar_chart.png    - Learned feature weights bar chart
         fig10_ellipse_overlay.pdf   - Ellipse overlay (k=16, 512, global)
+        fig10b_ellipse_overlay_two_hours.pdf        - Two-hour overlay (normal+extreme) across k=16, 512, Global
+        fig10b_ellipse_overlay_two_hours_learned.pdf - Same with Learned ω as 4th panel
         fig11_tau_sweep_unconstrained.pdf - NLL vs tau (no constraint, no reg, 16D)
         fig_nll_heatmap_focused_2d.pdf  - Per-point NLL scatter (k-NN vs Learned, 2D)
         fig_nll_heatmap_high_dim_16d.pdf - Per-point NLL scatter (k-NN vs Learned, 16D projected)
@@ -101,6 +103,11 @@ WIND_LABELS = {0: "Wind 1", 1: "Wind 2", 2: "Wind 3"}
 # Found via standardized Euclidean distance from centroid of eval set
 EXTREME_SAMPLE_IDX = 353  # Highest std: mean=122.7, std=74.1 MW
 EXTREME_SAMPLES = [353, 264, 482]  # High-std, high-mean+std corner, high-mean+std
+
+# Artificial anchor center for two-hour ellipse overlay (dims 1 & 2 = Wind 2 & Wind 3,
+# both Pmax ≈ 799.1 MW).  Chosen as Pmax/2 to keep ellipses in the positive quadrant
+# without referencing any particular data point.
+ELLIPSE_PLOT_CENTER_MW = np.array([400.0, 400.0])
 
 
 def _ensure_output_dirs():
@@ -2130,6 +2137,146 @@ def fig10_ellipse_overlay(
 
 
 # ============================================================================
+# FIGURE 10b: Two-Hour Ellipse Overlay Across k Methods
+# ============================================================================
+def fig10b_ellipse_overlay_two_hours(
+    output_path: Path = None,
+    normal_sample_idx: int = None,
+    extreme_sample_idx: int = None,
+    rho: float = 2.0,
+    include_learned: bool = False,
+    feature_set_dir: Path = None,
+    tau: float = 0.07,
+    k_learned: int = 128,
+) -> plt.Figure:
+    """
+    Two-hour ellipse overlay across k methods.
+
+    Each panel = one covariance method. Two ellipses per panel:
+      - Normal hour (teal):   eval-set point with lowest SYS_STD (calmest hour)
+      - Extreme hour (coral): EXTREME_SAMPLE_IDX (highest SYS_STD)
+
+    Both ellipses share an artificial center (ELLIPSE_PLOT_CENTER_MW = Pmax/2 for
+    Wind 2 & Wind 3) to isolate covariance shape without referencing a data mean.
+    All panels share the same axis limits.
+
+    Without learned (include_learned=False): 1x3 — k=16 | k=512 | Global
+    With learned    (include_learned=True):  1x4 — k=16 | k=512 | Global | Learned ω
+    """
+    from sweep_knn_k_values import ellipse_points_2d, load_data, sweep_k_values, compute_learned_omega_baseline
+
+    if feature_set_dir is None:
+        feature_set_dir = HIGH_DIM_16D_DIR
+    if extreme_sample_idx is None:
+        extreme_sample_idx = EXTREME_SAMPLE_IDX
+    if output_path is None:
+        suffix = "_learned" if include_learned else ""
+        output_path = OUTPUT_DIR / "figures" / f"fig10b_ellipse_overlay_two_hours{suffix}"
+
+    # Load data — same 75/25 split as fig8 and fig10
+    X_train, Y_train, X_eval, Y_eval, x_cols, y_cols, _, _ = load_data(
+        DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet",
+        ACTUALS_PARQUET,
+        actual_col=ACTUAL_COL,
+    )
+
+    # Find "normal" sample: eval point with lowest SYS_STD (calmest hour)
+    # Maximises visual contrast with EXTREME_SAMPLE_IDX (highest SYS_STD)
+    if normal_sample_idx is None:
+        sys_std_idx = x_cols.index("SYS_STD") if "SYS_STD" in x_cols else 1
+        normal_sample_idx = int(np.argmin(X_eval[:, sys_std_idx]))
+        print(f"  Normal sample idx: {normal_sample_idx} (lowest SYS_STD in eval set)")
+
+    N_train = X_train.shape[0]
+    k_values = [16, 512, N_train]
+    results = sweep_k_values(X_train, Y_train, X_eval, Y_eval, k_values)
+
+    dims = (1, 2)  # Wind 2 and Wind 3
+
+    # Fixed artificial center: Pmax/2 for Wind 2 & Wind 3 (see ELLIPSE_PLOT_CENTER_MW)
+    mu_common = ELLIPSE_PLOT_CENTER_MW
+
+    # Method specs: (key, display label)
+    methods = [
+        (16,      "k=16"),
+        (512,     "k=512"),
+        (N_train, f"Global (k={N_train})"),
+    ]
+
+    learned_result = None
+    if include_learned:
+        omega = _load_omega(feature_set_dir)
+        learned_result = compute_learned_omega_baseline(
+            X_train, Y_train, X_eval, Y_eval,
+            omega=omega, tau=tau, k=k_learned,
+            zero_mean=(ACTUAL_COL == "RESIDUAL"),
+        )
+        methods.append(("learned", f"Learned ω (τ={tau})"))
+
+    n_panels = len(methods)
+    color_normal  = "#2A9D8F"  # teal  — matches fig8 col 0
+    color_extreme = "#E76F51"  # coral — matches fig8 col 2
+
+    # Pre-compute all ellipses; find global symmetric radius for shared axes
+    ellipse_cache = {}
+    max_r = 0.0
+    for method_key, _ in methods:
+        for sidx in [normal_sample_idx, extreme_sample_idx]:
+            if method_key == "learned":
+                Sigma = learned_result["Sigma"][sidx]
+            else:
+                Sigma = results[method_key]["Sigma"][sidx]
+            Sigma2 = Sigma[np.ix_(list(dims), list(dims))]
+            ex, ey = ellipse_points_2d(mu_common, Sigma2, rho=rho)
+            ellipse_cache[(method_key, sidx)] = (ex, ey)
+            max_r = max(max_r,
+                        np.max(np.abs(ex - mu_common[0])),
+                        np.max(np.abs(ey - mu_common[1])))
+
+    # Shared symmetric square limits — equal x/y range means set_aspect="equal"
+    # has nothing to fight and produces no whitespace
+    r = max_r * 1.2
+    xlim = (mu_common[0] - r, mu_common[0] + r)
+    ylim = (mu_common[1] - r, mu_common[1] + r)
+
+    # Figure layout: square panels, width scales with panel count
+    panel_size = 2.0  # inches per panel
+    fig_w = panel_size * n_panels
+    fig, axes = plt.subplots(1, n_panels, figsize=(fig_w, panel_size))
+
+    hour_specs = [
+        (normal_sample_idx,  color_normal,  "Normal hour"),
+        (extreme_sample_idx, color_extreme, "Extreme hour"),
+    ]
+
+    for col, (method_key, label) in enumerate(methods):
+        ax = axes[col]
+
+        for sidx, color, _ in hour_specs:
+            ex, ey = ellipse_cache[(method_key, sidx)]
+            ax.plot(ex, ey, "-", linewidth=1.5, color=color)
+            ax.fill(ex, ey, alpha=0.12, color=color)
+
+        # Single center dot at fixed artificial center
+        ax.scatter([mu_common[0]], [mu_common[1]], s=30, c="black", marker="o", zorder=5)
+
+        ax.set_xlabel(WIND_LABELS[dims[0]] + " (MW)", fontsize=7)
+        if col == 0:
+            ax.set_ylabel(WIND_LABELS[dims[1]] + " (MW)", fontsize=7)
+        ax.set_title(label, fontsize=8)
+        ax.tick_params(labelsize=6)
+        ax.grid(True, alpha=0.3)
+        ax.set_xlim(*xlim)
+        ax.set_ylim(*ylim)
+        ax.set_aspect("equal")
+
+    plt.tight_layout(pad=0.5, w_pad=0.8)
+    _save_figure(fig, output_path)
+
+    return fig
+
+
+# ============================================================================
 # FIGURE 11: Tau Sweep for Learned Omega (unconstrained, no regularization)
 # ============================================================================
 def fig11_tau_sweep_unconstrained(
@@ -3087,6 +3234,22 @@ def generate_all_figures(use_residuals: bool = False):
             output_path=OUTPUT_DIR / "figures" / "fig10_ellipse_overlay_extreme",
         )
         figures_generated.append("fig10_ellipse_overlay_extreme")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+    # Figure 10b: Two-hour overlay (normal + extreme) across k methods — without learned
+    print("\n[10b/15] 2D ellipse overlay, two hours (normal + extreme), no learned...")
+    try:
+        fig10b_ellipse_overlay_two_hours(include_learned=False)
+        figures_generated.append("fig10b_ellipse_overlay_two_hours")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+    # Figure 10b learned: same with Learned ω as 4th panel
+    print("\n[10b_learned/15] 2D ellipse overlay, two hours, with learned ω...")
+    try:
+        fig10b_ellipse_overlay_two_hours(include_learned=True)
+        figures_generated.append("fig10b_ellipse_overlay_two_hours_learned")
     except Exception as e:
         print(f"  Error: {e}")
 

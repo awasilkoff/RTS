@@ -992,6 +992,11 @@ def build_aruc_ldr_model(
         vars_dict["v_prime"] = v_prime
         vars_dict["w_prime"] = w_prime
 
+    # Expose internals needed by iterative line violation resolution
+    vars_dict["_gens_at_bus"] = gens_at_bus
+    vars_dict["_z_elig_set"] = z_elig_set
+    vars_dict["_K"] = K
+
     return m, vars_dict
 
 

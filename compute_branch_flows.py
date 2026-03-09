@@ -176,6 +176,229 @@ def filter_monitored_lines(
     return filtered_data, line_mask
 
 
+def find_line_violations(
+    data_full: DAMData, p0_arr: np.ndarray, viol_tol: float = 1.0
+) -> list[tuple[int, int, float]]:
+    """Check all lines for flow violations.
+
+    Parameters
+    ----------
+    data_full : DAMData
+        Full system data with all lines (unfiltered PTDF/Fmax).
+    p0_arr : np.ndarray
+        Dispatch array (I, T) in MW.
+    viol_tol : float
+        Excess MW above Fmax to count as a violation.
+
+    Returns
+    -------
+    list of (line_idx, period, excess_MW) tuples.
+    """
+    flow = compute_branch_flows(data_full, p0_arr).values  # (L_full, T)
+    Fmax = data_full.Fmax
+    violations = []
+    for l in range(flow.shape[0]):
+        for t in range(flow.shape[1]):
+            excess = abs(flow[l, t]) - Fmax[l]
+            if excess > viol_tol:
+                violations.append((l, t, excess))
+    return violations
+
+
+def iterative_line_resolve(
+    model,
+    vars_dict: dict,
+    data: DAMData,
+    data_full: DAMData,
+    robust_mask: np.ndarray,
+    sqrt_Sigma,
+    rho,
+    rho_lines_frac: float | None,
+    time_varying: bool,
+    max_iter: int = 5,
+    viol_tol: float = 1.0,
+) -> int:
+    """Iteratively add violated line constraints and re-solve.
+
+    After the initial ARUC/DARUC solve, checks ALL lines for flow
+    violations. Any violated (line, period) pairs are added to the
+    existing Gurobi model as new constraints, the previous solution is
+    used as a warm start, and the model is re-solved.  Repeats until
+    no violations remain or *max_iter* iterations are exhausted.
+
+    Parameters
+    ----------
+    model : gurobipy.Model
+        Solved ARUC/DARUC model.
+    vars_dict : dict
+        Variable dict from ``build_aruc_ldr_model``.
+    data : DAMData
+        Filtered data used to build the model.
+    data_full : DAMData
+        Original (unfiltered) data with all lines.
+    robust_mask : np.ndarray of bool, shape (T,)
+    sqrt_Sigma : np.ndarray
+        Cholesky factor(s). Shape (T,K,K) if time-varying, else (K,K).
+    rho : float or np.ndarray
+        Uncertainty radius. Scalar or (T,) if time-varying.
+    rho_lines_frac : float or None
+        If set, ``rho_lines = rho_lines_frac * rho``.
+    time_varying : bool
+    max_iter : int
+    viol_tol : float
+        MW threshold for violations.
+
+    Returns
+    -------
+    int
+        Number of re-solve iterations performed (0 = no violations).
+    """
+    import gurobipy as gp
+    from gurobipy import GRB
+
+    p0 = vars_dict["p0"]
+    Z = vars_dict["Z"]
+    gens_at_bus = vars_dict["_gens_at_bus"]
+    z_elig_set = vars_dict["_z_elig_set"]
+    K = vars_dict["_K"]
+
+    I = data.n_gens
+    T = data.n_periods
+    N = data.n_buses
+    gen_to_bus = data.gen_to_bus.astype(int)
+    d = data.d  # (N, T) — same as data_full.d
+
+    # Resolve rho_lines (mirrors aruc_model.py logic)
+    if rho_lines_frac is not None:
+        rho_lines = rho_lines_frac * rho
+    else:
+        rho_lines = rho
+
+    added_pairs: set[tuple[int, int]] = set()
+
+    for iteration in range(1, max_iter + 1):
+        # Extract p0 dispatch
+        p0_arr = np.zeros((I, T))
+        for (i, t), var in p0.items():
+            p0_arr[i, t] = var.X
+
+        violations = find_line_violations(data_full, p0_arr, viol_tol)
+        if not violations:
+            print(f"  [Line iter] No violations (tol={viol_tol} MW) — converged.")
+            return iteration - 1
+
+        # Filter already-added pairs
+        new_viols = [(l, t, ex) for l, t, ex in violations if (l, t) not in added_pairs]
+        if not new_viols:
+            print(f"  [Line iter {iteration}] {len(violations)} violations but all "
+                  f"already constrained — cannot resolve further.")
+            return iteration
+
+        print(f"  [Line iter {iteration}] {len(new_viols)} new violated (line,period) pairs:")
+        for l, t, ex in sorted(new_viols, key=lambda x: -x[2])[:10]:
+            print(f"    {data_full.line_ids[l]:<15} t={t:2d}  excess={ex:.1f} MW")
+        if len(new_viols) > 10:
+            print(f"    ... and {len(new_viols) - 10} more")
+
+        PTDF_full = data_full.PTDF
+        Fmax_full = data_full.Fmax
+
+        n_added = 0
+        for l_full, t, _ex in new_viols:
+            added_pairs.add((l_full, t))
+            tag = f"l{l_full}_t{t}"
+
+            # Build flow_nom expression for this (l_full, t) using full PTDF
+            flow_nom = gp.LinExpr()
+            for n in range(N):
+                ptdf_val = PTDF_full[l_full, n]
+                if abs(ptdf_val) < 1e-10:
+                    continue
+                gen_sum = gp.quicksum(p0[i, t] for i in gens_at_bus[n])
+                flow_nom += ptdf_val * (gen_sum - float(d[n, t]))
+
+            fmax_l = float(Fmax_full[l_full])
+
+            if robust_mask[t]:
+                # Robust constraints with SOC
+                sqrt_Sigma_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
+                rho_lines_t = float(rho_lines[t]) if time_varying else float(rho_lines)
+
+                z_var = model.addVar(lb=0.0, name=f"z_line_add_{tag}")
+                y_vars = {}
+                for k in range(K):
+                    y_vars[k] = model.addVar(lb=-GRB.INFINITY, name=f"y_line_add_{tag}_k{k}")
+
+                # sensitivity: a[k] = sum_n PTDF[l,n] * sum_{i in z_elig at n} Z[i,t,k]
+                a_expr = [gp.LinExpr() for _ in range(K)]
+                for i in range(I):
+                    if i not in z_elig_set:
+                        continue
+                    n = int(gen_to_bus[i])
+                    ptdf_val = PTDF_full[l_full, n]
+                    if abs(ptdf_val) < 1e-10:
+                        continue
+                    for k in range(K):
+                        if (i, t, k) in Z:
+                            a_expr[k] += ptdf_val * Z[i, t, k]
+
+                # y = L^T @ a  (L = chol(Sigma))
+                for i_k in range(K):
+                    expr = gp.LinExpr()
+                    for j_k in range(K):
+                        coef = sqrt_Sigma_t[j_k, i_k]  # L^T[i_k, j_k]
+                        if abs(coef) < 1e-10:
+                            continue
+                        expr += coef * a_expr[j_k]
+                    model.addConstr(y_vars[i_k] == expr, name=f"y_line_add_def_{tag}_k{i_k}")
+
+                # SOC: z >= ||y||
+                model.addConstr(
+                    z_var * z_var >= gp.quicksum(y_vars[k] * y_vars[k] for k in range(K)),
+                    name=f"soc_line_add_{tag}",
+                )
+
+                # Robust flow limits
+                model.addConstr(flow_nom + rho_lines_t * z_var <= fmax_l,
+                                name=f"line_max_add_{tag}")
+                model.addConstr(-flow_nom + rho_lines_t * z_var <= fmax_l,
+                                name=f"line_min_add_{tag}")
+            else:
+                # Nominal flow limits
+                model.addConstr(flow_nom <= fmax_l, name=f"line_max_add_{tag}")
+                model.addConstr(flow_nom >= -fmax_l, name=f"line_min_add_{tag}")
+
+            n_added += 1
+
+        print(f"  [Line iter {iteration}] Added {n_added} constraint sets. Warm-starting re-solve...")
+
+        # Warm start from previous solution
+        for var in model.getVars():
+            try:
+                var.Start = var.X
+            except AttributeError:
+                pass  # new variables without .X yet
+
+        model.optimize()
+
+        if model.Status not in [GRB.OPTIMAL, GRB.SUBOPTIMAL]:
+            print(f"  [Line iter {iteration}] WARNING: re-solve status={model.Status}")
+            if model.SolCount == 0:
+                print("  [Line iter] No feasible solution after adding line constraints!")
+                return iteration
+
+    # Exhausted max_iter — final check
+    p0_arr = np.zeros((I, T))
+    for (i, t), var in p0.items():
+        p0_arr[i, t] = var.X
+    remaining = find_line_violations(data_full, p0_arr, viol_tol)
+    if remaining:
+        print(f"  [Line iter] WARNING: {len(remaining)} violations remain after {max_iter} iterations")
+    else:
+        print(f"  [Line iter] Converged after {max_iter} iterations.")
+    return max_iter
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Compute DC branch flows from a dispatch CSV.")

@@ -596,16 +596,18 @@ def run_rts_aruc(
         if model.SolCount == 0:
             raise RuntimeError("No feasible solution found by Gurobi.")
 
+    # Iterative line violation resolution (if lines were filtered)
+    if data_full is not None:
+        from compute_branch_flows import iterative_line_resolve
+        _rmask = robust_mask if robust_mask is not None else np.ones(data.n_periods, dtype=bool)
+        iterative_line_resolve(
+            model, vars_dict, data, data_full,
+            _rmask, sqrt_Sigma, rho,
+            rho_lines_frac, time_varying,
+        )
+
     results = extract_solution(data, model, vars_dict)
     print_brief_summary(results, data)
-
-    # Post-solve: validate flows against all lines (if filtered)
-    if data_full is not None:
-        from compute_branch_flows import compute_branch_flows, report_congestion
-        print("\n  Validating ARUC dispatch against ALL lines...")
-        p0_arr = results["p0"].values
-        flow_all = compute_branch_flows(data_full, p0_arr)
-        report_congestion(flow_all, data_full, top_n=5)
 
     # Analyze Z patterns
     analyze_Z_patterns(results["Z"], data)

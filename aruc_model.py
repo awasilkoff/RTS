@@ -548,26 +548,50 @@ def build_aruc_ldr_model(
     # This ensures worst-case dispatch stays within ramp limits.
     if robust_ramp:
         print(f"  [ARUC] robust_ramp=True: using SOC-based ramp constraints for robust periods")
+    n_rob_ramp = 0
+    n_nom_ramp = 0
+    n_skip_ramp = 0
     for i in range(I):
         if data.gen_type[i] != "THERMAL":
             continue
         for t in range(1, T):
             dt_ramp = (dt[t - 1] + dt[t]) / 2.0
             if robust_ramp and robust_mask[t] and robust_mask[t - 1] and i in z_elig_set:
+                # Filter: if RU (and RD) * dt_ramp >= 2*Pmax, robust ramp
+                # can never bind.  Worst-case dispatch at each period is
+                # bounded by [0, Pmax] from robust Pmax/Pmin constraints,
+                # so the max swing is 2*Pmax.
+                Pmax_i = float(Pmax_2d[i, t])
+                ru_cap = RU[i] * dt_ramp
+                rd_cap = RD[i] * dt_ramp
+                if ru_cap >= 2.0 * Pmax_i and rd_cap >= 2.0 * Pmax_i:
+                    n_skip_ramp += 1
+                    # Fall through to nominal ramp (still enforced, just
+                    # without the z_gen coupling that slows the solver).
+                    m.addConstr(
+                        p0[i, t] - p0[i, t - 1] <= ru_cap * u[i, t - 1] + ru_cap * v[i, t],
+                        name=f"ramp_up_i{i}_t{t}",
+                    )
+                    m.addConstr(
+                        p0[i, t - 1] - p0[i, t] <= rd_cap * u[i, t] + rd_cap * w[i, t],
+                        name=f"ramp_down_i{i}_t{t}",
+                    )
+                    continue
                 rho_t = rho[t] if time_varying else rho
                 rho_tm1 = rho[t - 1] if time_varying else rho
                 m.addConstr(
                     p0[i, t] + rho_t * z_gen[i, t]
                     - p0[i, t - 1] + rho_tm1 * z_gen[i, t - 1]
-                    <= RU[i] * dt_ramp * u[i, t - 1] + RU[i] * dt_ramp * v[i, t],
+                    <= ru_cap * u[i, t - 1] + ru_cap * v[i, t],
                     name=f"ramp_up_rob_i{i}_t{t}",
                 )
                 m.addConstr(
                     p0[i, t - 1] + rho_tm1 * z_gen[i, t - 1]
                     - p0[i, t] + rho_t * z_gen[i, t]
-                    <= RD[i] * dt_ramp * u[i, t] + RD[i] * dt_ramp * w[i, t],
+                    <= rd_cap * u[i, t] + rd_cap * w[i, t],
                     name=f"ramp_down_rob_i{i}_t{t}",
                 )
+                n_rob_ramp += 1
             else:
                 m.addConstr(
                     p0[i, t] - p0[i, t - 1] <= RU[i] * dt_ramp * u[i, t - 1] + RU[i] * dt_ramp * v[i, t],
@@ -577,6 +601,10 @@ def build_aruc_ldr_model(
                     p0[i, t - 1] - p0[i, t] <= RD[i] * dt_ramp * u[i, t] + RD[i] * dt_ramp * w[i, t],
                     name=f"ramp_down_i{i}_t{t}",
                 )
+                n_nom_ramp += 1
+    if robust_ramp:
+        print(f"  [ARUC] Robust ramp constraints: {n_rob_ramp} robust, "
+              f"{n_skip_ramp} filtered (non-binding), {n_nom_ramp} nominal")
 
     # Commitment logic u,v,w exactly as in DAM (you can keep or relax init)
     for i in range(I):

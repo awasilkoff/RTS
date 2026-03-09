@@ -256,9 +256,11 @@ The `--fast` flag is **ON by default** on `run_comparison.py`, `run_alpha_sweep.
 | `day1_only_robust` | `True` | Only day 1 gets SOC/Z constraints (48h horizon) |
 | `bar_qcp_conv_tol` | `1e-4` | Relaxed barrier convergence (default 1e-8) |
 | `time_limit` | `600s` | Safety backstop to prevent runaway solves |
-| `line_monitor_threshold` | `0.5` | Keep only lines loaded >=50% in DAM (when `--enforce-lines`) |
+| `line_monitor_threshold` | `0.5` | Per-hour line filtering at >=50% DAM loading (when `--enforce-lines`) |
 
 Individual overrides still work (e.g. `--fast --time-limit 300`).
+
+**Per-hour line filtering:** When `--line-monitor-threshold` is set, lines are filtered per `(line, period)` pair based on DAM dispatch loading (`|flow_l(t)| / Fmax_l >= threshold`). Lines never above threshold at any hour are dropped entirely (reducing PTDF row count). For remaining lines, only `(l, t)` pairs where loading exceeds threshold get flow constraints and SOC cones in ARUC. This can reduce line SOC constraints by 40-60% compared to a static (horizon-wide) filter. DAM always enforces all lines; the per-hour mask applies only to ARUC/DARUC.
 
 Additional Gurobi params always applied in `aruc_model.py`:
 - `Presolve=2`, `PreSparsify=1` — aggressive presolve helps SOC-heavy models

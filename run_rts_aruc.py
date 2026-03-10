@@ -252,6 +252,40 @@ def extract_solution(
     return results
 
 
+def extract_line_margins(vars_dict, data, rho, rho_lines_frac=None, time_varying=False):
+    """Extract robust line flow margins: rho_t * z_line[l,t] for each (line, period).
+
+    Returns DataFrame (line_ids x time) with margin in MW, or None if no line
+    SOC constraints exist (copperplate mode).
+    """
+    z_line = vars_dict.get("z_line", {})
+    if not z_line:
+        return None
+
+    L = len(data.line_ids)
+    T = len(data.time)
+
+    # Compute rho_lines (same logic as aruc_model.py lines 228-257)
+    if time_varying:
+        rho_arr = np.atleast_1d(rho)
+        if rho_lines_frac is not None:
+            rho_lines = rho_lines_frac * rho_arr
+        else:
+            rho_lines = rho_arr
+    else:
+        if rho_lines_frac is not None:
+            rho_lines = rho_lines_frac * rho
+        else:
+            rho_lines = rho
+
+    margin = np.zeros((L, T))
+    for (l, t) in z_line:
+        rho_t = rho_lines[t] if time_varying else rho_lines
+        margin[l, t] = rho_t * z_line[l, t].X
+
+    return pd.DataFrame(margin, index=data.line_ids, columns=data.time)
+
+
 def reshape_Z_for_generator(Z_df: pd.DataFrame, gen_id: str) -> pd.DataFrame:
     """
     Reshape Z coefficients for a single generator from (T*K,) to (T, K).
@@ -674,10 +708,19 @@ if __name__ == "__main__":
     p0_df.to_csv(out_dir / "dispatch_p0_aruc.csv")
     Z_df.to_csv(out_dir / "ldr_coefficients_Z_aruc.csv")
 
+    margin_df = extract_line_margins(
+        outputs_aruc["vars"], outputs_aruc["data"], outputs_aruc["rho"],
+        outputs_aruc.get("rho_lines_frac"), outputs_aruc["time_varying"],
+    )
+    if margin_df is not None:
+        margin_df.to_csv(out_dir / "line_margin.csv")
+
     print("\nWrote:")
     print(f"  {out_dir / 'commitment_u_aruc.csv'}")
     print(f"  {out_dir / 'dispatch_p0_aruc.csv'}")
     print(f"  {out_dir / 'ldr_coefficients_Z_aruc.csv'}")
+    if margin_df is not None:
+        print(f"  {out_dir / 'line_margin.csv'}")
 
     # Print Z statistics
     Z_array = Z_df.values

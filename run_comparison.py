@@ -29,7 +29,7 @@ import pandas as pd
 
 from dam_model import build_dam_model
 from run_rts_daruc import run_rts_daruc
-from run_rts_aruc import run_rts_aruc
+from run_rts_aruc import run_rts_aruc, extract_line_margins
 from run_rts_dam import extract_solution as extract_dam_solution
 from test_daruc_quick import analyze_Z
 from compare_aruc_vs_daruc import (
@@ -380,6 +380,12 @@ def main():
     np.save(daruc_dir / "Sigma.npy", daruc_outputs["Sigma"])
     np.save(daruc_dir / "rho.npy", np.atleast_1d(daruc_outputs["rho"]))
     analyze_Z(daruc_results["Z"], data, daruc_dir, rho=daruc_outputs["rho"])
+    daruc_margin = extract_line_margins(
+        daruc_outputs["vars"], data, daruc_outputs["rho"],
+        args.rho_lines_frac, daruc_outputs["time_varying"],
+    )
+    if daruc_margin is not None:
+        daruc_margin.to_csv(daruc_dir / "line_margin.csv")
 
     # Save DAM results (DAM uses "p" not "p0")
     dam_results["u"].to_csv(daruc_dir / "dam_commitment_u.csv")
@@ -450,6 +456,12 @@ def main():
     np.save(aruc_dir / "Sigma.npy", aruc_outputs["Sigma"])
     np.save(aruc_dir / "rho.npy", np.atleast_1d(aruc_outputs["rho"]))
     analyze_Z(aruc_results["Z"], data, aruc_dir, rho=aruc_outputs["rho"])
+    aruc_margin = extract_line_margins(
+        aruc_outputs["vars"], data, aruc_outputs["rho"],
+        aruc_outputs.get("rho_lines_frac"), aruc_outputs["time_varying"],
+    )
+    if aruc_margin is not None:
+        aruc_margin.to_csv(aruc_dir / "line_margin.csv")
 
     # Save ARUC summary
     aruc_summary = {

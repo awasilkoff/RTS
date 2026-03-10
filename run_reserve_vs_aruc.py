@@ -193,6 +193,7 @@ def main():
     lines.append(f"{'':25s} {'DAM':>14s} {'DAM+Reserve':>14s} {'ARUC-LDR':>14s}")
     lines.append("-" * 70)
     lines.append(f"{'Total cost ($)':25s} {cost_dam['total']:>14,.2f} {cost_reserve['total']:>14,.2f} {cost_aruc['total']:>14,.2f}")
+    lines.append(f"{'  Commitment (NL+SU)':25s} {cost_dam['commitment']:>14,.2f} {cost_reserve['commitment']:>14,.2f} {cost_aruc['commitment']:>14,.2f}")
     lines.append(f"{'  No-load':25s} {cost_dam['no_load']:>14,.2f} {cost_reserve['no_load']:>14,.2f} {cost_aruc['no_load']:>14,.2f}")
     lines.append(f"{'  Startup':25s} {cost_dam['startup']:>14,.2f} {cost_reserve['startup']:>14,.2f} {cost_aruc['startup']:>14,.2f}")
     lines.append(f"{'  Energy':25s} {cost_dam['energy']:>14,.2f} {cost_reserve['energy']:>14,.2f} {cost_aruc['energy']:>14,.2f}")

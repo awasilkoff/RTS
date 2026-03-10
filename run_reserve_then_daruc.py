@@ -295,6 +295,7 @@ def run_reserve_then_daruc(
     lines.append(f"{'':30s} {'DAM+Reserve':>14s} {'DARUC':>14s} {'Delta':>14s}")
     lines.append("-" * 75)
     lines.append(f"{'Total cost ($)':30s} {cost_reserve['total']:>14,.2f} {cost_daruc['total']:>14,.2f} {cost_daruc['total'] - cost_reserve['total']:>+14,.2f}")
+    lines.append(f"{'  Commitment (NL+SU)':30s} {cost_reserve['commitment']:>14,.2f} {cost_daruc['commitment']:>14,.2f} {cost_daruc['commitment'] - cost_reserve['commitment']:>+14,.2f}")
     lines.append(f"{'  No-load':30s} {cost_reserve['no_load']:>14,.2f} {cost_daruc['no_load']:>14,.2f} {cost_daruc['no_load'] - cost_reserve['no_load']:>+14,.2f}")
     lines.append(f"{'  Startup':30s} {cost_reserve['startup']:>14,.2f} {cost_daruc['startup']:>14,.2f} {cost_daruc['startup'] - cost_reserve['startup']:>+14,.2f}")
     lines.append(f"{'  Energy':30s} {cost_reserve['energy']:>14,.2f} {cost_daruc['energy']:>14,.2f} {cost_daruc['energy'] - cost_reserve['energy']:>+14,.2f}")

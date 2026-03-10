@@ -209,7 +209,7 @@ def compute_cost_breakdown(u_df: pd.DataFrame, p0_df: pd.DataFrame, data) -> dic
 
     Block structure: p[i,t] = sum_b p_block[i,t,b]  (blocks start from 0, not Pmin).
 
-    Returns dict with keys: no_load, startup, shutdown, energy, slack, total.
+    Returns dict with keys: no_load, startup, shutdown, energy, slack, commitment, total.
     """
     u = np.round(u_df.values).astype(float)
     p0 = p0_df.values
@@ -259,9 +259,11 @@ def compute_cost_breakdown(u_df: pd.DataFrame, p0_df: pd.DataFrame, data) -> dic
     slack_cost = float(m_penalty * (slack * dt).sum())
 
     total = no_load + startup + shutdown + energy + slack_cost
+    commitment = no_load + startup
     return {
         "no_load": no_load, "startup": startup, "shutdown": shutdown,
-        "energy": energy, "slack": slack_cost, "total": total,
+        "energy": energy, "slack": slack_cost, "commitment": commitment,
+        "total": total,
     }
 
 
@@ -1128,13 +1130,13 @@ def write_summary(
     # Cost breakdown
     if cost_aruc or cost_daruc or cost_dam:
         lines.append("\n--- Cost Breakdown ---")
-        header = (f"  {'':20s}  {'No-Load':>12s}  {'Startup':>12s}  {'Shutdown':>12s}"
+        header = (f"  {'':20s}  {'Commit':>12s}  {'No-Load':>12s}  {'Startup':>12s}  {'Shutdown':>12s}"
                   f"  {'Energy':>12s}  {'Slack':>12s}  {'Total':>12s}")
         lines.append(header)
         for name, cost in [("DAM", cost_dam), ("DAM+Reserve", cost_reserve), ("DARUC", cost_daruc), ("ARUC-LDR", cost_aruc)]:
             if cost:
                 lines.append(
-                    f"  {name:20s}  {cost['no_load']:>12,.2f}  {cost['startup']:>12,.2f}  "
+                    f"  {name:20s}  {cost['commitment']:>12,.2f}  {cost['no_load']:>12,.2f}  {cost['startup']:>12,.2f}  "
                     f"{cost['shutdown']:>12,.2f}  {cost['energy']:>12,.2f}  "
                     f"{cost['slack']:>12,.2f}  {cost['total']:>12,.2f}"
                 )

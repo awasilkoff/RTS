@@ -90,7 +90,7 @@ def main():
     print("\n" + "=" * 70)
     print("SOLVING DAM (baseline)")
     print("=" * 70)
-    dam_model, dam_vars = build_dam_model(data, M_p=1e4)
+    dam_model, dam_vars = build_dam_model(data, M_p=1e4, enforce_lines=False)
     dam_model.Params.MIPGap = args.mip_gap
     dam_model.optimize()
     dam_results = extract_dam_solution(data, dam_model, dam_vars)
@@ -104,6 +104,7 @@ def main():
     print("=" * 70)
     reserve_model, reserve_vars = build_dam_model(
         data, M_p=1e4, model_name="DAM_Reserve", reserve_requirement=R,
+        enforce_lines=False,
     )
     reserve_model.Params.MIPGap = args.mip_gap
     reserve_model.optimize()

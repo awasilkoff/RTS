@@ -107,7 +107,6 @@ def main():
         "--enforce-lines",
         action="store_true",
         help="Enforce line flow limits (default: copperplate)",
-        default=True,
     )
     parser.add_argument(
         "--uncertainty-npz",
@@ -142,7 +141,7 @@ def main():
     parser.add_argument(
         "--dispatch-cost-scale",
         type=float,
-        default=0.1,
+        default=0.01,
         help="Dispatch cost scale factor for incremental objective (default: 0.01)",
     )
     parser.add_argument(
@@ -172,7 +171,6 @@ def main():
         "--no-worst-case-cost",
         dest="worst_case_cost",
         action="store_false",
-        default=True,
         help="Disable worst-case dispatch cost epigraph (use nominal dispatch cost only)",
     )
     parser.set_defaults(worst_case_cost=True)
@@ -220,7 +218,7 @@ def main():
     parser.add_argument(
         "--line-monitor-threshold",
         type=float,
-        default=0.7,
+        default=0.8,
         help="DAM loading threshold for line filtering (e.g. 0.5 = keep lines loaded >=50%%)",
     )
     parser.add_argument(
@@ -251,9 +249,9 @@ def main():
     parser.add_argument(
         "--fast",
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False,
         help="Performance defaults ON by default: fix-wind-z, day1-only-robust, "
-             "bar-qcp-conv-tol=1e-4, time-limit=600, line-monitor-threshold=0.5 (when --enforce-lines). "
+             "bar-qcp-conv-tol=1e-4, time-limit=60000, line-monitor-threshold=0.5 (when --enforce-lines). "
              "Use --no-fast to disable.",
     )
     args = parser.parse_args()

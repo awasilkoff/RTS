@@ -48,26 +48,33 @@ from compare_aruc_vs_daruc import (
 )
 
 
-def compute_reserve_from_uncertainty(Sigma, rho):
+def compute_reserve_from_uncertainty(Sigma, rho, T=None):
     """Compute spinning reserve requirement from ellipsoidal uncertainty set.
 
     R[t] = rho[t] * sqrt(1^T Sigma[t] 1) -- worst-case total wind shortfall.
 
     Parameters
     ----------
-    Sigma : (T, K, K) array -- covariance matrices per period
+    Sigma : (T, K, K) or (K, K) array -- covariance matrices per period or static
     rho : scalar or (T,) array -- ellipsoid radii
+    T : int, optional -- number of periods (required when Sigma is 2D static)
 
     Returns
     -------
     R : (T,) array -- reserve requirement per period (MW)
     """
+    # Handle static (K, K) Sigma by broadcasting to (T, K, K)
+    if Sigma.ndim == 2:
+        if T is None:
+            raise ValueError("T must be provided when Sigma is 2D (static)")
+        Sigma = np.broadcast_to(Sigma[None, :, :], (T, Sigma.shape[0], Sigma.shape[1]))
+
     rho_arr = np.atleast_1d(rho)
-    T = Sigma.shape[0]
+    n_periods = Sigma.shape[0]
     if rho_arr.shape[0] == 1:
-        rho_arr = np.full(T, rho_arr[0])
+        rho_arr = np.full(n_periods, rho_arr[0])
     ones = np.ones(Sigma.shape[1])
-    R = np.array([rho_arr[t] * np.sqrt(ones @ Sigma[t] @ ones) for t in range(T)])
+    R = np.array([rho_arr[t] * np.sqrt(ones @ Sigma[t] @ ones) for t in range(n_periods)])
     return R
 
 
@@ -208,7 +215,7 @@ def main():
     parser.add_argument(
         "--with-reserve",
         action="store_true",
-        help="Re-solve DAM with spinning reserve derived from uncertainty set (requires --uncertainty-npz)",
+        help="Re-solve DAM with spinning reserve derived from uncertainty set (works with --uncertainty-npz or scalar --rho)",
     )
     parser.add_argument(
         "--line-monitor-threshold",
@@ -474,7 +481,7 @@ def main():
 
         Sigma = daruc_outputs["Sigma"]
         rho_val = daruc_outputs["rho"]
-        R = compute_reserve_from_uncertainty(Sigma, rho_val)
+        R = compute_reserve_from_uncertainty(Sigma, rho_val, T=data.n_periods)
         print(
             f"  Reserve requirement R[t]: min={R.min():.1f}, max={R.max():.1f}, mean={R.mean():.1f} MW"
         )
@@ -624,7 +631,7 @@ def main():
     print("QUICK COMPARISON (day-1 costs)")
     print("=" * 70)
     print(f"  DAM cost:        {cost_dam['total']:>14,.2f}" if cost_dam else "  DAM cost:        N/A")
-    if cost_reserve is not None:
+    if cost_reserve is not None and cost_dam is not None:
         print(
             f"  DAM+Reserve:     {cost_reserve['total']:>14,.2f}  "
             f"(+{cost_reserve['total'] - cost_dam['total']:,.2f} vs DAM)"

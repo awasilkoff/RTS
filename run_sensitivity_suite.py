@@ -6,13 +6,14 @@ Systematic sensitivity decomposition: runs multiple configurations of
 run_comparison.py to isolate the contribution of each robustness feature.
 
 Scenarios (2x2 matrix + baselines):
-  1. full_robust     — lines + robust ramps (full model)
-  2. lines_only      — lines, nominal ramps (isolates robust ramp value)
-  3. ramps_only      — copperplate, robust ramps (isolates line value)
-  4. stripped         — copperplate, nominal ramps (pure per-gen hedging)
-  5. dam_reserve      — DAM + spinning reserve (system-level baseline)
-  6. stripped_no_wcc  — like stripped but no worst-case cost epigraph
-  7. stripped_free_z  — like stripped but wind Z optimized freely (not fixed)
+  1. full_robust        — lines + robust ramps (full model)
+  2. lines_only         — lines, nominal ramps (isolates robust ramp value)
+  3. ramps_only         — copperplate, robust ramps (isolates line value)
+  4. stripped            — copperplate, nominal ramps (pure per-gen hedging)
+  5. dam_reserve         — DAM + spinning reserve (system-level baseline)
+  6. stripped_no_wcc     — like stripped but no worst-case cost epigraph
+  7. stripped_free_z     — like stripped but wind Z optimized freely (not fixed)
+  8. reserve_then_daruc  — DAM+Reserve commitment -> DARUC with lines + robust ramps
 
 All scenarios share the same start time, rho, horizon, and uncertainty set.
 Produces a combined CSV summary and prints a comparison table.
@@ -32,10 +33,10 @@ import sys
 from pathlib import Path
 
 
-def build_base_args(args) -> list[str]:
+def build_base_args(args, script: str = "run_comparison.py") -> list[str]:
     """Common args shared across all scenarios."""
     base = [
-        sys.executable, "run_comparison.py",
+        sys.executable, script,
         "--hours", str(args.hours),
         "--rho", str(args.rho),
         "--start-month", str(args.start_month),
@@ -92,14 +93,25 @@ SCENARIOS = [
         "extra": ["--no-fast"],  # no-fast disables fix_wind_z
         "override_fast": True,  # need to re-add other fast settings manually
     },
+    {
+        "name": "reserve_then_daruc",
+        "desc": "DAM+Reserve -> DARUC (lines + robust ramps, incremental obj)",
+        "script": "run_reserve_then_daruc.py",  # uses different script
+        "extra": [],
+    },
 ]
 
 
 def run_scenario(name: str, desc: str, base_args: list[str], extra: list[str],
-                 out_root: Path, override_fast: bool = False) -> Path:
-    """Run a single scenario via run_comparison.py subprocess."""
+                 out_root: Path, override_fast: bool = False,
+                 alt_base_args: list[str] | None = None) -> Path:
+    """Run a single scenario via subprocess.
+
+    alt_base_args overrides base_args when the scenario uses a different script.
+    """
     out_dir = out_root / name
-    cmd = list(base_args) + extra + ["--out-dir", str(out_dir)]
+    cmd = list(alt_base_args if alt_base_args is not None else base_args)
+    cmd += extra + ["--out-dir", str(out_dir)]
 
     # For override_fast: we disabled --fast to get free wind Z, but re-add
     # the other performance settings explicitly
@@ -131,6 +143,11 @@ def load_summary(out_dir: Path) -> dict | None:
         if p.exists():
             with open(p) as f:
                 summaries[subdir] = json.load(f)
+    # run_reserve_then_daruc.py writes a top-level summary.json
+    top_level = out_dir / "summary.json"
+    if top_level.exists() and not summaries:
+        with open(top_level) as f:
+            summaries["_top"] = json.load(f)
     return summaries if summaries else None
 
 
@@ -151,6 +168,15 @@ def collect_results(out_root: Path, scenarios: list[dict]) -> list[dict]:
                 row["dam_obj"] = summaries["daruc"].get("dam_objective")
             if "dam_reserve" in summaries:
                 row["reserve_obj"] = summaries["dam_reserve"].get("objective")
+            # reserve_then_daruc writes a top-level summary with cost dicts
+            if "_top" in summaries:
+                top = summaries["_top"]
+                if "reserve_cost" in top:
+                    row["reserve_obj"] = top["reserve_cost"].get("total")
+                if "daruc_cost" in top:
+                    row["daruc_obj"] = top["daruc_cost"].get("total")
+                if "extra_unit_hours_full_horizon" in top:
+                    row["extra_unit_hours"] = top["extra_unit_hours_full_horizon"]
         rows.append(row)
     return rows
 
@@ -180,6 +206,7 @@ def print_comparison(rows: list[dict]):
     print("  stripped    - dam_reserve  = value of per-gen Z hedging vs system reserve")
     print("  stripped    - stripped_no_wcc = value of worst-case cost epigraph")
     print("  stripped    - stripped_free_z = value of fixing wind Z to identity")
+    print("  reserve_then_daruc           = robustness gap: extra commitments to make reserve fully robust")
 
 
 def main():
@@ -203,7 +230,7 @@ def main():
     parser.add_argument("--scenarios", type=str, nargs="+", default=None,
                         help="Run only these scenarios (default: all). "
                              "Names: full_robust, lines_only, ramps_only, stripped, "
-                             "dam_reserve, stripped_no_wcc, stripped_free_z")
+                             "dam_reserve, stripped_no_wcc, stripped_free_z, reserve_then_daruc")
     parser.add_argument("--resume", action="store_true",
                         help="Skip scenarios that already have output directories")
     args = parser.parse_args()
@@ -229,9 +256,16 @@ def main():
         if args.resume and sc_dir.exists():
             print(f"\nSkipping {sc['name']} (already exists, --resume)")
             continue
+
+        # Scenarios with a different script get their own base args
+        alt_base = None
+        if "script" in sc:
+            alt_base = build_base_args(args, script=sc["script"])
+
         run_scenario(
             sc["name"], sc["desc"], base_args, sc["extra"],
             out_root, override_fast=sc.get("override_fast", False),
+            alt_base_args=alt_base,
         )
 
     # Collect and display results

@@ -214,7 +214,7 @@ def compute_cost_breakdown(u_df: pd.DataFrame, p0_df: pd.DataFrame, data) -> dic
     u = np.round(u_df.values).astype(float)
     p0 = p0_df.values
     I, T = u.shape
-    dt = data.dt  # (T,) period durations
+    dt = data.dt[:T]  # (T,) period durations, sliced to match u horizon
 
     # Startup detection: v[i,t] = max(0, u[i,t] - u[i,t-1])
     v = np.zeros_like(u)

@@ -50,6 +50,9 @@ from uncertainty_set_provider import UncertaintySetProvider
 SPP_FORECASTS_PARQUET = Path(
     "uncertainty_sets_refactored/data/forecasts_filtered_rts4_constellation_v2.parquet"
 )
+RTS_DIR = Path("RTS_Data")
+SOURCE_DIR = RTS_DIR / "SourceData"
+TS_DIR = RTS_DIR / "timeseries_data_files"
 
 
 def run_reserve_then_daruc(
@@ -86,10 +89,14 @@ def run_reserve_then_daruc(
     # ==================================================================
     print("Building DAMData...")
     data = build_damdata_from_rts(
+        source_dir=SOURCE_DIR,
+        ts_dir=TS_DIR,
         start_time=start_time,
         horizon_hours=horizon_hours,
         spp_forecasts_parquet=SPP_FORECASTS_PARQUET,
+        spp_start_idx=0,
         day2_interval_hours=day2_interval_hours,
+        single_block=True,
         include_renewables=include_renewables,
         include_nuclear=include_nuclear,
         include_zero_marginal=include_zero_marginal,
@@ -412,6 +419,12 @@ def main():
     parser.add_argument("--no-day1-only-robust", dest="day1_only_robust", action="store_false")
     parser.add_argument("--fix-wind-z", action="store_true", default=True)
     parser.add_argument("--no-fix-wind-z", dest="fix_wind_z", action="store_false")
+    parser.add_argument("--include-renewables", action=argparse.BooleanOptionalAction, default=False,
+                        help="Include solar (PV/RTPV) and hydro generators (default: exclude)")
+    parser.add_argument("--include-nuclear", action=argparse.BooleanOptionalAction, default=False,
+                        help="Include nuclear generators (default: exclude)")
+    parser.add_argument("--include-zero-marginal", action=argparse.BooleanOptionalAction, default=None,
+                        help="Override: include/exclude all zero-marginal-cost non-wind generators")
     parser.add_argument("--ramp-scale", type=float, default=1.0)
     parser.add_argument("--pmin-scale", type=float, default=1.0)
     parser.add_argument("--line-monitor-threshold", type=float, default=0.5)
@@ -443,6 +456,9 @@ def main():
         day2_interval_hours=args.day2_interval,
         day1_only_robust=args.day1_only_robust,
         fix_wind_z=args.fix_wind_z,
+        include_renewables=args.include_renewables,
+        include_nuclear=args.include_nuclear,
+        include_zero_marginal=args.include_zero_marginal,
         ramp_scale=args.ramp_scale,
         pmin_scale=args.pmin_scale,
         monitored_lines_threshold=args.line_monitor_threshold,

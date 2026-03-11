@@ -66,27 +66,27 @@ SCENARIOS = [
     {
         "name": "ramps_only",
         "desc": "Copperplate, robust ramps",
-        "extra": ["--robust-ramp"],
+        "extra": ["--robust-ramp", "--enforce-lines","--rho-lines-frac 0.0"],
     },
     {
         "name": "stripped",
         "desc": "Copperplate, nominal ramps (per-gen hedging only)",
-        "extra": ["--no-robust-ramp"],
+        "extra": ["--no-robust-ramp","--enforce-lines","--rho-lines-frac 0.0"],
     },
     {
         "name": "dam_reserve",
         "desc": "DAM + spinning reserve baseline",
-        "extra": ["--no-robust-ramp", "--with-reserve"],
+        "extra": ["--no-robust-ramp", "--with-reserve","--enforce-lines"],
     },
     {
         "name": "stripped_no_wcc",
         "desc": "Stripped + no worst-case cost epigraph",
-        "extra": ["--no-robust-ramp", "--no-worst-case-cost"],
+        "extra": ["--no-robust-ramp", "--no-worst-case-cost","--enforce-lines"],
     },
     {
         "name": "stripped_free_z",
         "desc": "Stripped + wind Z free (not fixed to identity)",
-        "extra": ["--no-robust-ramp", "--no-fix-wind-z"],
+        "extra": ["--no-robust-ramp", "--no-fix-wind-z","--enforce-lines"],
     },
     {
         "name": "reserve_then_daruc",

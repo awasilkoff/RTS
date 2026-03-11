@@ -160,7 +160,7 @@ def main():
         "--fix-wind-z",
         action=argparse.BooleanOptionalAction,
         help="Fix wind Z diagonal to 1 (wind fully tracks own realization, no curtailment)",
-        default=False,
+        default=True,
     )
     parser.add_argument(
         "--three-blocks",

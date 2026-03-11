@@ -419,6 +419,12 @@ def main():
     parser.add_argument("--no-day1-only-robust", dest="day1_only_robust", action="store_false")
     parser.add_argument("--fix-wind-z", action="store_true", default=True)
     parser.add_argument("--no-fix-wind-z", dest="fix_wind_z", action="store_false")
+    parser.add_argument("--include-renewables", action=argparse.BooleanOptionalAction, default=False,
+                        help="Include solar (PV/RTPV) and hydro generators (default: exclude)")
+    parser.add_argument("--include-nuclear", action=argparse.BooleanOptionalAction, default=False,
+                        help="Include nuclear generators (default: exclude)")
+    parser.add_argument("--include-zero-marginal", action=argparse.BooleanOptionalAction, default=None,
+                        help="Override: include/exclude all zero-marginal-cost non-wind generators")
     parser.add_argument("--ramp-scale", type=float, default=1.0)
     parser.add_argument("--pmin-scale", type=float, default=1.0)
     parser.add_argument("--line-monitor-threshold", type=float, default=0.5)
@@ -450,6 +456,9 @@ def main():
         day2_interval_hours=args.day2_interval,
         day1_only_robust=args.day1_only_robust,
         fix_wind_z=args.fix_wind_z,
+        include_renewables=args.include_renewables,
+        include_nuclear=args.include_nuclear,
+        include_zero_marginal=args.include_zero_marginal,
         ramp_scale=args.ramp_scale,
         pmin_scale=args.pmin_scale,
         monitored_lines_threshold=args.line_monitor_threshold,

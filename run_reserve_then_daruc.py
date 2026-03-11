@@ -40,9 +40,10 @@ from run_rts_aruc import (
     print_brief_summary,
     analyze_Z_patterns,
     reshape_uncertainty_for_variable_intervals,
+    extract_line_margins,
 )
 from run_rts_daruc import extract_dam_commitment, analyze_deviations, print_deviation_summary
-from run_comparison import compute_reserve_from_uncertainty
+from run_comparison import compute_reserve_from_uncertainty, save_line_flow_analysis
 from compare_aruc_vs_daruc import compute_cost_breakdown
 from uncertainty_set_provider import UncertaintySetProvider
 
@@ -248,6 +249,12 @@ def run_reserve_then_daruc(
     print_brief_summary(daruc_results, data)
     analyze_Z_patterns(daruc_results["Z"], data)
 
+    # Extract robust line margins (rho * z_line)
+    daruc_margin = extract_line_margins(
+        vars_dict, data, rho_val,
+        rho_lines_frac, time_varying,
+    )
+
     # ==================================================================
     # Deviation analysis
     # ==================================================================
@@ -367,6 +374,25 @@ def run_reserve_then_daruc(
         }
         with open(daruc_dir / "summary.json", "w") as f:
             json.dump(daruc_summary, f, indent=2)
+
+        # DARUC line margin
+        if daruc_margin is not None:
+            daruc_margin.to_csv(daruc_dir / "line_margin.csv")
+
+        # Line flow analysis (nominal flows + margin decomposition)
+        data_out = data_full if data_full is not None else data
+        print("\nLine flow analysis:")
+
+        reserve_flow_dir = reserve_dir / "line_flows"
+        reserve_flow_dir.mkdir(exist_ok=True)
+        save_line_flow_analysis(data_out, reserve_results["p"].values, None, "DAM+Reserve", reserve_flow_dir)
+
+        daruc_margin_full = None
+        if daruc_margin is not None:
+            daruc_margin_full = daruc_margin.reindex(data_out.line_ids, fill_value=0.0)
+        daruc_flow_dir = daruc_dir / "line_flows"
+        daruc_flow_dir.mkdir(exist_ok=True)
+        save_line_flow_analysis(data_out, daruc_results["p0"].values, daruc_margin_full, "DARUC", daruc_flow_dir)
 
         with open(out_dir / "summary.txt", "w") as f:
             f.write(summary_text)

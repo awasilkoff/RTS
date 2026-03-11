@@ -65,7 +65,7 @@ SCENARIOS = [
     {
         "name": "lines_only",
         "desc": "Lines enabled, nominal ramps",
-        "extra": ["--enforce-lines"],
+        "extra": ["--enforce-lines", "--no-robust-ramp"],
     },
     {
         "name": "ramps_only",
@@ -75,23 +75,22 @@ SCENARIOS = [
     {
         "name": "stripped",
         "desc": "Copperplate, nominal ramps (per-gen hedging only)",
-        "extra": [],
+        "extra": ["--no-robust-ramp"],
     },
     {
         "name": "dam_reserve",
         "desc": "DAM + spinning reserve baseline",
-        "extra": ["--with-reserve"],
+        "extra": ["--no-robust-ramp", "--with-reserve"],
     },
     {
         "name": "stripped_no_wcc",
         "desc": "Stripped + no worst-case cost epigraph",
-        "extra": ["--no-worst-case-cost"],
+        "extra": ["--no-robust-ramp", "--no-worst-case-cost"],
     },
     {
         "name": "stripped_free_z",
         "desc": "Stripped + wind Z free (not fixed to identity)",
-        "extra": ["--no-fast"],  # no-fast disables fix_wind_z
-        "override_fast": True,  # need to re-add other fast settings manually
+        "extra": ["--no-robust-ramp", "--no-fix-wind-z"],
     },
     {
         "name": "reserve_then_daruc",
@@ -103,7 +102,7 @@ SCENARIOS = [
 
 
 def run_scenario(name: str, desc: str, base_args: list[str], extra: list[str],
-                 out_root: Path, override_fast: bool = False,
+                 out_root: Path,
                  alt_base_args: list[str] | None = None) -> Path:
     """Run a single scenario via subprocess.
 
@@ -112,15 +111,6 @@ def run_scenario(name: str, desc: str, base_args: list[str], extra: list[str],
     out_dir = out_root / name
     cmd = list(alt_base_args if alt_base_args is not None else base_args)
     cmd += extra + ["--out-dir", str(out_dir)]
-
-    # For override_fast: we disabled --fast to get free wind Z, but re-add
-    # the other performance settings explicitly
-    if override_fast:
-        cmd += [
-            "--day1-only-robust",
-            "--bar-qcp-conv-tol", "1e-4",
-            "--time-limit", "600",
-        ]
 
     print(f"\n{'='*70}")
     print(f"SCENARIO: {name} — {desc}")
@@ -264,8 +254,7 @@ def main():
 
         run_scenario(
             sc["name"], sc["desc"], base_args, sc["extra"],
-            out_root, override_fast=sc.get("override_fast", False),
-            alt_base_args=alt_base,
+            out_root, alt_base_args=alt_base,
         )
 
     # Collect and display results

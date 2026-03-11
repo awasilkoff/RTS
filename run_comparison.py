@@ -158,7 +158,7 @@ def main():
     )
     parser.add_argument(
         "--fix-wind-z",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         help="Fix wind Z diagonal to 1 (wind fully tracks own realization, no curtailment)",
         default=True,
     )
@@ -206,7 +206,7 @@ def main():
     )
     parser.add_argument(
         "--robust-ramp",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         help="Use robust (SOC-based) ramp constraints that account for worst-case dispatch deviations",
         default=True,
     )

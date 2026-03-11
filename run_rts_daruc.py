@@ -28,6 +28,7 @@ from run_rts_dam import run_rts_dam
 from run_rts_aruc import (
     build_uncertainty_set,
     extract_solution,
+    extract_line_margins,
     print_brief_summary,
     analyze_Z_patterns,
     reshape_uncertainty_for_variable_intervals,
@@ -472,8 +473,17 @@ if __name__ == "__main__":
     daruc_results["Z"].to_csv(out_dir / "ldr_coefficients_Z_daruc.csv")
     dev_df.to_csv(out_dir / "deviation_summary.csv", index=False)
 
+    margin_df = extract_line_margins(
+        outputs["vars"], outputs["data"], outputs["rho"],
+        outputs.get("rho_lines_frac"), outputs["time_varying"],
+    )
+    if margin_df is not None:
+        margin_df.to_csv(out_dir / "line_margin.csv")
+
     print("\nWrote:")
     print(f"  {out_dir / 'commitment_u_daruc.csv'}")
     print(f"  {out_dir / 'dispatch_p0_daruc.csv'}")
     print(f"  {out_dir / 'ldr_coefficients_Z_daruc.csv'}")
     print(f"  {out_dir / 'deviation_summary.csv'}")
+    if margin_df is not None:
+        print(f"  {out_dir / 'line_margin.csv'}")

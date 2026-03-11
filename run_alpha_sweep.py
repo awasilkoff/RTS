@@ -328,6 +328,9 @@ def run_alpha_point(
         "dam_cost_total": dam_cost["total"],
         "daruc_cost_total": daruc_cost["total"],
         "aruc_cost_total": aruc_cost["total"],
+        "dam_commitment": dam_cost["commitment"],
+        "daruc_commitment": daruc_cost["commitment"],
+        "aruc_commitment": aruc_cost["commitment"],
         "dam_no_load": dam_cost["no_load"],
         "daruc_no_load": daruc_cost["no_load"],
         "aruc_no_load": aruc_cost["no_load"],
@@ -435,10 +438,16 @@ def plot_commitment_cost_vs_alpha(df: pd.DataFrame, out_dir: Path):
     """Commitment + startup cost vs alpha (no energy/dispatch costs)."""
     fig, ax = plt.subplots(figsize=(7, 4.5))
 
-    # Commitment cost = no_load + startup (+ shutdown, usually small)
-    dam_commit = df["dam_no_load"] + df["dam_startup"] + df["dam_shutdown"]
-    daruc_commit = df["daruc_no_load"] + df["daruc_startup"] + df["daruc_shutdown"]
-    aruc_commit = df["aruc_no_load"] + df["aruc_startup"] + df["aruc_shutdown"]
+    # Commitment cost = no_load + startup
+    if "dam_commitment" in df.columns:
+        dam_commit = df["dam_commitment"]
+        daruc_commit = df["daruc_commitment"]
+        aruc_commit = df["aruc_commitment"]
+    else:
+        # Backwards compat with older CSV files
+        dam_commit = df["dam_no_load"] + df["dam_startup"] + df["dam_shutdown"]
+        daruc_commit = df["daruc_no_load"] + df["daruc_startup"] + df["daruc_shutdown"]
+        aruc_commit = df["aruc_no_load"] + df["aruc_startup"] + df["aruc_shutdown"]
 
     ax.axhline(
         dam_commit.iloc[0],

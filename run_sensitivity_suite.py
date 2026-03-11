@@ -57,11 +57,7 @@ def build_base_args(args, script: str = "run_comparison.py") -> list[str]:
 
 
 SCENARIOS = [
-    {
-        "name": "full_robust",
-        "desc": "Full model: lines + robust ramps",
-        "extra": ["--enforce-lines", "--robust-ramp", "--with-reserve"],
-    },
+
     {
         "name": "lines_only",
         "desc": "Lines enabled, nominal ramps",
@@ -98,6 +94,11 @@ SCENARIOS = [
         "desc": "DAM+Reserve -> DARUC (lines + robust ramps, incremental obj)",
         "script": "run_reserve_then_daruc.py",  # uses different script
         "extra": [],
+    },
+{
+        "name": "full_robust",
+        "desc": "Full model: lines + robust ramps",
+        "extra": ["--enforce-lines", "--robust-ramp", "--with-reserve"],
     },
 ]
 

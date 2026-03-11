@@ -160,7 +160,7 @@ def main():
         "--fix-wind-z",
         action="store_true",
         help="Fix wind Z diagonal to 1 (wind fully tracks own realization, no curtailment)",
-        default=True,
+        default=False,
     )
     parser.add_argument(
         "--three-blocks",
@@ -218,7 +218,7 @@ def main():
     parser.add_argument(
         "--line-monitor-threshold",
         type=float,
-        default=0.8,
+        default=0.9,
         help="DAM loading threshold for line filtering (e.g. 0.5 = keep lines loaded >=50%%)",
     )
     parser.add_argument(

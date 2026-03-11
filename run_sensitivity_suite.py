@@ -57,44 +57,45 @@ def build_base_args(args, script: str = "run_comparison.py") -> list[str]:
 
 
 SCENARIOS = [
-
-    {
-        "name": "lines_only",
-        "desc": "Lines enabled, nominal ramps",
-        "extra": ["--enforce-lines", "--no-robust-ramp"],
-    },
-    {
-        "name": "ramps_only",
-        "desc": "Copperplate, robust ramps",
-        "extra": ["--robust-ramp", "--enforce-lines","--rho-lines-frac 0.0"],
-    },
-    {
-        "name": "stripped",
-        "desc": "Copperplate, nominal ramps (per-gen hedging only)",
-        "extra": ["--no-robust-ramp","--enforce-lines","--rho-lines-frac 0.0"],
-    },
-    {
-        "name": "dam_reserve",
-        "desc": "DAM + spinning reserve baseline",
-        "extra": ["--no-robust-ramp", "--with-reserve","--enforce-lines"],
-    },
-    {
-        "name": "stripped_no_wcc",
-        "desc": "Stripped + no worst-case cost epigraph",
-        "extra": ["--no-robust-ramp", "--no-worst-case-cost","--enforce-lines"],
-    },
-    {
-        "name": "stripped_free_z",
-        "desc": "Stripped + wind Z free (not fixed to identity)",
-        "extra": ["--no-robust-ramp", "--no-fix-wind-z","--enforce-lines"],
-    },
     {
         "name": "reserve_then_daruc",
         "desc": "DAM+Reserve -> DARUC (lines + robust ramps, incremental obj)",
         "script": "run_reserve_then_daruc.py",  # uses different script
         "extra": [],
     },
-{
+    {
+        "name": "stripped",
+        "desc": "Copperplate, nominal ramps (per-gen hedging only)",
+        "extra": ["--no-robust-ramp", "--enforce-lines", "--rho-lines-frac", "0.0"],
+    },
+    {
+        "name": "lines_only",
+        "desc": "Lines enabled, nominal ramps",
+        "extra": ["--enforce-lines", "--no-robust-ramp"],
+    },
+    # {
+    #     "name": "ramps_only",
+    #     "desc": "Copperplate, robust ramps",
+    #     "extra": ["--robust-ramp", "--enforce-lines","--rho-lines-frac", "0.0"],
+    # },
+
+    # {
+    #     "name": "dam_reserve",
+    #     "desc": "DAM + spinning reserve baseline",
+    #     "extra": ["--no-robust-ramp", "--with-reserve","--enforce-lines"],
+    # },
+    # {
+    #     "name": "stripped_no_wcc",
+    #     "desc": "Stripped + no worst-case cost epigraph",
+    #     "extra": ["--no-robust-ramp", "--no-worst-case-cost","--enforce-lines"],
+    # },
+    {
+        "name": "stripped_free_z",
+        "desc": "Stripped + wind Z free (not fixed to identity)",
+        "extra": ["--no-robust-ramp", "--no-fix-wind-z","--enforce-lines"],
+    },
+
+    {
         "name": "full_robust",
         "desc": "Full model: lines + robust ramps",
         "extra": ["--enforce-lines", "--robust-ramp", "--with-reserve"],
@@ -204,12 +205,12 @@ def main():
     parser = argparse.ArgumentParser(
         description="Run sensitivity suite: decompose robustness feature contributions"
     )
-    parser.add_argument("--rho", type=float, default=3.0)
+    parser.add_argument("--rho", type=float, default=2.0)
     parser.add_argument("--start-month", type=int, default=7)
     parser.add_argument("--start-day", type=int, default=15)
     parser.add_argument("--start-hour", type=int, default=0)
     parser.add_argument("--hours", type=int, default=48)
-    parser.add_argument("--uncertainty-npz", type=str, default="uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha90.npz")
+    parser.add_argument("--uncertainty-npz", type=str, default="uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha99.npz")
     parser.add_argument("--provider-start", type=int, default=2448)
     parser.add_argument("--rho-lines-frac", type=float, default=None)
     parser.add_argument("--mip-gap", type=float, default=0.005)
@@ -225,8 +226,14 @@ def main():
     parser.add_argument("--resume", action="store_true",
                         help="Skip scenarios that already have output directories")
     args = parser.parse_args()
-
-    tag = f"rho{args.rho}_{args.hours}h_m{args.start_month:02d}d{args.start_day:02d}"
+    if args.uncertainty_npz:
+        rho_tag = str(args.uncertainty_npz)[-6:-4]
+        print(rho_tag)
+    elif args.rho_lines_frac is not None:
+        rho_tag = f"rho{args.rho}_linesfrac{args.rho_lines_frac}"
+    else:
+        rho_tag = f"rho{args.rho}"
+    tag = f"rho{rho_tag}_{args.hours}h_m{args.start_month:02d}d{args.start_day:02d}"
     out_root = Path(args.out_dir) if args.out_dir else Path("sensitivity_suite") / tag
     out_root.mkdir(parents=True, exist_ok=True)
 

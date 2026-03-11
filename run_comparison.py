@@ -186,7 +186,7 @@ def main():
     parser.add_argument(
         "--uncertainty-npz",
         type=str,
-        default="uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha90.npz",
+        default="uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha99.npz",
         help="Path to time-varying uncertainty NPZ",
     )
     parser.add_argument(

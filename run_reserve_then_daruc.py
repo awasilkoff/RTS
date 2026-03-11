@@ -50,6 +50,9 @@ from uncertainty_set_provider import UncertaintySetProvider
 SPP_FORECASTS_PARQUET = Path(
     "uncertainty_sets_refactored/data/forecasts_filtered_rts4_constellation_v2.parquet"
 )
+RTS_DIR = Path("RTS_Data")
+SOURCE_DIR = RTS_DIR / "SourceData"
+TS_DIR = RTS_DIR / "timeseries_data_files"
 
 
 def run_reserve_then_daruc(
@@ -86,10 +89,14 @@ def run_reserve_then_daruc(
     # ==================================================================
     print("Building DAMData...")
     data = build_damdata_from_rts(
+        source_dir=SOURCE_DIR,
+        ts_dir=TS_DIR,
         start_time=start_time,
         horizon_hours=horizon_hours,
         spp_forecasts_parquet=SPP_FORECASTS_PARQUET,
+        spp_start_idx=0,
         day2_interval_hours=day2_interval_hours,
+        single_block=True,
         include_renewables=include_renewables,
         include_nuclear=include_nuclear,
         include_zero_marginal=include_zero_marginal,

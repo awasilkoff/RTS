@@ -975,6 +975,46 @@ def plot_z_matrix(case_dir: Path, hour: int, out_dir: Path, threshold: float = 0
     print(f"  Saved fig_z_C_norm_stack_h{hour:02d}.png/pdf")
     plt.close(fig_c)
 
+    # --- Option D: Stacked |Z| by source — thermal units only ---
+    thermal_mask = is_wind == 0
+    if thermal_mask.any():
+        Z_thermal = Z_active[thermal_mask]
+        thermal_names = [n for n, w in zip(active_names, is_wind) if not w]
+        n_th = len(thermal_names)
+
+        # Sort by row norm descending
+        th_norms = np.linalg.norm(Z_thermal, axis=1)
+        th_order = np.argsort(-th_norms)
+        Z_thermal = Z_thermal[th_order]
+        thermal_names = [thermal_names[i] for i in th_order]
+
+        fig_d, ax = plt.subplots(figsize=(10, max(3, n_th * 0.35 + 1.5)))
+
+        left = np.zeros(n_th)
+        for j in range(n_k):
+            abs_vals = np.abs(Z_thermal[:, j])
+            ax.barh(range(n_th), abs_vals, left=left, height=0.7,
+                    color=colors_k[j % len(colors_k)], label=k_labels[j],
+                    edgecolor="white", linewidth=0.3)
+            left += abs_vals
+
+        ax.set_yticks(range(n_th))
+        ax.set_yticklabels(thermal_names, fontsize=7)
+        ax.set_xlabel("|Z| contribution")
+        ax.legend(fontsize=8, loc="lower right", title="Wind Source", title_fontsize=8)
+        ax.invert_yaxis()
+        ax.set_title(
+            f"Thermal Response to Wind Uncertainty — DARUC Hour {hour:02d}\n"
+            f"({n_th} thermal gens with |Z| > {threshold})", fontsize=10)
+        fig_d.tight_layout()
+        for fmt in ("png", "pdf"):
+            fig_d.savefig(out_dir / f"fig_z_D_thermal_stack_h{hour:02d}.{fmt}",
+                          dpi=200, bbox_inches="tight")
+        print(f"  Saved fig_z_D_thermal_stack_h{hour:02d}.png/pdf")
+        plt.close(fig_d)
+    else:
+        print(f"  No active thermal generators at hour {hour}, skipping Option D")
+
 
 # ---------------------------------------------------------------------------
 # Chart 6: Network map with additionally committed units

@@ -289,181 +289,308 @@ def load_network_topology(
 # Wind generator bus IDs (from gen.csv: 122_WIND_1, 303_WIND_1, 309_WIND_1, 317_WIND_1)
 _WIND_BUSES = {122, 303, 309, 317}
 
+# Shared constants
+_LW_MIN, _LW_MAX = 0.8, 6.0
 
-def _draw_network_panel(
-    ax,
-    bus: pd.DataFrame,
-    branch: pd.DataFrame,
-    flow_df: pd.DataFrame,
-    hour_ts: pd.Timestamp,
-    title: str,
-    show_decomposition: bool = False,
-):
-    """Draw one network panel for a specific hour.
 
-    flow_df: the full (unfiltered) line_flow_analysis for this case at this hour.
-    show_decomposition: if True, use concentric halo (orange=worst-case, blue=nominal).
-    """
-    hour_data = flow_df[flow_df["period"] == hour_ts].set_index("line")
+def _get_hour_data(flow_df, hour_ts):
+    """Extract flow data for a specific hour, indexed by line UID."""
+    return flow_df[flow_df["period"] == hour_ts].set_index("line")
 
-    # Draw all branches as light gray background
+
+def _draw_base_network(ax, bus, branch):
+    """Draw gray background branches and bus dots (no labels)."""
     for uid, row in branch.iterrows():
         fb, tb = row["From Bus"], row["To Bus"]
         if fb not in bus.index or tb not in bus.index:
             continue
         x = [bus.loc[fb, "lng"], bus.loc[tb, "lng"]]
         y = [bus.loc[fb, "lat"], bus.loc[tb, "lat"]]
-        ax.plot(x, y, color="#d9d9d9", linewidth=0.8, zorder=1)
+        ax.plot(x, y, color="#e0e0e0", linewidth=0.5, zorder=1)
 
-    # Max linewidth for scaling
-    lw_max = 5.0
-    lw_min = 1.0
+    # Non-wind buses: small gray dots
+    non_wind = bus[~bus.index.isin(_WIND_BUSES)]
+    ax.scatter(non_wind["lng"], non_wind["lat"], s=8, c="#999999", zorder=5,
+               edgecolors="none")
+
+    # Wind buses: green triangles, no text labels
+    wind = bus[bus.index.isin(_WIND_BUSES)]
+    ax.scatter(wind["lng"], wind["lat"], s=80, c="#2ca02c", marker="^", zorder=6,
+               edgecolors="black", linewidths=0.6)
+
+
+def _get_branch_coords(uid, branch, bus):
+    """Return (x_array, y_array) for a branch, or None if buses missing."""
+    if uid not in branch.index:
+        return None
+    br = branch.loc[uid]
+    fb, tb = br["From Bus"], br["To Bus"]
+    if fb not in bus.index or tb not in bus.index:
+        return None
+    x = np.array([bus.loc[fb, "lng"], bus.loc[tb, "lng"]])
+    y = np.array([bus.loc[fb, "lat"], bus.loc[tb, "lat"]])
+    return x, y
+
+
+def _perpendicular_offset(x, y, offset_pts):
+    """Compute a perpendicular offset for parallel lines (in data coords)."""
+    dx = x[1] - x[0]
+    dy = y[1] - y[0]
+    length = np.sqrt(dx**2 + dy**2)
+    if length < 1e-10:
+        return np.zeros(2), np.zeros(2)
+    # Unit normal (perpendicular)
+    nx = -dy / length * offset_pts
+    ny = dx / length * offset_pts
+    return np.array([nx, nx]), np.array([ny, ny])
+
+
+def _label_binding(ax, x, y, uid, extra=""):
+    """Add a small label at midpoint for binding lines."""
+    mx, my = 0.5 * (x[0] + x[1]), 0.5 * (y[0] + y[1])
+    txt = uid + (f"\n{extra}" if extra else "")
+    ax.annotate(
+        txt, (mx, my), fontsize=5, fontweight="bold",
+        color="#b2182b", ha="center", va="bottom",
+        bbox=dict(boxstyle="round,pad=0.12", fc="white", ec="#b2182b",
+                  alpha=0.85, lw=0.5),
+        zorder=8,
+    )
+
+
+def _style_map_ax(ax, title):
+    """Common axis styling for map panels."""
+    ax.set_title(title, fontsize=10, fontweight="bold")
+    ax.set_aspect("equal")
+    ax.tick_params(labelsize=6)
+    ax.set_xlabel("")
+    ax.set_ylabel("")
+
+
+# ---- Option A: Parallel offset lines ----
+
+def _draw_panel_parallel(ax, bus, branch, hour_data, title):
+    """Two parallel lines per branch: blue=nominal, orange=margin.
+    Width proportional to MW value. Binding lines get red outline."""
+    _draw_base_network(ax, bus, branch)
+
+    offset_scale = 0.012  # data-coord offset between the two parallel lines
 
     for uid in hour_data.index:
-        if uid not in branch.index:
+        coords = _get_branch_coords(uid, branch, bus)
+        if coords is None:
             continue
+        x, y = coords
         row = hour_data.loc[uid]
-        br = branch.loc[uid]
-        fb, tb = br["From Bus"], br["To Bus"]
-        if fb not in bus.index or tb not in bus.index:
-            continue
-
-        x = np.array([bus.loc[fb, "lng"], bus.loc[tb, "lng"]])
-        y = np.array([bus.loc[fb, "lat"], bus.loc[tb, "lat"]])
         fmax = row["Fmax"]
         nom_abs = abs(row["flow_nominal"])
         margin = row["margin_rho_norm"]
+        is_binding = bool(row["binding"])
+
+        nom_frac = min(nom_abs / fmax, 1.0) if fmax > 0 else 0
+        margin_frac = min(margin / fmax, 1.0) if fmax > 0 else 0
+
+        lw_nom = _LW_MIN + (_LW_MAX - _LW_MIN) * nom_frac
+        lw_margin = _LW_MIN + (_LW_MAX - _LW_MIN) * margin_frac
+
+        ox, oy = _perpendicular_offset(x, y, offset_scale)
+
+        # Nominal (blue) on one side
+        ax.plot(x + ox, y + oy, color="#4393c3", linewidth=lw_nom, zorder=3,
+                solid_capstyle="round")
+        # Margin (orange) on the other side
+        if margin > 0.1:
+            ax.plot(x - ox, y - oy, color="#e08060", linewidth=lw_margin, zorder=3,
+                    solid_capstyle="round")
+
+        if is_binding:
+            ax.plot(x, y, color="#b2182b", linewidth=max(lw_nom, lw_margin) + 2,
+                    zorder=2, alpha=0.25)
+            _label_binding(ax, x, y, uid, f"{nom_abs:.0f}+{margin:.0f}")
+
+    _style_map_ax(ax, title)
+
+
+# ---- Option B: Three-panel (DAM loading | DARUC nominal | DARUC margin) ----
+
+def _draw_panel_single_metric(ax, bus, branch, hour_data, title,
+                               metric_col, color, vmax_mw=None):
+    """Single metric per line, thickness = MW value, uniform color."""
+    _draw_base_network(ax, bus, branch)
+
+    if vmax_mw is None:
+        vmax_mw = hour_data[metric_col].abs().max()
+    if vmax_mw < 1:
+        vmax_mw = 1.0
+
+    for uid in hour_data.index:
+        coords = _get_branch_coords(uid, branch, bus)
+        if coords is None:
+            continue
+        x, y = coords
+        row = hour_data.loc[uid]
+        val = abs(row[metric_col]) if metric_col == "flow_nominal" else row[metric_col]
+        is_binding = bool(row["binding"])
+
+        frac = min(val / vmax_mw, 1.0)
+        lw = _LW_MIN + (_LW_MAX - _LW_MIN) * frac
+
+        ax.plot(x, y, color=color, linewidth=lw, zorder=3, solid_capstyle="round",
+                alpha=max(0.3, frac))
+
+        if is_binding:
+            ax.plot(x, y, color="#b2182b", linewidth=lw + 2, zorder=2, alpha=0.25)
+            _label_binding(ax, x, y, uid)
+
+    _style_map_ax(ax, title)
+
+
+# ---- Option C: Color = nominal %, thickness = worst-case % ----
+
+def _draw_panel_dual_encode(ax, bus, branch, hour_data, title):
+    """Color encodes nominal loading %, thickness encodes worst-case loading %."""
+    _draw_base_network(ax, bus, branch)
+
+    cmap = plt.cm.coolwarm
+    norm = mcolors.Normalize(vmin=0, vmax=100)
+
+    for uid in hour_data.index:
+        coords = _get_branch_coords(uid, branch, bus)
+        if coords is None:
+            continue
+        x, y = coords
+        row = hour_data.loc[uid]
+        fmax = row["Fmax"]
         wc_abs = row["worst_case_abs_flow"]
         is_binding = bool(row["binding"])
 
-        # Linewidth proportional to worst-case flow / Fmax
         wc_frac = min(wc_abs / fmax, 1.0) if fmax > 0 else 0
-        nom_frac = min(nom_abs / fmax, 1.0) if fmax > 0 else 0
-        lw_wc = lw_min + (lw_max - lw_min) * wc_frac
-        lw_nom = lw_min + (lw_max - lw_min) * nom_frac
+        lw = _LW_MIN + (_LW_MAX - _LW_MIN) * wc_frac
 
-        if show_decomposition and margin > 0.1:
-            # Concentric halo: outer orange (worst-case), inner blue (nominal)
-            ax.plot(x, y, color="#f4a582", linewidth=lw_wc, zorder=3,
-                    solid_capstyle="round")
-            ax.plot(x, y, color="#4393c3", linewidth=lw_nom, zorder=4,
-                    solid_capstyle="round")
-        else:
-            # Single color by loading
-            cmap = plt.cm.RdYlGn_r
-            norm = mcolors.Normalize(vmin=0, vmax=100)
-            color = cmap(norm(min(row["loading_worst_case_pct"], 100)))
-            ax.plot(x, y, color=color, linewidth=lw_wc, zorder=3)
+        nom_loading = row["loading_nominal_pct"]
+        color = cmap(norm(min(nom_loading, 100)))
+        ax.plot(x, y, color=color, linewidth=lw, zorder=3, solid_capstyle="round")
 
-        # Binding highlight: red outline behind everything
         if is_binding:
-            ax.plot(x, y, color="red", linewidth=lw_wc + 2.5, zorder=2, alpha=0.35)
+            ax.plot(x, y, color="#b2182b", linewidth=lw + 2, zorder=2, alpha=0.25)
+            margin = row["margin_rho_norm"]
+            nom_abs = abs(row["flow_nominal"])
+            _label_binding(ax, x, y, uid,
+                           f"{nom_abs:.0f}+{margin:.0f}" if margin > 0.1 else "")
 
-        # Label binding lines
-        if is_binding:
-            mx, my = 0.5 * (x[0] + x[1]), 0.5 * (y[0] + y[1])
-            label_txt = uid
-            if margin > 0.1:
-                label_txt += f"\n{nom_abs:.0f}+{margin:.0f}"
-            ax.annotate(
-                label_txt, (mx, my), fontsize=5.5, fontweight="bold",
-                color="red", ha="center", va="bottom",
-                bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.8),
-                zorder=6,
-            )
-
-    # Draw non-wind buses
-    non_wind = bus[~bus.index.isin(_WIND_BUSES)]
-    ax.scatter(
-        non_wind["lng"], non_wind["lat"], s=12, c="#333333", zorder=5,
-        edgecolors="white", linewidths=0.3,
-    )
-
-    # Draw wind buses with distinct marker
-    wind = bus[bus.index.isin(_WIND_BUSES)]
-    ax.scatter(
-        wind["lng"], wind["lat"], s=100, c="#2ca02c", marker="^", zorder=6,
-        edgecolors="black", linewidths=0.8, label="Wind",
-    )
-    for bus_id, brow in wind.iterrows():
-        ax.annotate(
-            f"Bus {bus_id}", (brow["lng"], brow["lat"]),
-            fontsize=5.5, fontweight="bold", color="#2ca02c",
-            ha="left", va="bottom",
-            xytext=(4, 4), textcoords="offset points",
-            bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="#2ca02c", alpha=0.8),
-            zorder=7,
-        )
-
-    ax.set_title(title, fontsize=11, fontweight="bold")
-    ax.set_xlabel("Longitude")
-    ax.set_ylabel("Latitude")
-    ax.set_aspect("equal")
+    _style_map_ax(ax, title)
+    return cmap, norm
 
 
-def plot_network_map(
+# ---- Master plot functions ----
+
+def _find_hour_ts(df, hour):
+    """Find the pd.Timestamp matching the given hour (0-23)."""
+    for t in sorted(df["period"].unique()):
+        if t.hour == hour:
+            return t
+    return None
+
+
+def plot_network_maps(
     dam_raw: pd.DataFrame,
     daruc_raw: pd.DataFrame,
     hour: int,
     out_dir: Path,
 ):
-    """Two-panel network map at the given hour (0-23).
+    """Generate three network map options for comparison."""
+    from matplotlib.lines import Line2D
 
-    Left: DAM+Reserve (single-color edges by loading).
-    Right: DARUC (two-tone edges: nominal blue + margin orange for lines with margin).
-    """
     bus, branch = load_network_topology()
 
-    # Find the timestamp for this hour
-    all_periods = sorted(dam_raw["period"].unique())
-    hour_ts = None
-    for t in all_periods:
-        if t.hour == hour:
-            hour_ts = t
-            break
+    hour_ts = _find_hour_ts(dam_raw, hour)
     if hour_ts is None:
-        print(f"  WARNING: hour {hour} not found in data, skipping network map")
+        print(f"  WARNING: hour {hour} not found, skipping network maps")
         return
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8))
+    dam_hour = _get_hour_data(dam_raw, hour_ts)
+    daruc_hour = _get_hour_data(daruc_raw, hour_ts)
 
-    _draw_network_panel(
-        ax1, bus, branch, dam_raw, hour_ts,
-        f"DAM + Reserve (hour {hour:02d}:00)",
-        show_decomposition=False,
-    )
-    _draw_network_panel(
-        ax2, bus, branch, daruc_raw, hour_ts,
-        f"DARUC (hour {hour:02d}:00)",
-        show_decomposition=True,
-    )
+    # Shared Fmax for consistent scaling across panels
+    fmax_max = max(dam_hour["Fmax"].max(), daruc_hour["Fmax"].max())
 
-    # Legend
-    from matplotlib.lines import Line2D
-    legend_elements = [
+    # --- Option A: Parallel offset (2 panels) ---
+    fig_a, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8))
+    _draw_panel_parallel(ax1, bus, branch, dam_hour,
+                         f"DAM + Reserve (h{hour:02d})")
+    _draw_panel_parallel(ax2, bus, branch, daruc_hour,
+                         f"DARUC (h{hour:02d})")
+    legend_a = [
         Line2D([0], [0], color="#4393c3", lw=4, label="Nominal flow"),
-        Line2D([0], [0], color="#f4a582", lw=6, label="Robust margin (halo)"),
-        Line2D([0], [0], color="red", lw=5, alpha=0.35, label="Binding"),
-        Line2D([0], [0], color="#d9d9d9", lw=1, label="Unmonitored"),
-        Line2D([0], [0], marker="o", color="w", markerfacecolor="#333", markersize=5, label="Bus"),
+        Line2D([0], [0], color="#e08060", lw=4, label="Robust margin"),
+        Line2D([0], [0], color="#b2182b", lw=5, alpha=0.25, label="Binding"),
         Line2D([0], [0], marker="^", color="w", markerfacecolor="#2ca02c",
                markeredgecolor="black", markersize=8, label="Wind gen"),
     ]
-    fig.legend(
-        handles=legend_elements, loc="lower center", ncol=5, fontsize=9,
-        bbox_to_anchor=(0.5, -0.02),
-    )
-
-    fig.suptitle(
-        f"Network Line Flows: DAM+Reserve vs DARUC — Hour {hour:02d}:00",
-        fontsize=13,
-    )
-    fig.tight_layout(rect=[0, 0.04, 1, 0.96])
-
+    fig_a.legend(handles=legend_a, loc="lower center", ncol=4, fontsize=9,
+                 bbox_to_anchor=(0.5, -0.01))
+    fig_a.suptitle(f"Option A: Parallel Lines — Hour {hour:02d}:00", fontsize=13)
+    fig_a.tight_layout(rect=[0, 0.04, 1, 0.96])
     for fmt in ("png", "pdf"):
-        fig.savefig(out_dir / f"fig_network_map_h{hour:02d}.{fmt}", dpi=200, bbox_inches="tight")
-    print(f"  Saved fig_network_map_h{hour:02d}.png/pdf")
-    plt.close(fig)
+        fig_a.savefig(out_dir / f"fig_map_A_parallel_h{hour:02d}.{fmt}",
+                      dpi=200, bbox_inches="tight")
+    print(f"  Saved fig_map_A_parallel_h{hour:02d}.png/pdf")
+    plt.close(fig_a)
+
+    # --- Option B: Three panels (DAM wc | DARUC nominal | DARUC margin) ---
+    fig_b, (bx1, bx2, bx3) = plt.subplots(1, 3, figsize=(24, 7))
+    _draw_panel_single_metric(bx1, bus, branch, dam_hour,
+                               f"DAM+Res worst-case (h{hour:02d})",
+                               "worst_case_abs_flow", "#4393c3", vmax_mw=fmax_max)
+    _draw_panel_single_metric(bx2, bus, branch, daruc_hour,
+                               f"DARUC nominal (h{hour:02d})",
+                               "flow_nominal", "#4393c3", vmax_mw=fmax_max)
+    _draw_panel_single_metric(bx3, bus, branch, daruc_hour,
+                               f"DARUC margin only (h{hour:02d})",
+                               "margin_rho_norm", "#e08060", vmax_mw=fmax_max)
+    legend_b = [
+        Line2D([0], [0], color="#4393c3", lw=4, label="Flow (thickness=MW)"),
+        Line2D([0], [0], color="#e08060", lw=4, label="Margin (thickness=MW)"),
+        Line2D([0], [0], color="#b2182b", lw=5, alpha=0.25, label="Binding"),
+        Line2D([0], [0], marker="^", color="w", markerfacecolor="#2ca02c",
+               markeredgecolor="black", markersize=8, label="Wind gen"),
+    ]
+    fig_b.legend(handles=legend_b, loc="lower center", ncol=4, fontsize=9,
+                 bbox_to_anchor=(0.5, -0.01))
+    fig_b.suptitle(f"Option B: Three Panels — Hour {hour:02d}:00", fontsize=13)
+    fig_b.tight_layout(rect=[0, 0.04, 1, 0.96])
+    for fmt in ("png", "pdf"):
+        fig_b.savefig(out_dir / f"fig_map_B_three_panel_h{hour:02d}.{fmt}",
+                      dpi=200, bbox_inches="tight")
+    print(f"  Saved fig_map_B_three_panel_h{hour:02d}.png/pdf")
+    plt.close(fig_b)
+
+    # --- Option C: Dual encoding (2 panels) ---
+    fig_c, (cx1, cx2) = plt.subplots(1, 2, figsize=(18, 8))
+    _draw_panel_dual_encode(cx1, bus, branch, dam_hour,
+                            f"DAM + Reserve (h{hour:02d})")
+    cmap_c, norm_c = _draw_panel_dual_encode(
+        cx2, bus, branch, daruc_hour, f"DARUC (h{hour:02d})")
+    sm = plt.cm.ScalarMappable(cmap=cmap_c, norm=norm_c)
+    fig_c.colorbar(sm, ax=[cx1, cx2], label="Nominal Loading %", shrink=0.7, pad=0.02)
+    legend_c = [
+        Line2D([0], [0], color="gray", lw=1, label="Thin = low worst-case"),
+        Line2D([0], [0], color="gray", lw=5, label="Thick = high worst-case"),
+        Line2D([0], [0], color="#b2182b", lw=5, alpha=0.25, label="Binding"),
+        Line2D([0], [0], marker="^", color="w", markerfacecolor="#2ca02c",
+               markeredgecolor="black", markersize=8, label="Wind gen"),
+    ]
+    fig_c.legend(handles=legend_c, loc="lower center", ncol=4, fontsize=9,
+                 bbox_to_anchor=(0.5, -0.01))
+    fig_c.suptitle(
+        f"Option C: Color=Nominal%, Thickness=Worst-Case% — Hour {hour:02d}:00",
+        fontsize=13)
+    fig_c.tight_layout(rect=[0, 0.04, 1, 0.96])
+    for fmt in ("png", "pdf"):
+        fig_c.savefig(out_dir / f"fig_map_C_dual_encode_h{hour:02d}.{fmt}",
+                      dpi=200, bbox_inches="tight")
+    print(f"  Saved fig_map_C_dual_encode_h{hour:02d}.png/pdf")
+    plt.close(fig_c)
 
 
 # ---------------------------------------------------------------------------
@@ -507,8 +634,8 @@ def main():
     print("Chart 3: Flow decomposition...")
     plot_flow_decomposition(dam, daruc, binding_lines, out_dir)
 
-    print(f"\nChart 4: Network map (hour {args.map_hour})...")
-    plot_network_map(dam_raw, daruc_raw, args.map_hour, out_dir)
+    print(f"\nChart 4: Network maps (hour {args.map_hour}) — 3 options...")
+    plot_network_maps(dam_raw, daruc_raw, args.map_hour, out_dir)
 
     print(f"\nDone. Figures saved to {out_dir}/")
 

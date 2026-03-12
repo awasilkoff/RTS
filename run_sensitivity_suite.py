@@ -135,16 +135,22 @@ def load_summary(out_dir: Path) -> dict | None:
         if p.exists():
             with open(p) as f:
                 summaries[subdir] = json.load(f)
-    # run_reserve_then_daruc.py writes a top-level summary.json
+    # Both run_comparison.py and run_reserve_then_daruc.py write a top-level summary.json
     top_level = out_dir / "summary.json"
-    if top_level.exists() and not summaries:
+    if top_level.exists():
         with open(top_level) as f:
             summaries["_top"] = json.load(f)
     return summaries if summaries else None
 
 
 def collect_results(out_root: Path, scenarios: list[dict]) -> list[dict]:
-    """Collect key metrics from all scenario outputs."""
+    """Collect key metrics from all scenario outputs.
+
+    Reads the top-level summary.json (written by both run_comparison.py and
+    run_reserve_then_daruc.py) for day-1 cost breakdowns, unit-hours, and
+    wind curtailment.  Falls back to per-subdir summary.json for Gurobi
+    objectives when the top-level file is absent.
+    """
     rows = []
     for sc in scenarios:
         name = sc["name"]
@@ -153,42 +159,98 @@ def collect_results(out_root: Path, scenarios: list[dict]) -> list[dict]:
 
         row = {"scenario": name, "description": sc["desc"]}
         if summaries:
-            if "aruc" in summaries:
-                row["aruc_obj"] = summaries["aruc"].get("objective")
-            if "daruc" in summaries:
-                row["daruc_obj"] = summaries["daruc"].get("daruc_objective")
-                row["dam_obj"] = summaries["daruc"].get("dam_objective")
-            if "dam_reserve" in summaries:
-                row["reserve_obj"] = summaries["dam_reserve"].get("objective")
-            # reserve_then_daruc writes a top-level summary with cost dicts
-            if "_top" in summaries:
-                top = summaries["_top"]
-                if "reserve_cost" in top:
-                    row["reserve_obj"] = top["reserve_cost"].get("total")
-                if "daruc_cost" in top:
-                    row["daruc_obj"] = top["daruc_cost"].get("total")
+            # Prefer top-level summary.json (has day-1 cost breakdowns)
+            top = summaries.get("_top")
+            if top is not None:
+                # run_comparison.py format
+                for model in ("aruc", "daruc", "dam", "reserve"):
+                    cost_key = f"{model}_cost"
+                    if cost_key in top and top[cost_key] is not None:
+                        row[f"{model}_cost_total"] = top[cost_key].get("total")
+                        row[f"{model}_cost_energy"] = top[cost_key].get("energy")
+                        row[f"{model}_cost_commitment"] = top[cost_key].get("commitment")
+                    metrics_key = f"{model}_metrics"
+                    if metrics_key in top and top[metrics_key] is not None:
+                        row[f"{model}_unit_hours"] = top[metrics_key].get("unit_hours")
+                        row[f"{model}_wind_curt_mwh"] = top[metrics_key].get("wind_curtailment_mwh")
+
+                # run_reserve_then_daruc.py format (different key structure)
+                if "reserve_cost" in top and "reserve_cost_total" not in row:
+                    rc = top["reserve_cost"]
+                    row["reserve_cost_total"] = rc.get("total")
+                    row["reserve_cost_energy"] = rc.get("energy")
+                    row["reserve_cost_commitment"] = rc.get("commitment")
+                if "daruc_cost" in top and "daruc_cost_total" not in row:
+                    dc = top["daruc_cost"]
+                    row["daruc_cost_total"] = dc.get("total")
+                    row["daruc_cost_energy"] = dc.get("energy")
+                    row["daruc_cost_commitment"] = dc.get("commitment")
+                if "unit_hours" in top:
+                    uh = top["unit_hours"]
+                    row.setdefault("reserve_unit_hours", uh.get("reserve"))
+                    row.setdefault("daruc_unit_hours", uh.get("daruc"))
+                if "wind_curtailment_mwh" in top:
+                    wc = top["wind_curtailment_mwh"]
+                    row.setdefault("reserve_wind_curt_mwh", wc.get("reserve"))
+                    row.setdefault("daruc_wind_curt_mwh", wc.get("daruc"))
                 if "extra_unit_hours_full_horizon" in top:
                     row["extra_unit_hours"] = top["extra_unit_hours_full_horizon"]
+
+            # Fallback: per-subdir Gurobi objectives
+            if "aruc" in summaries and "aruc_cost_total" not in row:
+                row["aruc_obj"] = summaries["aruc"].get("objective")
+            if "daruc" in summaries and "daruc_cost_total" not in row:
+                row["daruc_obj"] = summaries["daruc"].get("daruc_objective")
+                row["dam_obj"] = summaries["daruc"].get("dam_objective")
+            if "dam_reserve" in summaries and "reserve_cost_total" not in row:
+                row["reserve_obj"] = summaries["dam_reserve"].get("objective")
         rows.append(row)
     return rows
 
 
+def _fmt(val, width=14, fmt_str=",.0f"):
+    """Format a numeric value or return '--' if missing."""
+    if val is not None:
+        return f"{val:>{width}{fmt_str}}"
+    return f"{'--':>{width}s}"
+
+
 def print_comparison(rows: list[dict]):
     """Print a compact comparison table."""
-    print("\n" + "=" * 90)
-    print("SENSITIVITY SUITE SUMMARY (Gurobi objectives, full horizon)")
-    print("=" * 90)
-    print(f"{'Scenario':<20s} {'DAM':>14s} {'DAM+Res':>14s} {'DARUC':>14s} {'ARUC':>14s}")
-    print("-" * 90)
-    for r in rows:
-        dam = f"{r['dam_obj']:>14,.0f}" if r.get("dam_obj") else f"{'--':>14s}"
-        res = f"{r['reserve_obj']:>14,.0f}" if r.get("reserve_obj") else f"{'--':>14s}"
-        daruc = f"{r['daruc_obj']:>14,.0f}" if r.get("daruc_obj") else f"{'--':>14s}"
-        aruc = f"{r['aruc_obj']:>14,.0f}" if r.get("aruc_obj") else f"{'--':>14s}"
-        print(f"{r['scenario']:<20s} {dam} {res} {daruc} {aruc}")
-    print("=" * 90)
-    print()
+    # Check if we have day-1 cost data (from enriched summaries)
+    has_day1 = any(r.get("daruc_cost_total") is not None for r in rows)
 
+    if has_day1:
+        print("\n" + "=" * 110)
+        print("SENSITIVITY SUITE SUMMARY (day-1 costs)")
+        print("=" * 110)
+        print(f"{'Scenario':<22s} {'DAM':>12s} {'DAM+Res':>12s} {'DARUC':>12s} {'ARUC':>12s} {'Curt(DARUC)':>12s} {'Curt(ARUC)':>12s}")
+        print("-" * 110)
+        for r in rows:
+            dam = _fmt(r.get("dam_cost_total"), 12)
+            res = _fmt(r.get("reserve_cost_total"), 12)
+            daruc = _fmt(r.get("daruc_cost_total"), 12)
+            aruc = _fmt(r.get("aruc_cost_total"), 12)
+            curt_d = _fmt(r.get("daruc_wind_curt_mwh"), 12)
+            curt_a = _fmt(r.get("aruc_wind_curt_mwh"), 12)
+            print(f"{r['scenario']:<22s} {dam} {res} {daruc} {aruc} {curt_d} {curt_a}")
+        print("=" * 110)
+    else:
+        # Fallback: Gurobi objectives only
+        print("\n" + "=" * 90)
+        print("SENSITIVITY SUITE SUMMARY (Gurobi objectives, full horizon)")
+        print("=" * 90)
+        print(f"{'Scenario':<20s} {'DAM':>14s} {'DAM+Res':>14s} {'DARUC':>14s} {'ARUC':>14s}")
+        print("-" * 90)
+        for r in rows:
+            dam = _fmt(r.get("dam_obj"))
+            res = _fmt(r.get("reserve_obj"))
+            daruc = _fmt(r.get("daruc_obj"))
+            aruc = _fmt(r.get("aruc_obj"))
+            print(f"{r['scenario']:<20s} {dam} {res} {daruc} {aruc}")
+        print("=" * 90)
+
+    print()
     # Print the interpretation guide
     print("Interpretation:")
     print("  full_robust - lines_only   = value of robust ramps (with lines)")
@@ -271,8 +333,10 @@ def main():
     # Save CSV
     csv_path = out_root / "sensitivity_results.csv"
     if rows:
+        # Collect all keys across rows (different scenarios may have different columns)
+        all_keys = dict.fromkeys(k for r in rows for k in r.keys())
         with open(csv_path, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=rows[0].keys())
+            writer = csv.DictWriter(f, fieldnames=all_keys)
             writer.writeheader()
             writer.writerows(rows)
         print(f"\nResults saved to {csv_path}")

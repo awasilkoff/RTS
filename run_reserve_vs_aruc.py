@@ -25,7 +25,7 @@ from io_rts import build_damdata_from_rts
 from dam_model import build_dam_model
 from run_rts_dam import extract_solution as extract_dam_solution
 from run_rts_aruc import run_rts_aruc, build_uncertainty_set
-from run_comparison import compute_reserve_from_uncertainty
+from runner_utils import compute_reserve_from_uncertainty
 from compare_aruc_vs_daruc import compute_cost_breakdown
 
 

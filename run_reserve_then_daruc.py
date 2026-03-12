@@ -43,7 +43,13 @@ from run_rts_aruc import (
     extract_line_margins,
 )
 from run_rts_daruc import extract_dam_commitment, analyze_deviations, print_deviation_summary
-from run_comparison import compute_reserve_from_uncertainty, save_line_flow_analysis
+from runner_utils import (
+    compute_reserve_from_uncertainty,
+    save_robust_outputs,
+    save_dam_outputs,
+    save_line_flows_if_enabled,
+    compute_day1_metrics,
+)
 from compare_aruc_vs_daruc import compute_cost_breakdown
 from uncertainty_set_provider import UncertaintySetProvider
 
@@ -340,9 +346,6 @@ def run_reserve_then_daruc(
         daruc_dir.mkdir(exist_ok=True)
 
         # Reserve outputs
-        reserve_results["u"].to_csv(reserve_dir / "commitment_u.csv")
-        reserve_results["p"].to_csv(reserve_dir / "dispatch_p0.csv")
-        np.save(reserve_dir / "reserve_requirement.npy", R)
         reserve_summary = {
             "objective": reserve_results["obj"],
             "hours": horizon_hours,
@@ -352,16 +355,9 @@ def run_reserve_then_daruc(
             "enforce_lines": True,
             "start_time": str(start_time),
         }
-        with open(reserve_dir / "summary.json", "w") as f:
-            json.dump(reserve_summary, f, indent=2)
+        save_dam_outputs(reserve_results, reserve_dir, summary_dict=reserve_summary, reserve_R=R)
 
         # DARUC outputs
-        daruc_results["u"].to_csv(daruc_dir / "commitment_u.csv")
-        daruc_results["p0"].to_csv(daruc_dir / "dispatch_p0.csv")
-        daruc_results["Z"].to_csv(daruc_dir / "Z_coefficients.csv")
-        dev_df.to_csv(daruc_dir / "deviation_summary.csv", index=False)
-        np.save(daruc_dir / "Sigma.npy", Sigma)
-        np.save(daruc_dir / "rho.npy", np.atleast_1d(rho_val))
         daruc_summary = {
             "daruc_objective": daruc_results["obj"],
             "reserve_objective": reserve_results["obj"],
@@ -372,27 +368,17 @@ def run_reserve_then_daruc(
             "dispatch_cost_scale": dispatch_cost_scale,
             "start_time": str(start_time),
         }
-        with open(daruc_dir / "summary.json", "w") as f:
-            json.dump(daruc_summary, f, indent=2)
-
-        # DARUC line margin
-        if daruc_margin is not None:
-            daruc_margin.to_csv(daruc_dir / "line_margin.csv")
+        save_robust_outputs(
+            daruc_results, data, daruc_dir, Sigma, rho_val,
+            deviation_df=dev_df, margin_df=daruc_margin,
+            summary_dict=daruc_summary,
+        )
 
         # Line flow analysis (nominal flows + margin decomposition)
         data_out = data_full if data_full is not None else data
         print("\nLine flow analysis:")
-
-        reserve_flow_dir = reserve_dir / "line_flows"
-        reserve_flow_dir.mkdir(exist_ok=True)
-        save_line_flow_analysis(data_out, reserve_results["p"].values, None, "DAM+Reserve", reserve_flow_dir)
-
-        daruc_margin_full = None
-        if daruc_margin is not None:
-            daruc_margin_full = daruc_margin.reindex(data_out.line_ids, fill_value=0.0)
-        daruc_flow_dir = daruc_dir / "line_flows"
-        daruc_flow_dir.mkdir(exist_ok=True)
-        save_line_flow_analysis(data_out, daruc_results["p0"].values, daruc_margin_full, "DARUC", daruc_flow_dir)
+        save_line_flows_if_enabled(True, data_out, reserve_results["p"].values, None, "DAM+Reserve", reserve_dir, "line_flows")
+        save_line_flows_if_enabled(True, data_out, daruc_results["p0"].values, daruc_margin, "DARUC", daruc_dir, "line_flows")
 
         with open(out_dir / "summary.txt", "w") as f:
             f.write(summary_text)

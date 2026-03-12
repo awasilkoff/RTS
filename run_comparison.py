@@ -27,12 +27,18 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from compute_branch_flows import compute_branch_flows
 from dam_model import build_dam_model
 from run_rts_daruc import run_rts_daruc
 from run_rts_aruc import run_rts_aruc, extract_line_margins
 from run_rts_dam import extract_solution as extract_dam_solution
 from test_daruc_quick import analyze_Z
+from runner_utils import (
+    compute_reserve_from_uncertainty,
+    save_robust_outputs,
+    save_dam_outputs,
+    save_line_flows_if_enabled,
+    compute_day1_metrics,
+)
 from compare_aruc_vs_daruc import (
     load_results,
     load_dam_results,
@@ -47,110 +53,6 @@ from compare_aruc_vs_daruc import (
     fig_pmin_vs_dispatch,
     write_summary,
 )
-
-
-def compute_reserve_from_uncertainty(Sigma, rho, T=None):
-    """Compute spinning reserve requirement from ellipsoidal uncertainty set.
-
-    R[t] = rho[t] * sqrt(1^T Sigma[t] 1) -- worst-case total wind shortfall.
-
-    Parameters
-    ----------
-    Sigma : (T, K, K) or (K, K) array -- covariance matrices per period or static
-    rho : scalar or (T,) array -- ellipsoid radii
-    T : int, optional -- number of periods (required when Sigma is 2D static)
-
-    Returns
-    -------
-    R : (T,) array -- reserve requirement per period (MW)
-    """
-    # Handle static (K, K) Sigma by broadcasting to (T, K, K)
-    if Sigma.ndim == 2:
-        if T is None:
-            raise ValueError("T must be provided when Sigma is 2D (static)")
-        Sigma = np.broadcast_to(Sigma[None, :, :], (T, Sigma.shape[0], Sigma.shape[1]))
-
-    rho_arr = np.atleast_1d(rho)
-    n_periods = Sigma.shape[0]
-    if rho_arr.shape[0] == 1:
-        rho_arr = np.full(n_periods, rho_arr[0])
-    ones = np.ones(Sigma.shape[1])
-    R = np.array([rho_arr[t] * np.sqrt(ones @ Sigma[t] @ ones) for t in range(n_periods)])
-    return R
-
-
-def save_line_flow_analysis(data, dispatch_arr, margin_df, label, out_dir):
-    """Save line flow decomposition CSVs for a single model run.
-
-    Outputs (all L x T DataFrames):
-      - line_flow_nominal.csv   : PTDF-based nominal flows (MW)
-      - line_flow_analysis.csv  : long-format table with columns:
-            line, period, flow_nominal, margin, worst_case_abs,
-            Fmax, loading_nominal, loading_worst_case, binding
-
-    Parameters
-    ----------
-    data : DAMData (must have PTDF, Fmax, line_ids, etc.)
-    dispatch_arr : (I, T) array — p0 for ARUC/DARUC, p for DAM
-    margin_df : DataFrame (L x T) of rho*z_line margins, or None (DAM)
-    label : str — model label for printing
-    out_dir : Path — directory to write CSVs
-    """
-    flow_df = compute_branch_flows(data, dispatch_arr)
-    flow_df.to_csv(out_dir / "line_flow_nominal.csv")
-
-    L = len(data.line_ids)
-    T = len(data.time)
-    Fmax = data.Fmax
-
-    flow_vals = flow_df.values  # (L, T)
-    margin_vals = margin_df.values if margin_df is not None else np.zeros((L, T))
-
-    rows = []
-    for l_idx in range(L):
-        for t_idx in range(T):
-            f_nom = flow_vals[l_idx, t_idx]
-            m = margin_vals[l_idx, t_idx]
-            fmax = Fmax[l_idx]
-            wc_abs = abs(f_nom) + m
-            rows.append({
-                "line": data.line_ids[l_idx],
-                "period": data.time[t_idx],
-                "flow_nominal": round(f_nom, 2),
-                "margin_rho_norm": round(m, 2),
-                "worst_case_abs_flow": round(wc_abs, 2),
-                "Fmax": round(fmax, 2),
-                "loading_nominal_pct": round(abs(f_nom) / fmax * 100, 1) if fmax > 0 else 0.0,
-                "loading_worst_case_pct": round(wc_abs / fmax * 100, 1) if fmax > 0 else 0.0,
-                "binding": wc_abs >= fmax - 1.0,
-            })
-
-    analysis_df = pd.DataFrame(rows)
-    analysis_df.to_csv(out_dir / "line_flow_analysis.csv", index=False)
-
-    # Print summary of binding lines
-    binding = analysis_df[analysis_df["binding"]]
-    n_binding = binding.groupby("line").size()
-    if len(n_binding) > 0:
-        print(f"  [{label}] {len(n_binding)} lines binding at least one period, "
-              f"{len(binding)} total (line,period) pairs")
-        top = n_binding.nlargest(5)
-        for lid, cnt in top.items():
-            print(f"    {lid}: binding {cnt}/{T} periods")
-    else:
-        print(f"  [{label}] No binding lines")
-
-    # Summary of margin reservation (robust models only)
-    if margin_df is not None and margin_vals.max() > 0:
-        # For lines that have nonzero margin, what fraction of Fmax is reserved?
-        active = margin_vals > 0.01
-        if active.any():
-            fmax_2d = Fmax[:, None] * np.ones((1, T))
-            pct_reserved = margin_vals[active] / fmax_2d[active] * 100
-            print(f"  [{label}] Margin reservation (where active): "
-                  f"mean={pct_reserved.mean():.1f}%, max={pct_reserved.max():.1f}%")
-
-    return flow_df, analysis_df
 
 
 def main():
@@ -448,42 +350,10 @@ def main():
     dev_df = daruc_outputs["deviation_summary"]
 
     # Save DARUC outputs
-    daruc_results["u"].to_csv(daruc_dir / "commitment_u.csv")
-    daruc_results["p0"].to_csv(daruc_dir / "dispatch_p0.csv")
-    daruc_results["Z"].to_csv(daruc_dir / "Z_coefficients.csv")
-    dev_df.to_csv(daruc_dir / "deviation_summary.csv", index=False)
-    np.save(daruc_dir / "Sigma.npy", daruc_outputs["Sigma"])
-    np.save(daruc_dir / "rho.npy", np.atleast_1d(daruc_outputs["rho"]))
-    analyze_Z(daruc_results["Z"], data, daruc_dir, rho=daruc_outputs["rho"])
     daruc_margin = extract_line_margins(
         daruc_outputs["vars"], data, daruc_outputs["rho"],
         args.rho_lines_frac, daruc_outputs["time_varying"],
     )
-    if daruc_margin is not None:
-        daruc_margin.to_csv(daruc_dir / "line_margin.csv")
-
-    # Save DAM results (DAM uses "p" not "p0")
-    dam_results["u"].to_csv(daruc_dir / "dam_commitment_u.csv")
-    dam_results["p"].to_csv(daruc_dir / "dam_dispatch_p0.csv")
-
-    # Line flow analysis (use unfiltered data for full line coverage)
-    data_full = daruc_outputs.get("data_full") or data
-    if args.enforce_lines:
-        print("\nLine flow analysis:")
-        # Reindex margin to full line set (fill unmonitored lines with 0)
-        daruc_margin_full = None
-        if daruc_margin is not None:
-            daruc_margin_full = daruc_margin.reindex(data_full.line_ids, fill_value=0.0)
-
-        dam_flow_dir = daruc_dir / "dam_line_flows"
-        dam_flow_dir.mkdir(exist_ok=True)
-        save_line_flow_analysis(data_full, dam_results["p"].values, None, "DAM", dam_flow_dir)
-
-        daruc_flow_dir = daruc_dir / "daruc_line_flows"
-        daruc_flow_dir.mkdir(exist_ok=True)
-        save_line_flow_analysis(data_full, daruc_results["p0"].values, daruc_margin_full, "DARUC", daruc_flow_dir)
-
-    # Save DARUC summary
     daruc_summary = {
         "daruc_objective": daruc_results["obj"],
         "dam_objective": dam_results["obj"],
@@ -499,8 +369,22 @@ def main():
         "enforce_lines": args.enforce_lines,
         "start_time": str(start_time),
     }
-    with open(daruc_dir / "summary.json", "w") as f:
-        json.dump(daruc_summary, f, indent=2)
+    save_robust_outputs(
+        daruc_results, data, daruc_dir, daruc_outputs["Sigma"], daruc_outputs["rho"],
+        deviation_df=dev_df, margin_df=daruc_margin,
+        summary_dict=daruc_summary, analyze_z_fn=analyze_Z,
+    )
+
+    # Save DAM results (DAM uses "p" not "p0")
+    dam_results["u"].to_csv(daruc_dir / "dam_commitment_u.csv")
+    dam_results["p"].to_csv(daruc_dir / "dam_dispatch_p0.csv")
+
+    # Line flow analysis (use unfiltered data for full line coverage)
+    data_full = daruc_outputs.get("data_full") or data
+    if args.enforce_lines:
+        print("\nLine flow analysis:")
+        save_line_flows_if_enabled(True, data_full, dam_results["p"].values, None, "DAM", daruc_dir, "dam_line_flows")
+        save_line_flows_if_enabled(True, data_full, daruc_results["p0"].values, daruc_margin, "DARUC", daruc_dir, "daruc_line_flows")
 
     print(f"\nDARUC objective: {daruc_results['obj']:,.2f}")
     print(f"DAM objective:   {dam_results['obj']:,.2f}")
@@ -542,28 +426,10 @@ def main():
     aruc_results = aruc_outputs["results"]
 
     # Save ARUC outputs
-    aruc_results["u"].to_csv(aruc_dir / "commitment_u.csv")
-    aruc_results["p0"].to_csv(aruc_dir / "dispatch_p0.csv")
-    aruc_results["Z"].to_csv(aruc_dir / "Z_coefficients.csv")
-    np.save(aruc_dir / "Sigma.npy", aruc_outputs["Sigma"])
-    np.save(aruc_dir / "rho.npy", np.atleast_1d(aruc_outputs["rho"]))
-    analyze_Z(aruc_results["Z"], data, aruc_dir, rho=aruc_outputs["rho"])
     aruc_margin = extract_line_margins(
         aruc_outputs["vars"], data, aruc_outputs["rho"],
         aruc_outputs.get("rho_lines_frac"), aruc_outputs["time_varying"],
     )
-    if aruc_margin is not None:
-        aruc_margin.to_csv(aruc_dir / "line_margin.csv")
-
-    if args.enforce_lines:
-        aruc_margin_full = None
-        if aruc_margin is not None:
-            aruc_margin_full = aruc_margin.reindex(data_full.line_ids, fill_value=0.0)
-        aruc_flow_dir = aruc_dir / "aruc_line_flows"
-        aruc_flow_dir.mkdir(exist_ok=True)
-        save_line_flow_analysis(data_full, aruc_results["p0"].values, aruc_margin_full, "ARUC", aruc_flow_dir)
-
-    # Save ARUC summary
     aruc_summary = {
         "objective": aruc_results["obj"],
         "hours": args.hours,
@@ -574,8 +440,11 @@ def main():
         "enforce_lines": args.enforce_lines,
         "start_time": str(start_time),
     }
-    with open(aruc_dir / "summary.json", "w") as f:
-        json.dump(aruc_summary, f, indent=2)
+    save_robust_outputs(
+        aruc_results, data, aruc_dir, aruc_outputs["Sigma"], aruc_outputs["rho"],
+        margin_df=aruc_margin, summary_dict=aruc_summary, analyze_z_fn=analyze_Z,
+    )
+    save_line_flows_if_enabled(args.enforce_lines, data_full, aruc_results["p0"].values, aruc_margin, "ARUC", aruc_dir, "aruc_line_flows")
 
     print(f"\nARUC-LDR objective: {aruc_results['obj']:,.2f}")
 
@@ -618,14 +487,6 @@ def main():
             )
         else:
             reserve_results = extract_dam_solution(data, reserve_model, reserve_vars)
-            reserve_results["u"].to_csv(reserve_dir / "commitment_u.csv")
-            reserve_results["p"].to_csv(reserve_dir / "dispatch_p0.csv")
-
-            if args.enforce_lines:
-                reserve_flow_dir = reserve_dir / "reserve_line_flows"
-                reserve_flow_dir.mkdir(exist_ok=True)
-                save_line_flow_analysis(data_full, reserve_results["p"].values, None, "DAM+Reserve", reserve_flow_dir)
-
             reserve_summary = {
                 "objective": reserve_results["obj"],
                 "hours": args.hours,
@@ -635,9 +496,8 @@ def main():
                 "enforce_lines": args.enforce_lines,
                 "start_time": str(start_time),
             }
-            with open(reserve_dir / "summary.json", "w") as f:
-                json.dump(reserve_summary, f, indent=2)
-            np.save(reserve_dir / "reserve_requirement.npy", R)
+            save_dam_outputs(reserve_results, reserve_dir, summary_dict=reserve_summary, reserve_R=R)
+            save_line_flows_if_enabled(args.enforce_lines, data_full, reserve_results["p"].values, None, "DAM+Reserve", reserve_dir, "reserve_line_flows")
 
             print(f"\nDAM+Reserve objective: {reserve_results['obj']:,.2f}")
 
@@ -764,6 +624,23 @@ def main():
     u_daruc = _round_commitment(daruc_loaded["u"][d1_common])
     diff_count = (u_aruc.values != u_daruc.values).sum()
     print(f"\n  Commitment differences (day 1): {diff_count} (gen,hour) entries differ")
+
+    # Top-level summary.json (uniform interface for run_sensitivity_suite.py)
+    metrics_aruc = compute_day1_metrics(data, aruc_results)
+    metrics_daruc = compute_day1_metrics(data, daruc_results)
+    top_summary = {
+        "aruc_cost": cost_aruc,
+        "daruc_cost": cost_daruc,
+        "dam_cost": cost_dam,
+        "reserve_cost": cost_reserve,
+        "aruc_metrics": metrics_aruc,
+        "daruc_metrics": metrics_daruc,
+        "dam_metrics": compute_day1_metrics(data, dam_results) if dam_loaded is not None else None,
+        "reserve_metrics": compute_day1_metrics(data, reserve_results) if reserve_results is not None else None,
+    }
+    with open(out_dir / "summary.json", "w") as f:
+        json.dump(top_summary, f, indent=2)
+
     print(f"\n  All outputs: {out_dir}/")
     print("=" * 70)
 

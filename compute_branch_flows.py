@@ -84,7 +84,7 @@ def report_congestion(flow_df: pd.DataFrame, data: DAMData, top_n: int = 10) -> 
 
 def compute_line_loading_mask(
     data: DAMData, p: np.ndarray, threshold: float = 0.5
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Per-hour line monitoring mask based on dispatch loading.
 
     Parameters
@@ -103,18 +103,20 @@ def compute_line_loading_mask(
         True where line *l* should be enforced at period *t*.
     loading : np.ndarray of float, shape (L, T)
         Per-hour loading fractions for diagnostics.
+    flow : np.ndarray of float, shape (L, T)
+        Signed flow values (MW) for determining binding direction.
     """
     flow = compute_branch_flows(data, p).values  # (L, T)
     Fmax = data.Fmax[:, None]  # (L, 1) for broadcasting
     loading = np.where(Fmax > 0, np.abs(flow) / Fmax, 0.0)  # (L, T)
     mask = loading >= threshold  # (L, T) bool
-    return mask, loading
+    return mask, loading, flow
 
 
 def filter_monitored_lines(
     data: DAMData, p: np.ndarray, threshold: float = 0.8
-) -> tuple[DAMData, np.ndarray | None]:
-    """Return filtered data and per-hour monitoring mask.
+) -> tuple[DAMData, np.ndarray | None, np.ndarray | None]:
+    """Return filtered data, per-hour monitoring mask, and flow direction.
 
     Two-stage filter:
     1. **Static pre-filter** — drop lines never above *threshold* at any
@@ -138,8 +140,12 @@ def filter_monitored_lines(
         Copy with rows dropped for lines never above *threshold*.
     line_mask : np.ndarray of bool, shape (L_filtered, T)
         Per-hour mask over the *filtered* line indices.
+    flow_direction : np.ndarray of float, shape (L_filtered, T)
+        Signed screening flow (MW) for the kept lines.  Used by
+        ``build_aruc_ldr_model`` to add only the binding-direction
+        line constraint.
     """
-    mask_full, loading_full = compute_line_loading_mask(data, p, threshold)
+    mask_full, loading_full, flow_full = compute_line_loading_mask(data, p, threshold)
 
     # Stage 1: static — keep lines that are above threshold at ANY hour
     ever_active = mask_full.any(axis=1)  # (L,) bool
@@ -149,6 +155,7 @@ def filter_monitored_lines(
 
     # Per-hour stats for kept lines
     line_mask = mask_full[ever_active, :]  # (n_kept, T)
+    flow_direction = flow_full[ever_active, :]  # (n_kept, T)
     n_lt_pairs = int(line_mask.sum())
     n_lt_total = n_kept * mask_full.shape[1]
 
@@ -173,12 +180,12 @@ def filter_monitored_lines(
         "Fmax": data.Fmax[ever_active],
         "line_ids": filtered_line_ids,
     })
-    return filtered_data, line_mask
+    return filtered_data, line_mask, flow_direction
 
 
 def find_line_violations(
     data_full: DAMData, p0_arr: np.ndarray, viol_tol: float = 1.0
-) -> list[tuple[int, int, float]]:
+) -> list[tuple[int, int, float, float]]:
     """Check all lines for flow violations.
 
     Parameters
@@ -192,7 +199,9 @@ def find_line_violations(
 
     Returns
     -------
-    list of (line_idx, period, excess_MW) tuples.
+    list of (line_idx, period, excess_MW, signed_flow_MW) tuples.
+        signed_flow_MW indicates the flow direction (positive or negative)
+        so callers can add only the binding-direction constraint.
     """
     flow = compute_branch_flows(data_full, p0_arr).values  # (L_full, T)
     Fmax = data_full.Fmax
@@ -201,7 +210,7 @@ def find_line_violations(
         for t in range(flow.shape[1]):
             excess = abs(flow[l, t]) - Fmax[l]
             if excess > viol_tol:
-                violations.append((l, t, excess))
+                violations.append((l, t, excess, flow[l, t]))
     return violations
 
 
@@ -288,15 +297,15 @@ def iterative_line_resolve(
             return iteration - 1
 
         # Filter already-added pairs
-        new_viols = [(l, t, ex) for l, t, ex in violations if (l, t) not in added_pairs]
+        new_viols = [(l, t, ex, fv) for l, t, ex, fv in violations if (l, t) not in added_pairs]
         if not new_viols:
             print(f"  [Line iter {iteration}] {len(violations)} violations but all "
                   f"already constrained — cannot resolve further.")
             return iteration
 
         print(f"  [Line iter {iteration}] {len(new_viols)} new violated (line,period) pairs:")
-        for l, t, ex in sorted(new_viols, key=lambda x: -x[2])[:10]:
-            print(f"    {data_full.line_ids[l]:<15} t={t:2d}  excess={ex:.1f} MW")
+        for l, t, ex, fv in sorted(new_viols, key=lambda x: -x[2])[:10]:
+            print(f"    {data_full.line_ids[l]:<15} t={t:2d}  excess={ex:.1f} MW  flow={fv:+.1f}")
         if len(new_viols) > 10:
             print(f"    ... and {len(new_viols) - 10} more")
 
@@ -304,9 +313,13 @@ def iterative_line_resolve(
         Fmax_full = data_full.Fmax
 
         n_added = 0
-        for l_full, t, _ex in new_viols:
+        for l_full, t, _ex, flow_val in new_viols:
             added_pairs.add((l_full, t))
             tag = f"l{l_full}_t{t}"
+
+            # Binding direction: violations always have |flow| > Fmax,
+            # so we trust the sign to determine which side binds.
+            positive_binding = (flow_val >= 0)
 
             # Build flow_nom expression for this (l_full, t) using full PTDF
             flow_nom = gp.LinExpr()
@@ -358,15 +371,19 @@ def iterative_line_resolve(
                     name=f"soc_line_add_{tag}",
                 )
 
-                # Robust flow limits
-                model.addConstr(flow_nom + rho_lines_t * z_var <= fmax_l,
-                                name=f"line_max_add_{tag}")
-                model.addConstr(-flow_nom + rho_lines_t * z_var <= fmax_l,
-                                name=f"line_min_add_{tag}")
+                # Robust flow limit — binding direction only
+                if positive_binding:
+                    model.addConstr(flow_nom + rho_lines_t * z_var <= fmax_l,
+                                    name=f"line_max_add_{tag}")
+                else:
+                    model.addConstr(-flow_nom + rho_lines_t * z_var <= fmax_l,
+                                    name=f"line_min_add_{tag}")
             else:
-                # Nominal flow limits
-                model.addConstr(flow_nom <= fmax_l, name=f"line_max_add_{tag}")
-                model.addConstr(flow_nom >= -fmax_l, name=f"line_min_add_{tag}")
+                # Nominal flow limit — binding direction only
+                if positive_binding:
+                    model.addConstr(flow_nom <= fmax_l, name=f"line_max_add_{tag}")
+                else:
+                    model.addConstr(flow_nom >= -fmax_l, name=f"line_min_add_{tag}")
 
             n_added += 1
 

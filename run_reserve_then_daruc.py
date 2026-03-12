@@ -184,10 +184,11 @@ def run_reserve_then_daruc(
     # ==================================================================
     data_full = None
     line_mask = None
+    flow_direction = None
     if monitored_lines_threshold is not None:
         from compute_branch_flows import filter_monitored_lines
         data_full = data
-        data, line_mask = filter_monitored_lines(
+        data, line_mask, flow_direction = filter_monitored_lines(
             data, reserve_results["p"].values, monitored_lines_threshold
         )
 
@@ -226,6 +227,7 @@ def run_reserve_then_daruc(
         threads=threads,
         bar_qcp_conv_tol=bar_qcp_conv_tol,
         line_mask=line_mask,
+        flow_direction=flow_direction,
     )
 
     # Warm start from reserve solution

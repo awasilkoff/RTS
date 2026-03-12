@@ -122,9 +122,9 @@ def plot_loading_heatmaps(
         ax.set_xlabel("Hour")
 
     ax1.set_ylabel("Line")
-    fig.colorbar(im, ax=[ax1, ax2], label="Worst-Case Loading %", shrink=0.8)
-    fig.suptitle("Worst-Case Line Loading: DAM+Reserve vs DARUC (Day 1)", fontsize=13)
-    fig.tight_layout(rect=[0, 0, 0.92, 0.95])
+    fig.suptitle("Worst-Case Line Loading: DAM+Reserve vs DARUC (Day 1)", fontsize=13, y=1.02)
+    fig.tight_layout()
+    fig.colorbar(im, ax=[ax1, ax2], label="Worst-Case Loading %", shrink=0.8, pad=0.02)
 
     for fmt in ("png", "pdf"):
         fig.savefig(out_dir / f"fig_loading_heatmap.{fmt}", dpi=200, bbox_inches="tight")
@@ -175,10 +175,11 @@ def plot_binding_diff(
     ax.set_ylabel("Line")
     ax.set_title("Binding Status: DAM+Reserve vs DARUC (Day 1)", fontsize=12)
 
-    # Legend
+    # Legend outside the plot area
     from matplotlib.patches import Patch
     legend_elements = [Patch(facecolor=c, edgecolor="gray", label=l) for c, l in zip(colors, labels)]
-    ax.legend(handles=legend_elements, loc="upper right", fontsize=8, ncol=2)
+    ax.legend(handles=legend_elements, loc="upper center", fontsize=8, ncol=4,
+              bbox_to_anchor=(0.5, -0.15))
 
     fig.tight_layout()
     for fmt in ("png", "pdf"):

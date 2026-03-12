@@ -2,13 +2,15 @@
 """
 Line flow comparison visualizations: DAM+Reserve vs DARUC.
 
-Generates three charts:
+Generates four charts:
   1. Side-by-side worst-case loading heatmaps (lines x hours)
   2. Binding status diff heatmap (both / only-DAM / only-DARUC / neither)
   3. Stacked bar decomposition: nominal flow + robust margin at peak hour
+  4. Network map at a specific hour showing flows on the RTS-GMLC topology
 
 Usage:
     python plot_line_flows.py --case-dir sensitivity_suite/rho99_48h_m07d15/reserve_then_daruc
+    python plot_line_flows.py --case-dir sensitivity_suite/rho99_48h_m07d15/reserve_then_daruc --map-hour 7
 """
 
 from __future__ import annotations
@@ -266,6 +268,171 @@ def plot_flow_decomposition(
 
 
 # ---------------------------------------------------------------------------
+# Chart 4: Network map at a specific hour
+# ---------------------------------------------------------------------------
+
+_RTS_DATA = Path(__file__).parent / "RTS_Data" / "SourceData"
+
+
+def load_network_topology(
+    data_dir: Path = _RTS_DATA,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Load bus (with lat/lng) and branch (with from/to bus) data."""
+    bus = pd.read_csv(data_dir / "bus.csv")
+    bus = bus.set_index("Bus ID")
+    branch = pd.read_csv(data_dir / "branch.csv")
+    branch = branch.set_index("UID")
+    return bus, branch
+
+
+def _draw_network_panel(
+    ax,
+    bus: pd.DataFrame,
+    branch: pd.DataFrame,
+    flow_df: pd.DataFrame,
+    hour_ts: pd.Timestamp,
+    title: str,
+    show_decomposition: bool = False,
+):
+    """Draw one network panel for a specific hour.
+
+    flow_df: the full (unfiltered) line_flow_analysis for this case at this hour.
+    show_decomposition: if True, draw two-tone edges (nominal + margin).
+    """
+    hour_data = flow_df[flow_df["period"] == hour_ts].set_index("line")
+
+    # Draw all branches as light gray background
+    for uid, row in branch.iterrows():
+        fb, tb = row["From Bus"], row["To Bus"]
+        if fb not in bus.index or tb not in bus.index:
+            continue
+        x = [bus.loc[fb, "lng"], bus.loc[tb, "lng"]]
+        y = [bus.loc[fb, "lat"], bus.loc[tb, "lat"]]
+        ax.plot(x, y, color="#d9d9d9", linewidth=0.8, zorder=1)
+
+    # Draw lines with flow data, colored by loading
+    cmap = plt.cm.RdYlGn_r
+    norm = mcolors.Normalize(vmin=0, vmax=100)
+
+    for uid in hour_data.index:
+        if uid not in branch.index:
+            continue
+        row = hour_data.loc[uid]
+        br = branch.loc[uid]
+        fb, tb = br["From Bus"], br["To Bus"]
+        if fb not in bus.index or tb not in bus.index:
+            continue
+
+        x = np.array([bus.loc[fb, "lng"], bus.loc[tb, "lng"]])
+        y = np.array([bus.loc[fb, "lat"], bus.loc[tb, "lat"]])
+        loading = row["loading_worst_case_pct"]
+        is_binding = bool(row["binding"])
+        lw = 1.5 + 3.0 * min(loading, 100) / 100
+
+        if show_decomposition and row["margin_rho_norm"] > 0.1:
+            # Two-tone: nominal portion then margin portion
+            fmax = row["Fmax"]
+            nom_frac = min(abs(row["flow_nominal"]) / fmax, 1.0) if fmax > 0 else 0
+            # Draw nominal portion (blue)
+            xm = x[0] + nom_frac * (x[1] - x[0])
+            ym = y[0] + nom_frac * (y[1] - y[0])
+            ax.plot([x[0], xm], [y[0], ym], color="#4393c3", linewidth=lw, zorder=3, solid_capstyle="butt")
+            # Draw margin portion (orange)
+            ax.plot([xm, x[1]], [ym, y[1]], color="#f4a582", linewidth=lw, zorder=3, solid_capstyle="butt")
+        else:
+            color = cmap(norm(min(loading, 100)))
+            ax.plot(x, y, color=color, linewidth=lw, zorder=3)
+
+        # Binding highlight: red outline
+        if is_binding:
+            ax.plot(x, y, color="red", linewidth=lw + 1.5, zorder=2, alpha=0.4)
+
+        # Label binding lines
+        if is_binding:
+            mx, my = 0.5 * (x[0] + x[1]), 0.5 * (y[0] + y[1])
+            ax.annotate(
+                uid, (mx, my), fontsize=6, fontweight="bold",
+                color="red", ha="center", va="bottom",
+                bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.7),
+                zorder=5,
+            )
+
+    # Draw buses
+    ax.scatter(
+        bus["lng"], bus["lat"], s=12, c="#333333", zorder=4, edgecolors="white", linewidths=0.3,
+    )
+
+    ax.set_title(title, fontsize=11, fontweight="bold")
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    ax.set_aspect("equal")
+
+
+def plot_network_map(
+    dam_raw: pd.DataFrame,
+    daruc_raw: pd.DataFrame,
+    hour: int,
+    out_dir: Path,
+):
+    """Two-panel network map at the given hour (0-23).
+
+    Left: DAM+Reserve (single-color edges by loading).
+    Right: DARUC (two-tone edges: nominal blue + margin orange for lines with margin).
+    """
+    bus, branch = load_network_topology()
+
+    # Find the timestamp for this hour
+    all_periods = sorted(dam_raw["period"].unique())
+    hour_ts = None
+    for t in all_periods:
+        if t.hour == hour:
+            hour_ts = t
+            break
+    if hour_ts is None:
+        print(f"  WARNING: hour {hour} not found in data, skipping network map")
+        return
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8))
+
+    _draw_network_panel(
+        ax1, bus, branch, dam_raw, hour_ts,
+        f"DAM + Reserve (hour {hour:02d}:00)",
+        show_decomposition=False,
+    )
+    _draw_network_panel(
+        ax2, bus, branch, daruc_raw, hour_ts,
+        f"DARUC (hour {hour:02d}:00)",
+        show_decomposition=True,
+    )
+
+    # Legend for DARUC decomposition
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Line2D([0], [0], color="#4393c3", lw=3, label="Nominal flow"),
+        Line2D([0], [0], color="#f4a582", lw=3, label="Robust margin"),
+        Line2D([0], [0], color="red", lw=4, alpha=0.4, label="Binding"),
+        Line2D([0], [0], color="#d9d9d9", lw=1, label="Unmonitored"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="#333", markersize=5, label="Bus"),
+    ]
+    fig.legend(
+        handles=legend_elements, loc="lower center", ncol=5, fontsize=9,
+        bbox_to_anchor=(0.5, -0.02),
+    )
+
+    fig.suptitle(
+        f"Network Line Flows: DAM+Reserve vs DARUC — Hour {hour:02d}:00",
+        fontsize=13,
+    )
+    fig.tight_layout(rect=[0, 0.04, 1, 0.96])
+
+    for fmt in ("png", "pdf"):
+        fig.savefig(out_dir / f"fig_network_map_h{hour:02d}.{fmt}", dpi=200, bbox_inches="tight")
+    print(f"  Saved fig_network_map_h{hour:02d}.png/pdf")
+    plt.close(fig)
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -278,6 +445,10 @@ def main():
     parser.add_argument(
         "--out-dir", type=str, default=None,
         help="Output directory for figures (default: same as case-dir)",
+    )
+    parser.add_argument(
+        "--map-hour", type=int, default=7,
+        help="Hour (0-23) for network map snapshot (default: 7)",
     )
     args = parser.parse_args()
 
@@ -301,6 +472,9 @@ def main():
 
     print("Chart 3: Flow decomposition...")
     plot_flow_decomposition(dam, daruc, binding_lines, out_dir)
+
+    print(f"\nChart 4: Network map (hour {args.map_hour})...")
+    plot_network_map(dam_raw, daruc_raw, args.map_hour, out_dir)
 
     print(f"\nDone. Figures saved to {out_dir}/")
 

@@ -1,0 +1,36 @@
+{
+  "reserve_cost": {
+    "no_load": 334990.94688863994,
+    "startup": 134147.66641000003,
+    "shutdown": 0.0,
+    "energy": 2185649.1794642983,
+    "slack": 1.6370904631912708e-07,
+    "commitment": 469138.61329864,
+    "total": 2654787.7927631023
+  },
+  "daruc_cost": {
+    "no_load": 373632.68906808,
+    "startup": 142977.96931000001,
+    "shutdown": 0.0,
+    "energy": 2420974.4990118155,
+    "slack": 0.0,
+    "commitment": 516610.65837808,
+    "total": 2937585.1573898955
+  },
+  "unit_hours": {
+    "reserve": 739.0,
+    "daruc": 827.0,
+    "extra": 88.0
+  },
+  "wind_curtailment_mwh": {
+    "reserve": 1511.339978082744,
+    "daruc": 7260.567187495171
+  },
+  "extra_generators": 17,
+  "extra_unit_hours_full_horizon": 88,
+  "reserve_requirement": {
+    "min": 237.46748826360832,
+    "max": 933.3886454570586,
+    "mean": 508.73248813202474
+  }
+}

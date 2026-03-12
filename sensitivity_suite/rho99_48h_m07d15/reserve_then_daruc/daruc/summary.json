@@ -1,0 +1,10 @@
+{
+  "daruc_objective": 541893.2635221528,
+  "reserve_objective": 5366849.181769711,
+  "hours": 48,
+  "enforce_lines": true,
+  "robust_ramp": true,
+  "incremental_obj": true,
+  "dispatch_cost_scale": 0.1,
+  "start_time": "2020-07-15 00:00:00"
+}

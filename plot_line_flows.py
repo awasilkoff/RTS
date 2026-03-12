@@ -594,6 +594,204 @@ def plot_network_maps(
 
 
 # ---------------------------------------------------------------------------
+# Chart 5: Z matrix for a single hour (DARUC only)
+# ---------------------------------------------------------------------------
+
+# Wind generator names matching the 4 uncertainty sources (k=0..3)
+_WIND_GEN_NAMES = ["309_WIND_1", "317_WIND_1", "303_WIND_1", "122_WIND_1"]
+
+
+def load_z_matrix(case_dir: Path) -> tuple[np.ndarray, list[str], list[str], list[int]]:
+    """Load Z_coefficients.csv and return (Z_3d, gen_ids, timestamps, k_vals).
+
+    Returns Z as shape (n_gens, n_periods, n_k).
+    """
+    z_path = case_dir / "daruc" / "Z_coefficients.csv"
+    if not z_path.exists():
+        raise FileNotFoundError(f"Z_coefficients.csv not found at {z_path}")
+
+    # Row 0 = timestamps, Row 1 = k indices, Rows 2+ = gen data
+    raw = pd.read_csv(z_path, header=None)
+
+    timestamps_row = raw.iloc[0, 1:].values.astype(str)
+    k_row = raw.iloc[1, 1:].values.astype(int)
+    gen_ids = raw.iloc[2:, 0].values.astype(str).tolist()
+    data = raw.iloc[2:, 1:].values.astype(float)
+
+    # Unique timestamps and k values
+    unique_times = list(dict.fromkeys(timestamps_row))  # preserves order
+    unique_k = sorted(set(k_row))
+    n_k = len(unique_k)
+    n_t = len(unique_times)
+    n_gen = len(gen_ids)
+
+    # Reshape to (n_gen, n_t, n_k)
+    Z = data.reshape(n_gen, n_t, n_k)
+
+    return Z, gen_ids, unique_times, unique_k
+
+
+def _get_hour_z(Z, gen_ids, timestamps, hour):
+    """Extract Z[:, t, :] for the given hour. Returns (Z_hour, active_mask, hour_label)."""
+    hour_str = f"{hour:02d}:00:00"
+    t_idx = None
+    for i, ts in enumerate(timestamps):
+        if hour_str in ts:
+            t_idx = i
+            break
+    if t_idx is None:
+        return None, None, None
+
+    Z_hour = Z[:, t_idx, :]  # (n_gen, n_k)
+    return Z_hour, timestamps[t_idx]
+
+
+def _filter_active_gens(Z_hour, gen_ids, threshold=0.001):
+    """Return indices and names of generators with max|Z| > threshold."""
+    max_abs = np.max(np.abs(Z_hour), axis=1)
+    mask = max_abs > threshold
+    active_idx = np.where(mask)[0]
+    active_names = [gen_ids[i] for i in active_idx]
+    return active_idx, active_names
+
+
+def plot_z_matrix(case_dir: Path, hour: int, out_dir: Path, threshold: float = 0.001):
+    """Generate multiple Z matrix visualizations for a single hour."""
+    from matplotlib.lines import Line2D
+
+    Z, gen_ids, timestamps, k_vals = load_z_matrix(case_dir)
+    result = _get_hour_z(Z, gen_ids, timestamps, hour)
+    if result[0] is None:
+        print(f"  WARNING: hour {hour} not found in Z data, skipping")
+        return
+
+    Z_hour, hour_label = result
+    active_idx, active_names = _filter_active_gens(Z_hour, gen_ids, threshold)
+
+    if len(active_idx) == 0:
+        print(f"  No generators with |Z| > {threshold} at hour {hour}")
+        return
+
+    Z_active = Z_hour[active_idx]  # (n_active, n_k)
+    n_active = len(active_names)
+    n_k = len(k_vals)
+
+    # Wind source labels
+    k_labels = [_WIND_GEN_NAMES[k] if k < len(_WIND_GEN_NAMES) else f"k={k}"
+                for k in k_vals]
+
+    # Sort: wind gens first, then by row norm descending
+    is_wind = np.array([1 if "WIND" in n else 0 for n in active_names])
+    row_norms = np.linalg.norm(Z_active, axis=1)
+    sort_order = np.lexsort((-row_norms, -is_wind))
+    Z_active = Z_active[sort_order]
+    active_names = [active_names[i] for i in sort_order]
+    is_wind = is_wind[sort_order]
+    row_norms = row_norms[sort_order]
+
+    # Color-code gen labels: green for wind, black for thermal
+    label_colors = ["#2ca02c" if w else "black" for w in is_wind]
+
+    print(f"  {n_active} active generators (|Z| > {threshold}) at hour {hour}")
+
+    # --- Option A: Annotated heatmap (diverging) ---
+    fig_a, ax = plt.subplots(figsize=(max(5, n_k * 1.5 + 2), max(4, n_active * 0.35 + 1.5)))
+    vabs = np.max(np.abs(Z_active))
+    im = ax.imshow(Z_active, aspect="auto", cmap="RdBu_r", vmin=-vabs, vmax=vabs,
+                   interpolation="nearest")
+    # Annotate cells with values
+    for i in range(n_active):
+        for j in range(n_k):
+            val = Z_active[i, j]
+            if abs(val) > threshold:
+                ax.text(j, i, f"{val:.3f}", ha="center", va="center",
+                        fontsize=6, color="white" if abs(val) > 0.5 * vabs else "black")
+
+    ax.set_xticks(range(n_k))
+    ax.set_xticklabels(k_labels, fontsize=8, rotation=30, ha="right")
+    ax.set_yticks(range(n_active))
+    ax.set_yticklabels(active_names, fontsize=7)
+    for i, c in enumerate(label_colors):
+        ax.get_yticklabels()[i].set_color(c)
+    ax.set_xlabel("Uncertainty Source (Wind Generator)")
+    fig_a.colorbar(im, ax=ax, label="Z coefficient", shrink=0.8)
+    ax.set_title(f"Option A: Z Matrix Heatmap — DARUC Hour {hour:02d}\n"
+                 f"({n_active} gens with |Z| > {threshold})", fontsize=10)
+    fig_a.tight_layout()
+    for fmt in ("png", "pdf"):
+        fig_a.savefig(out_dir / f"fig_z_A_heatmap_h{hour:02d}.{fmt}",
+                      dpi=200, bbox_inches="tight")
+    print(f"  Saved fig_z_A_heatmap_h{hour:02d}.png/pdf")
+    plt.close(fig_a)
+
+    # --- Option B: Grouped horizontal bars (one color per wind source) ---
+    fig_b, ax = plt.subplots(figsize=(10, max(4, n_active * 0.4 + 1.5)))
+    bar_height = 0.8 / n_k
+    colors_k = ["#4393c3", "#e08060", "#66c2a5", "#984ea3"]
+    for j in range(n_k):
+        offsets = np.arange(n_active) + (j - n_k / 2 + 0.5) * bar_height
+        ax.barh(offsets, Z_active[:, j], height=bar_height,
+                color=colors_k[j % len(colors_k)], label=k_labels[j],
+                edgecolor="white", linewidth=0.3)
+
+    ax.axvline(0, color="black", linewidth=0.5)
+    ax.set_yticks(range(n_active))
+    ax.set_yticklabels(active_names, fontsize=7)
+    for i, c in enumerate(label_colors):
+        ax.get_yticklabels()[i].set_color(c)
+    ax.set_xlabel("Z coefficient value")
+    ax.legend(fontsize=8, loc="lower right", title="Wind Source")
+    ax.set_title(f"Option B: Z Coefficients by Wind Source — DARUC Hour {hour:02d}\n"
+                 f"({n_active} gens with |Z| > {threshold})", fontsize=10)
+    ax.invert_yaxis()
+    fig_b.tight_layout()
+    for fmt in ("png", "pdf"):
+        fig_b.savefig(out_dir / f"fig_z_B_bars_h{hour:02d}.{fmt}",
+                      dpi=200, bbox_inches="tight")
+    print(f"  Saved fig_z_B_bars_h{hour:02d}.png/pdf")
+    plt.close(fig_b)
+
+    # --- Option C: Row-norm bar + stacked contribution ---
+    fig_c, (cx1, cx2) = plt.subplots(1, 2, figsize=(14, max(4, n_active * 0.35 + 1.5)),
+                                      gridspec_kw={"width_ratios": [1, 2]}, sharey=True)
+
+    # Left: total row norm
+    cx1.barh(range(n_active), row_norms[sort_order] if False else
+             np.linalg.norm(Z_active, axis=1),
+             color=["#2ca02c" if w else "#4393c3" for w in is_wind],
+             edgecolor="white", linewidth=0.3)
+    cx1.set_xlabel("||Z row||")
+    cx1.set_yticks(range(n_active))
+    cx1.set_yticklabels(active_names, fontsize=7)
+    for i, c in enumerate(label_colors):
+        cx1.get_yticklabels()[i].set_color(c)
+    cx1.set_title("Row Norm", fontsize=9)
+    cx1.invert_yaxis()
+
+    # Right: stacked absolute contributions per wind source
+    left = np.zeros(n_active)
+    for j in range(n_k):
+        abs_vals = np.abs(Z_active[:, j])
+        cx2.barh(range(n_active), abs_vals, left=left, height=0.7,
+                 color=colors_k[j % len(colors_k)], label=k_labels[j],
+                 edgecolor="white", linewidth=0.3)
+        left += abs_vals
+
+    cx2.set_xlabel("|Z| contribution")
+    cx2.legend(fontsize=7, loc="lower right", title="Wind Source", title_fontsize=7)
+    cx2.set_title("Stacked |Z| by Source", fontsize=9)
+
+    fig_c.suptitle(f"Option C: Z Norm + Source Decomposition — DARUC Hour {hour:02d}\n"
+                   f"({n_active} gens with |Z| > {threshold})", fontsize=10)
+    fig_c.tight_layout()
+    for fmt in ("png", "pdf"):
+        fig_c.savefig(out_dir / f"fig_z_C_norm_stack_h{hour:02d}.{fmt}",
+                      dpi=200, bbox_inches="tight")
+    print(f"  Saved fig_z_C_norm_stack_h{hour:02d}.png/pdf")
+    plt.close(fig_c)
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -610,6 +808,10 @@ def main():
     parser.add_argument(
         "--map-hour", type=int, default=7,
         help="Hour (0-23) for network map snapshot (default: 7)",
+    )
+    parser.add_argument(
+        "--z-threshold", type=float, default=0.001,
+        help="Min |Z| to include a generator in Z matrix plots (default: 0.001)",
     )
     args = parser.parse_args()
 
@@ -636,6 +838,12 @@ def main():
 
     print(f"\nChart 4: Network maps (hour {args.map_hour}) — 3 options...")
     plot_network_maps(dam_raw, daruc_raw, args.map_hour, out_dir)
+
+    print(f"\nChart 5: Z matrix (hour {args.map_hour}) — 3 options...")
+    try:
+        plot_z_matrix(case_dir, args.map_hour, out_dir, threshold=args.z_threshold)
+    except FileNotFoundError as e:
+        print(f"  Skipping Z matrix: {e}")
 
     print(f"\nDone. Figures saved to {out_dir}/")
 

@@ -88,6 +88,7 @@ def build_aruc_ldr_model(
     threads: Optional[int] = None,
     bar_qcp_conv_tol: Optional[float] = None,
     line_mask: Optional[np.ndarray] = None,
+    flow_direction: Optional[np.ndarray] = None,
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Adaptive robust UC with linear decision rules:
@@ -733,6 +734,28 @@ def build_aruc_ldr_model(
 
     if not enforce_lines:
         print("  [ARUC] Line flow constraints DISABLED (copper-plate mode)")
+
+    # Helper: determine which flow direction(s) to constrain.
+    # When flow_direction is provided, use screening flow sign to add only
+    # the binding direction.  For near-zero flows (loading < 10% of Fmax),
+    # add both directions as a safety fallback.
+    _DIRECTION_DEADBAND = 0.1  # 10% of Fmax loading threshold
+    def _binding_dirs(l, t):
+        """Return list of directions to constrain: 'pos', 'neg', or both."""
+        if flow_direction is None:
+            return ("pos", "neg")
+        fmax_l = Fmax[l]
+        if fmax_l <= 0:
+            return ("pos", "neg")
+        screen_flow = flow_direction[l, t]
+        if abs(screen_flow) / fmax_l < _DIRECTION_DEADBAND:
+            return ("pos", "neg")  # ambiguous direction — keep both
+        if screen_flow >= 0:
+            return ("pos",)
+        return ("neg",)
+
+    n_single_dir = 0  # count of (l,t) pairs with single-direction constraint
+
     if enforce_lines:
         for l in range(L):
             for t in range(T):
@@ -747,16 +770,22 @@ def build_aruc_ldr_model(
                     gen_sum = gp.quicksum(p0[i, t] for i in gens_at_bus[n])
                     flow_nom += PTDF[l, n] * (gen_sum - float(d[n, t]))
 
+                dirs = _binding_dirs(l, t)
+                if len(dirs) == 1:
+                    n_single_dir += 1
+
                 if not robust_mask[t]:
                     # Nominal line flow constraints (like DAM)
-                    m.addConstr(
-                        flow_nom <= Fmax[l],
-                        name=f"line_max_nom_l{l}_t{t}",
-                    )
-                    m.addConstr(
-                        flow_nom >= -Fmax[l],
-                        name=f"line_min_nom_l{l}_t{t}",
-                    )
+                    if "pos" in dirs:
+                        m.addConstr(
+                            flow_nom <= Fmax[l],
+                            name=f"line_max_nom_l{l}_t{t}",
+                        )
+                    if "neg" in dirs:
+                        m.addConstr(
+                            flow_nom >= -Fmax[l],
+                            name=f"line_min_nom_l{l}_t{t}",
+                        )
                     continue
 
                 # --- Robust period ---
@@ -795,15 +824,22 @@ def build_aruc_ldr_model(
                     name=f"soc_line_l{l}_t{t}",
                 )
 
-                # 5) Robust line limits
-                m.addConstr(
-                    flow_nom + rho_lines_t * z_line[l, t] <= Fmax[l],
-                    name=f"line_max_rob_l{l}_t{t}",
-                )
-                m.addConstr(
-                    -flow_nom + rho_lines_t * z_line[l, t] <= Fmax[l],
-                    name=f"line_min_rob_l{l}_t{t}",
-                )
+                # 5) Robust line limits — binding direction only
+                if "pos" in dirs:
+                    m.addConstr(
+                        flow_nom + rho_lines_t * z_line[l, t] <= Fmax[l],
+                        name=f"line_max_rob_l{l}_t{t}",
+                    )
+                if "neg" in dirs:
+                    m.addConstr(
+                        -flow_nom + rho_lines_t * z_line[l, t] <= Fmax[l],
+                        name=f"line_min_rob_l{l}_t{t}",
+                    )
+
+        if flow_direction is not None and n_single_dir > 0:
+            n_active = sum(1 for l in range(L) for t in range(T) if _line_active(l, t))
+            print(f"  [ARUC] Single-direction line constraints: {n_single_dir}/{n_active} "
+                  f"(line,period) pairs ({n_single_dir / max(n_active, 1) * 100:.0f}%)")
 
     # 3) Wind availability — only for robust periods
     #    When fix_wind_z=True, Z[wind_k,t,k]=1 and Z[wind_k,t,j!=k]=0 are

@@ -541,11 +541,12 @@ def run_rts_aruc(
     # Optional: filter to monitored lines based on external DAM dispatch
     data_full = None
     line_mask = None
+    flow_direction = None
     if (monitored_lines_threshold is not None
             and dam_dispatch_for_screening is not None and enforce_lines):
         from compute_branch_flows import filter_monitored_lines
         data_full = data
-        data, line_mask = filter_monitored_lines(
+        data, line_mask, flow_direction = filter_monitored_lines(
             data, dam_dispatch_for_screening, monitored_lines_threshold
         )
         print(f"    n_lines  = {data.n_lines} (after filtering)")
@@ -612,6 +613,7 @@ def run_rts_aruc(
         threads=threads,
         bar_qcp_conv_tol=bar_qcp_conv_tol,
         line_mask=line_mask,
+        flow_direction=flow_direction,
     )
 
     # Warm start: prefer previous ARUC solution (sweep mode) over DAM

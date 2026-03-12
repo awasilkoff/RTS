@@ -890,6 +890,160 @@ def plot_z_matrix(case_dir: Path, hour: int, out_dir: Path, threshold: float = 0
 
 
 # ---------------------------------------------------------------------------
+# Chart 6: Network map with additionally committed units
+# ---------------------------------------------------------------------------
+
+def load_deviation_summary(case_dir: Path) -> pd.DataFrame:
+    """Load deviation_summary.csv with parsed periods_added lists."""
+    path = case_dir / "daruc" / "deviation_summary.csv"
+    if not path.exists():
+        raise FileNotFoundError(f"deviation_summary.csv not found at {path}")
+    df = pd.read_csv(path)
+    # Parse periods_added from string repr of list
+    import ast
+    df["periods_added"] = df["periods_added"].apply(ast.literal_eval)
+    return df
+
+
+def _gen_id_to_bus(gen_id: str) -> int:
+    """Extract bus ID from generator UID (e.g. '207_CT_1' -> 207)."""
+    return int(gen_id.split("_")[0])
+
+
+def plot_network_commitment_map(
+    case_dir: Path,
+    dam_raw: pd.DataFrame,
+    daruc_raw: pd.DataFrame,
+    hour: int,
+    out_dir: Path,
+):
+    """Network map showing line flows + additionally committed generators at a given hour.
+
+    Uses deviation_summary.csv to identify which generators DARUC commits
+    beyond what DAM+Reserve committed, and highlights them on the map.
+    """
+    from matplotlib.lines import Line2D
+
+    bus, branch = load_network_topology()
+    dev = load_deviation_summary(case_dir)
+
+    hour_ts = _find_hour_ts(dam_raw, hour)
+    if hour_ts is None:
+        print(f"  WARNING: hour {hour} not found, skipping commitment map")
+        return
+
+    daruc_hour = _get_hour_data(daruc_raw, hour_ts)
+
+    # Find generators additionally committed at this hour (period index = hour for day-1)
+    extra_gens = []
+    for _, row in dev.iterrows():
+        if hour in row["periods_added"]:
+            extra_gens.append({
+                "gen_id": row["gen_id"],
+                "gen_type": row["gen_type"],
+                "bus_id": _gen_id_to_bus(row["gen_id"]),
+                "extra_hours": row["extra_committed_hours"],
+            })
+
+    extra_df = pd.DataFrame(extra_gens) if extra_gens else pd.DataFrame(
+        columns=["gen_id", "gen_type", "bus_id", "extra_hours"]
+    )
+
+    # Group by bus for display (multiple units may be at same bus)
+    bus_extra = {}
+    if not extra_df.empty:
+        for bus_id, grp in extra_df.groupby("bus_id"):
+            bus_extra[bus_id] = grp["gen_id"].tolist()
+
+    print(f"  {len(extra_gens)} extra-committed generators at hour {hour}: "
+          f"{[g['gen_id'] for g in extra_gens]}")
+
+    fig, ax = plt.subplots(figsize=(12, 9))
+
+    # Draw base network
+    _draw_base_network(ax, bus, branch)
+
+    # Draw DARUC line flows (parallel style: nominal + margin)
+    offset_scale = 0.012
+    for uid in daruc_hour.index:
+        coords = _get_branch_coords(uid, branch, bus)
+        if coords is None:
+            continue
+        x, y = coords
+        row = daruc_hour.loc[uid]
+        fmax = row["Fmax"]
+        nom_abs = abs(row["flow_nominal"])
+        margin = row["margin_rho_norm"]
+        is_binding = bool(row["binding"])
+
+        nom_frac = min(nom_abs / fmax, 1.0) if fmax > 0 else 0
+        margin_frac = min(margin / fmax, 1.0) if fmax > 0 else 0
+
+        lw_nom = _LW_MIN + (_LW_MAX - _LW_MIN) * nom_frac
+        lw_margin = _LW_MIN + (_LW_MAX - _LW_MIN) * margin_frac
+
+        ox, oy = _perpendicular_offset(x, y, offset_scale)
+
+        ax.plot(x + ox, y + oy, color="#4393c3", linewidth=lw_nom, zorder=3,
+                solid_capstyle="round")
+        if margin > 0.1:
+            ax.plot(x - ox, y - oy, color="#e08060", linewidth=lw_margin, zorder=3,
+                    solid_capstyle="round")
+
+        if is_binding:
+            ax.plot(x, y, color="#b2182b", linewidth=max(lw_nom, lw_margin) + 2,
+                    zorder=2, alpha=0.25)
+            _label_binding(ax, x, y, uid, f"{nom_abs:.0f}+{margin:.0f}")
+
+    # Highlight additionally committed units
+    for bus_id, gen_list in bus_extra.items():
+        if bus_id not in bus.index:
+            continue
+        bx = bus.loc[bus_id, "lng"]
+        by = bus.loc[bus_id, "lat"]
+        n_units = len(gen_list)
+
+        # Red square marker sized by number of units
+        marker_size = 60 + 30 * n_units
+        ax.scatter(bx, by, s=marker_size, c="#d62728", marker="s", zorder=7,
+                   edgecolors="black", linewidths=0.8)
+
+        # Label with short gen names
+        short_names = [g.replace("_", " ") for g in gen_list]
+        label_text = "\n".join(short_names)
+        ax.annotate(
+            label_text, (bx, by),
+            fontsize=5.5, fontweight="bold", color="#d62728",
+            ha="left", va="bottom",
+            xytext=(5, 5), textcoords="offset points",
+            bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="#d62728",
+                      alpha=0.9, lw=0.6),
+            zorder=9,
+        )
+
+    _style_map_ax(ax, f"DARUC Flows + Extra Commitments — Hour {hour:02d}:00")
+
+    legend_elements = [
+        Line2D([0], [0], color="#4393c3", lw=4, label="Nominal flow"),
+        Line2D([0], [0], color="#e08060", lw=4, label="Robust margin"),
+        Line2D([0], [0], color="#b2182b", lw=5, alpha=0.25, label="Binding line"),
+        Line2D([0], [0], marker="^", color="w", markerfacecolor="#2ca02c",
+               markeredgecolor="black", markersize=8, label="Wind gen"),
+        Line2D([0], [0], marker="s", color="w", markerfacecolor="#d62728",
+               markeredgecolor="black", markersize=8, label="Extra-committed unit"),
+    ]
+    ax.legend(handles=legend_elements, loc="lower left", fontsize=8,
+              framealpha=0.9)
+
+    fig.tight_layout()
+    for fmt in ("png", "pdf"):
+        fig.savefig(out_dir / f"fig_map_commitment_h{hour:02d}.{fmt}",
+                    dpi=200, bbox_inches="tight")
+    print(f"  Saved fig_map_commitment_h{hour:02d}.png/pdf")
+    plt.close(fig)
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -939,6 +1093,14 @@ def main():
 
     print(f"\nChart 4: Network maps (hour {args.map_hour}) — 3 options...")
     plot_network_maps(dam_raw, daruc_raw, args.map_hour, out_dir)
+
+    print(f"\nChart 6: Network map + extra commitments (hour {args.map_hour})...")
+    try:
+        plot_network_commitment_map(
+            case_dir, dam_raw, daruc_raw, args.map_hour, out_dir,
+        )
+    except FileNotFoundError as e:
+        print(f"  Skipping commitment map: {e}")
 
     print(f"\nChart 5: Z matrix (hour {args.map_hour}) — 3 options...")
     try:

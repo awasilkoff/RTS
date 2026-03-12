@@ -32,6 +32,7 @@ def build_dam_model(
     model_name: str = "DAM_UC",
     enforce_lines: bool = True,
     reserve_requirement: Optional[np.ndarray] = None,
+    reserve_ramp_multiplier: Optional[float] = 1.0,
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Build a deterministic day-ahead UC model using Gurobi.
@@ -367,10 +368,12 @@ def build_dam_model(
                     name=f"res_headroom_i{i}_t{t}",
                 )
                 # Ramp cap: reserve <= ramp-up capability over the period
-                m.addConstr(
-                    r[i, t] <= RU[i] * dt[t],
-                    name=f"res_ramp_i{i}_t{t}",
-                )
+                # Skip when reserve_ramp_multiplier is None or <= 0
+                if reserve_ramp_multiplier is not None and reserve_ramp_multiplier > 0:
+                    m.addConstr(
+                        r[i, t] <= RU[i] * dt[t] * reserve_ramp_multiplier,
+                        name=f"res_ramp_i{i}_t{t}",
+                    )
         for t in range(T):
             m.addConstr(
                 gp.quicksum(r[i, t] for i in is_thermal) >= reserve_requirement[t],

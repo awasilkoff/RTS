@@ -309,6 +309,12 @@ if __name__ == "__main__":
         help="Re-solve DAM with spinning reserve derived from uncertainty set (requires --uncertainty-npz)",
     )
     parser.add_argument(
+        "--reserve-ramp-multiplier",
+        type=float,
+        default=1.0,
+        help="Multiplier on reserve ramp-rate cap (RU*dt*mult). 0 to disable ramp cap entirely. Default: 1.0",
+    )
+    parser.add_argument(
         "--out-dir",
         type=str,
         default=None,

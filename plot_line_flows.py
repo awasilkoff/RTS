@@ -285,6 +285,10 @@ def load_network_topology(
     return bus, branch
 
 
+# Wind generator bus IDs (from gen.csv: 122_WIND_1, 303_WIND_1, 309_WIND_1, 317_WIND_1)
+_WIND_BUSES = {122, 303, 309, 317}
+
+
 def _draw_network_panel(
     ax,
     bus: pd.DataFrame,
@@ -297,7 +301,7 @@ def _draw_network_panel(
     """Draw one network panel for a specific hour.
 
     flow_df: the full (unfiltered) line_flow_analysis for this case at this hour.
-    show_decomposition: if True, draw two-tone edges (nominal + margin).
+    show_decomposition: if True, use concentric halo (orange=worst-case, blue=nominal).
     """
     hour_data = flow_df[flow_df["period"] == hour_ts].set_index("line")
 
@@ -310,9 +314,9 @@ def _draw_network_panel(
         y = [bus.loc[fb, "lat"], bus.loc[tb, "lat"]]
         ax.plot(x, y, color="#d9d9d9", linewidth=0.8, zorder=1)
 
-    # Draw lines with flow data, colored by loading
-    cmap = plt.cm.RdYlGn_r
-    norm = mcolors.Normalize(vmin=0, vmax=100)
+    # Max linewidth for scaling
+    lw_max = 5.0
+    lw_min = 1.0
 
     for uid in hour_data.index:
         if uid not in branch.index:
@@ -325,42 +329,70 @@ def _draw_network_panel(
 
         x = np.array([bus.loc[fb, "lng"], bus.loc[tb, "lng"]])
         y = np.array([bus.loc[fb, "lat"], bus.loc[tb, "lat"]])
-        loading = row["loading_worst_case_pct"]
+        fmax = row["Fmax"]
+        nom_abs = abs(row["flow_nominal"])
+        margin = row["margin_rho_norm"]
+        wc_abs = row["worst_case_abs_flow"]
         is_binding = bool(row["binding"])
-        lw = 1.5 + 3.0 * min(loading, 100) / 100
 
-        if show_decomposition and row["margin_rho_norm"] > 0.1:
-            # Two-tone: nominal portion then margin portion
-            fmax = row["Fmax"]
-            nom_frac = min(abs(row["flow_nominal"]) / fmax, 1.0) if fmax > 0 else 0
-            # Draw nominal portion (blue)
-            xm = x[0] + nom_frac * (x[1] - x[0])
-            ym = y[0] + nom_frac * (y[1] - y[0])
-            ax.plot([x[0], xm], [y[0], ym], color="#4393c3", linewidth=lw, zorder=3, solid_capstyle="butt")
-            # Draw margin portion (orange)
-            ax.plot([xm, x[1]], [ym, y[1]], color="#f4a582", linewidth=lw, zorder=3, solid_capstyle="butt")
+        # Linewidth proportional to worst-case flow / Fmax
+        wc_frac = min(wc_abs / fmax, 1.0) if fmax > 0 else 0
+        nom_frac = min(nom_abs / fmax, 1.0) if fmax > 0 else 0
+        lw_wc = lw_min + (lw_max - lw_min) * wc_frac
+        lw_nom = lw_min + (lw_max - lw_min) * nom_frac
+
+        if show_decomposition and margin > 0.1:
+            # Concentric halo: outer orange (worst-case), inner blue (nominal)
+            ax.plot(x, y, color="#f4a582", linewidth=lw_wc, zorder=3,
+                    solid_capstyle="round")
+            ax.plot(x, y, color="#4393c3", linewidth=lw_nom, zorder=4,
+                    solid_capstyle="round")
         else:
-            color = cmap(norm(min(loading, 100)))
-            ax.plot(x, y, color=color, linewidth=lw, zorder=3)
+            # Single color by loading
+            cmap = plt.cm.RdYlGn_r
+            norm = mcolors.Normalize(vmin=0, vmax=100)
+            color = cmap(norm(min(row["loading_worst_case_pct"], 100)))
+            ax.plot(x, y, color=color, linewidth=lw_wc, zorder=3)
 
-        # Binding highlight: red outline
+        # Binding highlight: red outline behind everything
         if is_binding:
-            ax.plot(x, y, color="red", linewidth=lw + 1.5, zorder=2, alpha=0.4)
+            ax.plot(x, y, color="red", linewidth=lw_wc + 2.5, zorder=2, alpha=0.35)
 
         # Label binding lines
         if is_binding:
             mx, my = 0.5 * (x[0] + x[1]), 0.5 * (y[0] + y[1])
+            label_txt = uid
+            if margin > 0.1:
+                label_txt += f"\n{nom_abs:.0f}+{margin:.0f}"
             ax.annotate(
-                uid, (mx, my), fontsize=6, fontweight="bold",
+                label_txt, (mx, my), fontsize=5.5, fontweight="bold",
                 color="red", ha="center", va="bottom",
-                bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.7),
-                zorder=5,
+                bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.8),
+                zorder=6,
             )
 
-    # Draw buses
+    # Draw non-wind buses
+    non_wind = bus[~bus.index.isin(_WIND_BUSES)]
     ax.scatter(
-        bus["lng"], bus["lat"], s=12, c="#333333", zorder=4, edgecolors="white", linewidths=0.3,
+        non_wind["lng"], non_wind["lat"], s=12, c="#333333", zorder=5,
+        edgecolors="white", linewidths=0.3,
     )
+
+    # Draw wind buses with distinct marker
+    wind = bus[bus.index.isin(_WIND_BUSES)]
+    ax.scatter(
+        wind["lng"], wind["lat"], s=100, c="#2ca02c", marker="^", zorder=6,
+        edgecolors="black", linewidths=0.8, label="Wind",
+    )
+    for bus_id, brow in wind.iterrows():
+        ax.annotate(
+            f"Bus {bus_id}", (brow["lng"], brow["lat"]),
+            fontsize=5.5, fontweight="bold", color="#2ca02c",
+            ha="left", va="bottom",
+            xytext=(4, 4), textcoords="offset points",
+            bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="#2ca02c", alpha=0.8),
+            zorder=7,
+        )
 
     ax.set_title(title, fontsize=11, fontweight="bold")
     ax.set_xlabel("Longitude")
@@ -405,15 +437,16 @@ def plot_network_map(
         show_decomposition=True,
     )
 
-    # Legend for DARUC decomposition
+    # Legend
     from matplotlib.lines import Line2D
-    from matplotlib.patches import Patch
     legend_elements = [
-        Line2D([0], [0], color="#4393c3", lw=3, label="Nominal flow"),
-        Line2D([0], [0], color="#f4a582", lw=3, label="Robust margin"),
-        Line2D([0], [0], color="red", lw=4, alpha=0.4, label="Binding"),
+        Line2D([0], [0], color="#4393c3", lw=4, label="Nominal flow"),
+        Line2D([0], [0], color="#f4a582", lw=6, label="Robust margin (halo)"),
+        Line2D([0], [0], color="red", lw=5, alpha=0.35, label="Binding"),
         Line2D([0], [0], color="#d9d9d9", lw=1, label="Unmonitored"),
         Line2D([0], [0], marker="o", color="w", markerfacecolor="#333", markersize=5, label="Bus"),
+        Line2D([0], [0], marker="^", color="w", markerfacecolor="#2ca02c",
+               markeredgecolor="black", markersize=8, label="Wind gen"),
     ]
     fig.legend(
         handles=legend_elements, loc="lower center", ncol=5, fontsize=9,

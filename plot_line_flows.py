@@ -269,6 +269,112 @@ def plot_flow_decomposition(
 
 
 # ---------------------------------------------------------------------------
+# Chart 3b: Flow decomposition snapshot at a specific hour
+# ---------------------------------------------------------------------------
+
+def plot_flow_decomposition_hour(
+    dam_raw: pd.DataFrame,
+    daruc_raw: pd.DataFrame,
+    hour: int,
+    out_dir: Path,
+    top_n: int = 20,
+):
+    """Horizontal stacked bars for ALL monitored lines at a specific hour.
+
+    Shows top_n lines sorted by worst-case loading. Includes both binding
+    and non-binding lines to give the full picture at that snapshot.
+    """
+    hour_ts = _find_hour_ts(dam_raw, hour)
+    if hour_ts is None:
+        print(f"  WARNING: hour {hour} not found, skipping hourly decomposition")
+        return
+
+    daruc_h = daruc_raw[daruc_raw["period"] == hour_ts].copy()
+    dam_h = dam_raw[dam_raw["period"] == hour_ts].copy()
+
+    if daruc_h.empty:
+        print(f"  No DARUC data at hour {hour}")
+        return
+
+    # Sort by worst-case loading, take top N
+    daruc_h = daruc_h.sort_values("loading_worst_case_pct", ascending=False).head(top_n)
+    lines_sorted = daruc_h["line"].tolist()
+
+    # Merge DAM data
+    dam_lookup = dam_h.set_index("line")
+
+    records = []
+    for _, row in daruc_h.iterrows():
+        line = row["line"]
+        dam_nom = abs(dam_lookup.loc[line, "flow_nominal"]) if line in dam_lookup.index else 0
+        records.append({
+            "line": line,
+            "nominal_abs": abs(row["flow_nominal"]),
+            "margin": row["margin_rho_norm"],
+            "Fmax": row["Fmax"],
+            "dam_nominal_abs": dam_nom,
+            "wc_loading": row["loading_worst_case_pct"],
+            "binding": row["binding"],
+        })
+
+    rec_df = pd.DataFrame(records)
+    # Reverse so highest loading is at top
+    rec_df = rec_df.iloc[::-1].reset_index(drop=True)
+
+    n = len(rec_df)
+    fig, ax = plt.subplots(figsize=(10, max(3, n * 0.35 + 1.5)))
+
+    y_pos = np.arange(n)
+
+    # Stacked: nominal + margin
+    ax.barh(y_pos, rec_df["nominal_abs"], height=0.6,
+            color="#4393c3", label="DARUC |nominal|", zorder=2)
+    ax.barh(y_pos, rec_df["margin"], height=0.6,
+            left=rec_df["nominal_abs"].values,
+            color="#e08060", label="DARUC robust margin", zorder=2)
+
+    # Fmax reference
+    ax.barh(y_pos, rec_df["Fmax"], height=0.65,
+            color="none", edgecolor="black", linewidth=1.0,
+            label="Fmax", zorder=3)
+
+    # DAM+Reserve nominal as diamond markers
+    ax.scatter(rec_df["dam_nominal_abs"], y_pos,
+               marker="D", s=40, c="#2166ac", edgecolors="black", linewidths=0.4,
+               zorder=4, label="DAM+Res |nominal|")
+
+    # Highlight binding lines in red on y-axis labels
+    labels = rec_df["line"].tolist()
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(labels, fontsize=7)
+    for i, (_, row) in enumerate(rec_df.iterrows()):
+        if row["binding"]:
+            ax.get_yticklabels()[i].set_color("#b2182b")
+            ax.get_yticklabels()[i].set_fontweight("bold")
+
+    ax.set_xlabel("Flow (MW)")
+    ax.set_title(f"Flow Decomposition — Hour {hour:02d}:00 (top {n} lines by loading)",
+                 fontsize=11)
+    ax.legend(loc="lower right", fontsize=7)
+    ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
+
+    fig.tight_layout()
+    for fmt in ("png", "pdf"):
+        fig.savefig(out_dir / f"fig_flow_decomp_h{hour:02d}.{fmt}",
+                    dpi=200, bbox_inches="tight")
+    print(f"  Saved fig_flow_decomp_h{hour:02d}.png/pdf")
+    plt.close(fig)
+
+
+def _find_hour_ts(df, hour):
+    """Find the pd.Timestamp matching the given hour (0-23)."""
+    for t in sorted(df["period"].unique()):
+        if t.hour == hour:
+            return t
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Chart 4: Network map at a specific hour
 # ---------------------------------------------------------------------------
 
@@ -483,14 +589,6 @@ def _draw_panel_dual_encode(ax, bus, branch, hour_data, title):
 
 
 # ---- Master plot functions ----
-
-def _find_hour_ts(df, hour):
-    """Find the pd.Timestamp matching the given hour (0-23)."""
-    for t in sorted(df["period"].unique()):
-        if t.hour == hour:
-            return t
-    return None
-
 
 def plot_network_maps(
     dam_raw: pd.DataFrame,
@@ -835,6 +933,9 @@ def main():
 
     print("Chart 3: Flow decomposition...")
     plot_flow_decomposition(dam, daruc, binding_lines, out_dir)
+
+    print(f"\nChart 3b: Flow decomposition snapshot (hour {args.map_hour})...")
+    plot_flow_decomposition_hour(dam_raw, daruc_raw, args.map_hour, out_dir)
 
     print(f"\nChart 4: Network maps (hour {args.map_hour}) — 3 options...")
     plot_network_maps(dam_raw, daruc_raw, args.map_hour, out_dir)

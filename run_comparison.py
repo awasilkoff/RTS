@@ -193,6 +193,12 @@ def main():
         help="Re-solve DAM with spinning reserve derived from uncertainty set (works with --uncertainty-npz or scalar --rho)",
     )
     parser.add_argument(
+        "--reserve-ramp-multiplier",
+        type=float,
+        default=1.0,
+        help="Multiplier on reserve ramp-rate cap (RU*dt*mult). 0 to disable ramp cap entirely. Default: 1.0",
+    )
+    parser.add_argument(
         "--line-monitor-threshold",
         type=float,
         default=0.9,
@@ -468,12 +474,14 @@ def main():
         reserve_dir.mkdir(exist_ok=True)
 
         print("\nBuilding DAM model with spinning reserve constraint...")
+        ramp_mult = args.reserve_ramp_multiplier if args.reserve_ramp_multiplier > 0 else None
         reserve_model, reserve_vars = build_dam_model(
             data,
             M_p=1e4,
             model_name="DAM_Reserve",
             enforce_lines=args.enforce_lines,
             reserve_requirement=R,
+            reserve_ramp_multiplier=ramp_mult,
         )
         reserve_model.Params.MIPGap = args.mip_gap
         print("  Model built. Starting optimization...")
@@ -493,6 +501,7 @@ def main():
                 "reserve_min_mw": float(R.min()),
                 "reserve_max_mw": float(R.max()),
                 "reserve_mean_mw": float(R.mean()),
+                "reserve_ramp_multiplier": args.reserve_ramp_multiplier,
                 "enforce_lines": args.enforce_lines,
                 "start_time": str(start_time),
             }

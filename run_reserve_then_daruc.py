@@ -83,6 +83,7 @@ def run_reserve_then_daruc(
     time_limit: float | None = 600.0,
     threads: int | None = None,
     bar_qcp_conv_tol: float | None = 1e-4,
+    reserve_ramp_multiplier: float | None = 1.0,
     out_dir: Path | None = None,
 ) -> dict:
     """
@@ -157,6 +158,7 @@ def run_reserve_then_daruc(
         data, M_p=1e4, model_name="DAM_Reserve",
         enforce_lines=True,
         reserve_requirement=R,
+        reserve_ramp_multiplier=reserve_ramp_multiplier,
     )
     reserve_model.Params.MIPGap = mip_gap
     print("  Solving DAM+Reserve...")
@@ -354,6 +356,7 @@ def run_reserve_then_daruc(
             "reserve_min_mw": float(R.min()),
             "reserve_max_mw": float(R.max()),
             "reserve_mean_mw": float(R.mean()),
+            "reserve_ramp_multiplier": reserve_ramp_multiplier,
             "enforce_lines": True,
             "start_time": str(start_time),
         }
@@ -441,6 +444,8 @@ def main():
                         help="Override: include/exclude all zero-marginal-cost non-wind generators")
     parser.add_argument("--ramp-scale", type=float, default=1.0)
     parser.add_argument("--pmin-scale", type=float, default=1.0)
+    parser.add_argument("--reserve-ramp-multiplier", type=float, default=1.0,
+                        help="Multiplier on reserve ramp-rate cap (RU*dt*mult). 0 to disable. Default: 1.0")
     parser.add_argument("--line-monitor-threshold", type=float, default=0.9)
     parser.add_argument("--time-limit", type=float, default=6000)
     parser.add_argument("--threads", type=int, default=None)
@@ -479,6 +484,7 @@ def main():
         time_limit=args.time_limit,
         threads=args.threads,
         bar_qcp_conv_tol=args.bar_qcp_conv_tol,
+        reserve_ramp_multiplier=args.reserve_ramp_multiplier if args.reserve_ramp_multiplier > 0 else None,
         out_dir=out_dir,
     )
 

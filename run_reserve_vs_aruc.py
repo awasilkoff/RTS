@@ -46,6 +46,8 @@ def main():
     parser.add_argument("--mip-gap", type=float, default=0.005)
     parser.add_argument("--time-limit", type=float, default=600)
     parser.add_argument("--bar-qcp-conv-tol", type=float, default=1e-4)
+    parser.add_argument("--reserve-ramp-multiplier", type=float, default=1.0,
+                        help="Multiplier on reserve ramp-rate cap (RU*dt*mult). 0 to disable. Default: 1.0")
     parser.add_argument("--out-dir", type=str, default=None)
     args = parser.parse_args()
 
@@ -102,9 +104,11 @@ def main():
     print("\n" + "=" * 70)
     print("SOLVING DAM + SPINNING RESERVE")
     print("=" * 70)
+    ramp_mult = args.reserve_ramp_multiplier if args.reserve_ramp_multiplier > 0 else None
     reserve_model, reserve_vars = build_dam_model(
         data, M_p=1e4, model_name="DAM_Reserve", reserve_requirement=R,
         enforce_lines=False,
+        reserve_ramp_multiplier=ramp_mult,
     )
     reserve_model.Params.MIPGap = args.mip_gap
     reserve_model.optimize()

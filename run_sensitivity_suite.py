@@ -228,7 +228,6 @@ def main():
     args = parser.parse_args()
     if args.uncertainty_npz:
         rho_tag = str(args.uncertainty_npz)[-6:-4]
-        print(rho_tag)
     elif args.rho_lines_frac is not None:
         rho_tag = f"rho{args.rho}_linesfrac{args.rho_lines_frac}"
     else:

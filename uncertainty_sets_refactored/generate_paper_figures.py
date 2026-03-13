@@ -902,7 +902,6 @@ def fig3b_4b_hyperparameter_sweeps(
         linewidth=2,
         markersize=5,
         color=COLORS["knn"],
-        label="k-NN",
     )
     ax_k.fill_between(
         k_vals,
@@ -923,7 +922,6 @@ def fig3b_4b_hyperparameter_sweeps(
         zorder=10,
         edgecolors="black",
         linewidths=1,
-        label=f"Best: k={k_vals[best_k_idx]}",
     )
 
     # Load sweep data for baselines and kappa panels
@@ -954,20 +952,17 @@ def fig3b_4b_hyperparameter_sweeps(
         linestyle="--",
         linewidth=1.5,
         color=COLORS["learned"],
-        label=f"Learned ω (κ={best_tau_all:g})",
     )
     ax_k.axhline(
         nll_global,
         linestyle=":",
         linewidth=1.5,
         color=COLORS["global"],
-        label="Global",
     )
 
     ax_k.set_xlabel("k (Number of Neighbors)")
     ax_k.set_ylabel("Validation NLL")
     ax_k.set_xscale("log")
-    ax_k.legend(fontsize=6, loc="upper left")
     ax_k.grid(True, alpha=0.3)
     ax_k.text(
         0.02,
@@ -1019,7 +1014,6 @@ def fig3b_4b_hyperparameter_sweeps(
             linewidth=2,
             markersize=5,
             color=COLORS["learned"],
-            label=f"Learned ω ({constraint_name})",
         )
 
         # Mark best kappa
@@ -1033,7 +1027,6 @@ def fig3b_4b_hyperparameter_sweeps(
             zorder=10,
             edgecolors="black",
             linewidths=1,
-            label=f"Best: κ={tau_vals[best_idx]:g}",
         )
 
         # Baselines: best k-NN and global
@@ -1042,19 +1035,16 @@ def fig3b_4b_hyperparameter_sweeps(
             linestyle="--",
             linewidth=1.5,
             color=COLORS["knn"],
-            label=f"k-NN (k={k_vals[best_k_idx]})",
         )
         ax.axhline(
             nll_global,
             linestyle=":",
             linewidth=1.5,
             color=COLORS["global"],
-            label="Global",
         )
 
         ax.set_xlabel("κ (Kernel Bandwidth)")
         ax.set_xscale("log")
-        ax.legend(fontsize=6, loc="upper left")
         ax.grid(True, alpha=0.3)
         ax.text(
             0.02,

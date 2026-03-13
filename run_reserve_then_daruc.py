@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 
 import numpy as np
@@ -93,8 +94,15 @@ def run_reserve_then_daruc(
     """
 
     # ==================================================================
+    # Timing
+    # ==================================================================
+    t_wall_start = time.time()
+    timings = {}
+
+    # ==================================================================
     # Build DAMData
     # ==================================================================
+    t0 = time.time()
     print("Building DAMData...")
     data = build_damdata_from_rts(
         source_dir=SOURCE_DIR,
@@ -112,6 +120,7 @@ def run_reserve_then_daruc(
         pmin_scale=pmin_scale,
     )
     T = data.n_periods
+    timings["data_build"] = time.time() - t0
 
     # ==================================================================
     # Build uncertainty set
@@ -162,7 +171,9 @@ def run_reserve_then_daruc(
     )
     reserve_model.Params.MIPGap = mip_gap
     print("  Solving DAM+Reserve...")
+    t0 = time.time()
     reserve_model.optimize()
+    timings["dam_reserve_solve"] = time.time() - t0
 
     from gurobipy import GRB as _GRB
     if reserve_model.Status not in [_GRB.OPTIMAL, _GRB.SUBOPTIMAL]:
@@ -207,6 +218,7 @@ def run_reserve_then_daruc(
         print(f"  day1_only_robust: {int(robust_mask.sum())} robust + "
               f"{T - int(robust_mask.sum())} nominal periods")
 
+    t0 = time.time()
     print("\nBuilding DARUC model (with reserve commitment floor)...")
     model, vars_dict = build_aruc_ldr_model(
         data=data,
@@ -236,8 +248,12 @@ def run_reserve_then_daruc(
     if reserve_vars is not None:
         warm_start_aruc_from_dam(model, vars_dict, reserve_vars, data)
 
+    timings["daruc_build"] = time.time() - t0
+
     print("  Solving DARUC...")
+    t0 = time.time()
     model.optimize()
+    timings["daruc_solve"] = time.time() - t0
 
     import gurobipy as gp
     if model.Status not in [gp.GRB.OPTIMAL, gp.GRB.SUBOPTIMAL]:
@@ -246,14 +262,17 @@ def run_reserve_then_daruc(
         print(f"WARNING: DARUC status={model.Status}")
 
     # Iterative line violation resolution (if lines were filtered)
+    line_iterations = 0
     if data_full is not None:
         from compute_branch_flows import iterative_line_resolve
         _rmask = robust_mask if robust_mask is not None else np.ones(T, dtype=bool)
-        iterative_line_resolve(
+        t0 = time.time()
+        line_iterations = iterative_line_resolve(
             model, vars_dict, data, data_full,
             _rmask, sqrt_Sigma, rho_val,
             rho_lines_frac, time_varying,
         )
+        timings["line_iterations_solve"] = time.time() - t0
 
     daruc_results = extract_aruc_solution(data, model, vars_dict)
     print_brief_summary(daruc_results, data)
@@ -311,6 +330,8 @@ def run_reserve_then_daruc(
     # ==================================================================
     # Print summary
     # ==================================================================
+    timings["total_wall"] = time.time() - t_wall_start
+
     lines = []
     lines.append("=" * 70)
     lines.append("RESERVE-THEN-DARUC ROBUSTNESS GAP (day-1 metrics)")
@@ -332,6 +353,19 @@ def run_reserve_then_daruc(
         lines.append(f"Total extra unit-hours (full horizon): {dev_df['extra_committed_hours'].sum()}")
     else:
         lines.append("\nNo additional commitments needed — reserve solution is already fully robust.")
+
+    lines.append("")
+    lines.append("--- Timing ---")
+    lines.append(f"{'Data build':30s} {timings.get('data_build', 0):>8.1f} s")
+    lines.append(f"{'DAM+Reserve solve':30s} {timings.get('dam_reserve_solve', 0):>8.1f} s")
+    lines.append(f"{'DARUC model build':30s} {timings.get('daruc_build', 0):>8.1f} s")
+    lines.append(f"{'DARUC solve (initial)':30s} {timings.get('daruc_solve', 0):>8.1f} s")
+    if line_iterations > 0:
+        label = f"Line iterations ({line_iterations} re-solves)"
+        lines.append(f"{label:30s} {timings.get('line_iterations_solve', 0):>8.1f} s")
+    else:
+        lines.append(f"{'Line iterations':30s} {'0 (converged)':>12s}")
+    lines.append(f"{'Total wall time':30s} {timings['total_wall']:>8.1f} s")
     lines.append("=" * 70)
 
     summary_text = "\n".join(lines)
@@ -399,6 +433,8 @@ def run_reserve_then_daruc(
             "reserve_requirement": {
                 "min": float(R.min()), "max": float(R.max()), "mean": float(R.mean()),
             },
+            "line_iterations": line_iterations,
+            "timings_seconds": {k: round(v, 2) for k, v in timings.items()},
         }
         with open(out_dir / "summary.json", "w") as f:
             json.dump(combined, f, indent=2)

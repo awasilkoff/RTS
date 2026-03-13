@@ -128,15 +128,31 @@ def analyze_deviations(
 
     u_prime = vars_dict["u_prime"]
 
+    dam_u = dam_commitment["u"]  # (I, T)
+
     rows = []
     for i in range(I):
         extra_hours = 0
         periods_added = []
+        extra_startups = 0
         for t in range(T):
             val = u_prime[i, t].X
             if val > 0.5:
                 extra_hours += 1
                 periods_added.append(t)
+                # Extra startup: unit was off in previous period (combined schedule)
+                if t == 0:
+                    prev_on = dam_u[i, 0] > 0.5  # DAM was already on at t=0
+                    # u_prime adds commitment, so if DAM had it on, no startup
+                    # Actually at t=0 we need to check initial conditions
+                    # but u_prime[i,0]>0.5 means DARUC started it, and DAM didn't have it on
+                    # so this is a startup unless the unit was on from initial conditions
+                    prev_on = bool(getattr(data, 'u_init', np.zeros(I))[i] > 0.5)
+                else:
+                    prev_on = (dam_u[i, t - 1] > 0.5 or
+                               u_prime[i, t - 1].X > 0.5)
+                if not prev_on:
+                    extra_startups += 1
 
         if extra_hours > 0:
             rows.append(
@@ -144,9 +160,10 @@ def analyze_deviations(
                     "gen_id": gen_ids[i],
                     "gen_type": data.gen_type[i],
                     "extra_committed_hours": extra_hours,
-                    "dam_committed_hours": int(dam_commitment["u"][i, :].sum()),
+                    "extra_startups": extra_startups,
+                    "dam_committed_hours": int(dam_u[i, :].sum()),
                     "daruc_committed_hours": int(
-                        dam_commitment["u"][i, :].sum() + extra_hours
+                        dam_u[i, :].sum() + extra_hours
                     ),
                     "periods_added": str(periods_added),
                 }
@@ -160,6 +177,7 @@ def analyze_deviations(
                 "gen_id",
                 "gen_type",
                 "extra_committed_hours",
+                "extra_startups",
                 "dam_committed_hours",
                 "daruc_committed_hours",
                 "periods_added",
@@ -189,8 +207,10 @@ def print_deviation_summary(
         print("\nNo additional commitments made by DARUC.")
     else:
         total_extra = dev_df["extra_committed_hours"].sum()
+        total_startups = dev_df["extra_startups"].sum() if "extra_startups" in dev_df.columns else 0
         print(f"\nGenerators with additional commitments: {len(dev_df)}")
         print(f"Total extra unit-hours committed: {total_extra}")
+        print(f"Total extra startups: {int(total_startups)}")
         print(f"\nDetails:")
         print(dev_df.to_string(index=False))
 

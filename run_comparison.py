@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 
 import numpy as np
@@ -315,6 +316,9 @@ def main():
     print(f"  Output:   {out_dir}")
     print("=" * 70)
 
+    t_wall_start = time.time()
+    timings = {}
+
     # ==================================================================
     # Step 1: Run DARUC (includes DAM as step 1)
     # ==================================================================
@@ -322,6 +326,7 @@ def main():
     print("RUNNING DARUC (two-step: DAM -> robust reliability)")
     print("=" * 70)
 
+    t0 = time.time()
     daruc_outputs = run_rts_daruc(
         start_time=start_time,
         horizon_hours=args.hours,
@@ -392,6 +397,11 @@ def main():
         save_line_flows_if_enabled(True, data_full, dam_results["p"].values, None, "DAM", daruc_dir, "dam_line_flows")
         save_line_flows_if_enabled(True, data_full, daruc_results["p0"].values, daruc_margin, "DARUC", daruc_dir, "daruc_line_flows")
 
+    timings["daruc_total"] = time.time() - t0
+    # Propagate sub-timings from DARUC
+    daruc_timings = daruc_outputs.get("timings", {})
+    daruc_line_iters = daruc_outputs.get("line_iterations", 0)
+
     print(f"\nDARUC objective: {daruc_results['obj']:,.2f}")
     print(f"DAM objective:   {dam_results['obj']:,.2f}")
 
@@ -402,6 +412,7 @@ def main():
     print("RUNNING ARUC-LDR (one-shot robust)")
     print("=" * 70)
 
+    t0 = time.time()
     aruc_outputs = run_rts_aruc(
         start_time=start_time,
         horizon_hours=args.hours,
@@ -452,6 +463,10 @@ def main():
     )
     save_line_flows_if_enabled(args.enforce_lines, data_full, aruc_results["p0"].values, aruc_margin, "ARUC", aruc_dir, "aruc_line_flows")
 
+    timings["aruc_total"] = time.time() - t0
+    aruc_timings = aruc_outputs.get("timings", {})
+    aruc_line_iters = aruc_outputs.get("line_iterations", 0)
+
     print(f"\nARUC-LDR objective: {aruc_results['obj']:,.2f}")
 
     # ==================================================================
@@ -473,6 +488,7 @@ def main():
 
         reserve_dir.mkdir(exist_ok=True)
 
+        t0 = time.time()
         print("\nBuilding DAM model with spinning reserve constraint...")
         ramp_mult = args.reserve_ramp_multiplier if args.reserve_ramp_multiplier > 0 else None
         reserve_model, reserve_vars = build_dam_model(
@@ -509,6 +525,7 @@ def main():
             save_line_flows_if_enabled(args.enforce_lines, data_full, reserve_results["p"].values, None, "DAM+Reserve", reserve_dir, "reserve_line_flows")
 
             print(f"\nDAM+Reserve objective: {reserve_results['obj']:,.2f}")
+            timings["reserve_solve"] = time.time() - t0
 
     # ==================================================================
     # Step 3: Compare
@@ -634,6 +651,27 @@ def main():
     diff_count = (u_aruc.values != u_daruc.values).sum()
     print(f"\n  Commitment differences (day 1): {diff_count} (gen,hour) entries differ")
 
+    timings["total_wall"] = time.time() - t_wall_start
+
+    # Print timing summary
+    print("\n--- Timing ---")
+    print(f"  {'DARUC (DAM + build + solve)':30s} {timings.get('daruc_total', 0):>8.1f} s")
+    if daruc_timings:
+        print(f"    {'DAM solve':28s} {daruc_timings.get('dam_solve', 0):>8.1f} s")
+        print(f"    {'DARUC build':28s} {daruc_timings.get('daruc_build', 0):>8.1f} s")
+        print(f"    {'DARUC solve':28s} {daruc_timings.get('daruc_solve', 0):>8.1f} s")
+        if daruc_line_iters > 0:
+            print(f"    {'Line iters (' + str(daruc_line_iters) + ' re-solves)':28s} {daruc_timings.get('line_iterations_solve', 0):>8.1f} s")
+    print(f"  {'ARUC (build + solve)':30s} {timings.get('aruc_total', 0):>8.1f} s")
+    if aruc_timings:
+        print(f"    {'Model build':28s} {aruc_timings.get('model_build', 0):>8.1f} s")
+        print(f"    {'Solve':28s} {aruc_timings.get('solve', 0):>8.1f} s")
+        if aruc_line_iters > 0:
+            print(f"    {'Line iters (' + str(aruc_line_iters) + ' re-solves)':28s} {aruc_timings.get('line_iterations_solve', 0):>8.1f} s")
+    if "reserve_solve" in timings:
+        print(f"  {'DAM+Reserve':30s} {timings['reserve_solve']:>8.1f} s")
+    print(f"  {'Total wall time':30s} {timings['total_wall']:>8.1f} s")
+
     # Top-level summary.json (uniform interface for run_sensitivity_suite.py)
     metrics_aruc = compute_day1_metrics(data, aruc_results)
     metrics_daruc = compute_day1_metrics(data, daruc_results)
@@ -646,6 +684,11 @@ def main():
         "daruc_metrics": metrics_daruc,
         "dam_metrics": compute_day1_metrics(data, dam_results) if dam_loaded is not None else None,
         "reserve_metrics": compute_day1_metrics(data, reserve_results) if reserve_results is not None else None,
+        "timings_seconds": {k: round(v, 2) for k, v in timings.items()},
+        "daruc_timings_seconds": {k: round(v, 2) for k, v in daruc_timings.items()} if daruc_timings else None,
+        "aruc_timings_seconds": {k: round(v, 2) for k, v in aruc_timings.items()} if aruc_timings else None,
+        "daruc_line_iterations": daruc_line_iters,
+        "aruc_line_iterations": aruc_line_iters,
     }
     with open(out_dir / "summary.json", "w") as f:
         json.dump(top_summary, f, indent=2)

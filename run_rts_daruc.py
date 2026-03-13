@@ -14,6 +14,7 @@ Uses:
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Optional, Dict, Any, Union
 
@@ -285,6 +286,9 @@ def run_rts_daruc(
         }
     """
 
+    t_wall_start = time.time()
+    timings = {}
+
     # ==================================================================
     # STEP 1: Deterministic DA-UC
     # ==================================================================
@@ -292,6 +296,7 @@ def run_rts_daruc(
     print("STEP 1: DETERMINISTIC DAY-AHEAD UC")
     print("=" * 70)
 
+    t0 = time.time()
     dam_outputs = run_rts_dam(
         source_dir=source_dir,
         ts_dir=ts_dir,
@@ -309,6 +314,8 @@ def run_rts_daruc(
         ramp_scale=ramp_scale,
         pmin_scale=pmin_scale,
     )
+
+    timings["dam_solve"] = time.time() - t0
 
     dam_results = dam_outputs["results"]
     data = dam_outputs["data"]
@@ -384,6 +391,7 @@ def run_rts_daruc(
         )
         model_name = "DARUC_RTS"
 
+    t0 = time.time()
     print("\nBuilding Gurobi DARUC model (with DAM commitment floor)...")
     model, vars_dict = build_aruc_ldr_model(
         data=data,
@@ -422,9 +430,12 @@ def run_rts_daruc(
             if dam_model.Status in [_GRB.OPTIMAL, _GRB.SUBOPTIMAL]:
                 warm_start_aruc_from_dam(model, vars_dict, dam_vars, data)
 
-    print("  Model built. Starting optimization...")
+    timings["daruc_build"] = time.time() - t0
 
+    print("  Model built. Starting optimization...")
+    t0 = time.time()
     model.optimize()
+    timings["daruc_solve"] = time.time() - t0
 
     if model.Status not in [gp.GRB.OPTIMAL, gp.GRB.SUBOPTIMAL]:
         print(f"WARNING: DARUC did not terminate optimally. Status: {model.Status}")
@@ -432,14 +443,19 @@ def run_rts_daruc(
             raise RuntimeError("No feasible DARUC solution found.")
 
     # Iterative line violation resolution (if lines were filtered)
+    line_iterations = 0
     if data_full is not None:
         from compute_branch_flows import iterative_line_resolve
         _rmask = robust_mask if robust_mask is not None else np.ones(data.n_periods, dtype=bool)
-        iterative_line_resolve(
+        t0 = time.time()
+        line_iterations = iterative_line_resolve(
             model, vars_dict, data, data_full,
             _rmask, sqrt_Sigma, rho_val,
             rho_lines_frac, time_varying,
         )
+        timings["line_iterations_solve"] = time.time() - t0
+
+    timings["total_wall"] = time.time() - t_wall_start
 
     daruc_results = extract_solution(data, model, vars_dict)
     print_brief_summary(daruc_results, data)
@@ -473,6 +489,8 @@ def run_rts_daruc(
         "rho_lines_frac": rho_lines_frac,
         "time_varying": time_varying,
         "line_mask": line_mask,
+        "timings": timings,
+        "line_iterations": line_iterations,
     }
 
 

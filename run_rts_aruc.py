@@ -19,6 +19,7 @@ to match your local setup and chosen study period.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Optional, Dict, Any, Union
 
@@ -515,6 +516,10 @@ def run_rts_aruc(
           "time_varying": bool indicating if time-varying uncertainty was used,
         }
     """
+    t_wall_start = time.time()
+    timings = {}
+
+    t0 = time.time()
     print("Building DAMData from RTS-GMLC...")
     data: DAMData = build_damdata_from_rts(
         source_dir=source_dir,
@@ -532,6 +537,7 @@ def run_rts_aruc(
         pmin_scale=pmin_scale,
     )
     T = data.n_periods
+    timings["data_build"] = time.time() - t0
     print("  Done. Data shapes:")
     print(f"    n_gens   = {data.n_gens}")
     print(f"    n_buses  = {data.n_buses}")
@@ -593,6 +599,7 @@ def run_rts_aruc(
         )
         model_name = "ARUC_LDR_RTS"
 
+    t0 = time.time()
     print("\nBuilding Gurobi ARUC-LDR model...")
     model, vars_dict = build_aruc_ldr_model(
         data=data,
@@ -632,9 +639,12 @@ def run_rts_aruc(
         else:
             print("  DAM warm start failed, proceeding without warm start")
 
-    print("  Model built. Starting optimization...")
+    timings["model_build"] = time.time() - t0
 
+    print("  Model built. Starting optimization...")
+    t0 = time.time()
     model.optimize()
+    timings["solve"] = time.time() - t0
 
     if model.Status not in [gp.GRB.OPTIMAL, gp.GRB.SUBOPTIMAL]:
         print(f"WARNING: Model did not terminate optimally. Status: {model.Status}")
@@ -642,14 +652,17 @@ def run_rts_aruc(
             raise RuntimeError("No feasible solution found by Gurobi.")
 
     # Iterative line violation resolution (if lines were filtered)
+    line_iterations = 0
     if data_full is not None:
         from compute_branch_flows import iterative_line_resolve
         _rmask = robust_mask if robust_mask is not None else np.ones(data.n_periods, dtype=bool)
-        iterative_line_resolve(
+        t0 = time.time()
+        line_iterations = iterative_line_resolve(
             model, vars_dict, data, data_full,
             _rmask, sqrt_Sigma, rho,
             rho_lines_frac, time_varying,
         )
+        timings["line_iterations_solve"] = time.time() - t0
 
     results = extract_solution(data, model, vars_dict)
     print_brief_summary(results, data)
@@ -661,6 +674,8 @@ def run_rts_aruc(
     if dam_results is not None:
         compare_with_deterministic(results, dam_results)
 
+    timings["total_wall"] = time.time() - t_wall_start
+
     return {
         "data": data,
         "model": model,
@@ -670,6 +685,8 @@ def run_rts_aruc(
         "rho": rho,
         "rho_lines_frac": rho_lines_frac,
         "time_varying": time_varying,
+        "timings": timings,
+        "line_iterations": line_iterations,
     }
 
 

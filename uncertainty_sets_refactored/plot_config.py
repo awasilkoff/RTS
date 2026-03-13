@@ -13,10 +13,10 @@ import matplotlib.pyplot as plt
 # IEEE single-column figure sizes (3.5" wide)
 # Fonts must be 7pt+ when printed
 FONT_SIZES = {
-    "small": 8,      # Ticks, legend
-    "medium": 9,     # Axis labels
-    "large": 9,      # Titles (often omitted for IEEE)
-    "xlarge": 10,    # Figure suptitle
+    "small": 10,     # Ticks, legend
+    "medium": 11,    # Axis labels
+    "large": 12,     # Titles (often omitted for IEEE)
+    "xlarge": 13,    # Figure suptitle
 }
 
 # For two-column figures (7" wide), double these
@@ -68,8 +68,8 @@ def setup_plotting():
         "savefig.bbox": "tight",
 
         # Lines
-        "lines.linewidth": 2.0,
-        "lines.markersize": 8,
+        "lines.linewidth": 2.5,
+        "lines.markersize": 10,
 
         # Grid
         "axes.grid": True,

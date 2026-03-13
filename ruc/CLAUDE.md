@@ -195,8 +195,14 @@ python ruc/run_ruc.py --hours 12 --start-month 7 --start-day 15 --t-next 25 --rh
 
 ### Paper
 
-Sections 1–5 and 7 are fully drafted in `Paper_Files/paper.tex` (7 pages). Section 6 (Case Study) has structure and TODO comments awaiting numerical results. Compile with:
+Two versions of the paper exist in `Paper_Files/`:
+
+- **`paper.tex`** — Original two-phase decomposition version (Phase 1 deterministic MIP + Phase 2 robust SOCP + CCG iteration). Sections 1–5 and 7 are fully drafted (7 pages). Section 6 (Case Study) has TODO comments.
+- **`paper_monolithic.tex`** — Monolithic MISOCP version. Eliminates the Phase 1/Phase 2/CCG machinery and instead presents a single MISOCP that jointly optimizes gated commitment and robust dispatch (same as existing ARUC infrastructure but with gated objective). The gating concept, market-reliability decomposition, and generalization sections are preserved. This version is simpler and more consistent with how the code would actually be implemented (reusing `aruc_model.py` with a gating mask and incremental objective).
+
+Compile either with:
 
 ```bash
 cd ruc/Paper_Files && pdflatex paper.tex
+cd ruc/Paper_Files && pdflatex paper_monolithic.tex
 ```

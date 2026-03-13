@@ -24,11 +24,30 @@ This formulation reuses:
 
 ```
 ruc/
-├── CLAUDE.md          # This file
-├── ruc_model.py       # New RUC formulation (Gurobi model builder)
-├── run_ruc.py         # End-to-end RUC pipeline
-└── ...                # Additional modules as needed
+├── CLAUDE.md              # This file
+├── ruc_model.py           # CCG-based RUC formulation (Phase 1 MIP + Phase 2 SOCP)
+├── run_ruc.py             # CCG pipeline: DAM → gating → Phase 1/2 iteration
+├── run_ruc_monolithic.py  # Monolithic pipeline: DAM → gating → single MISOCP
+└── Paper_Files/
+    ├── paper.tex              # Paper with two-phase CCG approach
+    └── paper_monolithic.tex   # Paper with monolithic MISOCP approach
 ```
+
+### Two implementation approaches
+
+**CCG decomposition** (`run_ruc.py` + `ruc_model.py`):
+- Phase 1: Deterministic gated MIP (no SOC constraints)
+- Phase 2: Robust feasibility SOCP (no integers)
+- CCG iteration if Phase 2 finds a gap
+- Self-contained model builder in `ruc_model.py`
+
+**Monolithic MISOCP** (`run_ruc_monolithic.py`):
+- Single solve: reuses `aruc_model.py` with `gating_mask` parameter
+- `build_aruc_ldr_model(..., incremental_obj=True, gating_mask=gating_mask)`
+- Same optimal solution, simpler code, leverages existing ARUC infrastructure
+- Added `gating_mask` parameter to `aruc_model.py:build_aruc_ldr_model()`
+
+Both approaches share `assign_notification_times()` (from `run_ruc.py`) and `compute_gating_sets()` (from `ruc_model.py`).
 
 ## Paper Outline (Variation 1: "The Diagnosis")
 
@@ -181,16 +200,28 @@ Phase 2 now has slack on all constraint families (power balance, wind SOC, line 
 ### Key commands
 
 ```bash
+# === Monolithic MISOCP (recommended) ===
+
 # Basic smoke test (copper-plate, small rho)
-python ruc/run_ruc.py --hours 6 --start-month 7 --start-day 15 --t-next 25 --rho 2.0
+python ruc/run_ruc_monolithic.py --hours 6 --start-month 7 --start-day 15 --t-next 25 --rho 2.0
 
 # Full test with lines (moderate rho)
-python ruc/run_ruc.py --hours 12 --start-month 7 --start-day 15 --t-next 25 --rho 5.0 --enforce-lines
+python ruc/run_ruc_monolithic.py --hours 12 --start-month 7 --start-day 15 --t-next 25 --rho 5.0 --enforce-lines
+
+# With performance tuning
+python ruc/run_ruc_monolithic.py --hours 48 --start-month 7 --start-day 15 --t-next 25 --rho 5.0 --enforce-lines --day1-only-robust --fix-wind-z --time-limit 600
+
+# Outputs go to ruc/ruc_outputs/mono_<run_tag>/
+
+# === CCG decomposition (original) ===
+
+# Basic smoke test
+python ruc/run_ruc.py --hours 6 --start-month 7 --start-day 15 --t-next 25 --rho 2.0
 
 # Stress test (large rho, CCG iterations)
 python ruc/run_ruc.py --hours 12 --start-month 7 --start-day 15 --t-next 25 --rho 25.0 --enforce-lines --max-ccg-iter 5
 
-# All outputs go to ruc/ruc_outputs/<run_tag>/
+# Outputs go to ruc/ruc_outputs/<run_tag>/
 ```
 
 ### Paper

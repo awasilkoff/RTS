@@ -89,6 +89,7 @@ def build_aruc_ldr_model(
     bar_qcp_conv_tol: Optional[float] = None,
     line_mask: Optional[np.ndarray] = None,
     flow_direction: Optional[np.ndarray] = None,
+    gating_mask: Optional[np.ndarray] = None,
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Adaptive robust UC with linear decision rules:
@@ -354,16 +355,25 @@ def build_aruc_ldr_model(
     if incremental_obj and dam_commitment is not None:
         # Incremental objective: only pay commitment costs for additional
         # units (u_dam=0), scale dispatch costs down to break ties.
+        # If gating_mask is provided, further restrict to gated (i,t) pairs.
         u_dam_arr = dam_commitment["u"]
+        gated_label = ""
+        if gating_mask is not None:
+            gated_label = " (gated only)"
+            n_gated = int(gating_mask.sum())
+            print(f"  [ARUC] Gated incremental objective: {n_gated} gated (i,t) pairs{gated_label}")
         if worst_case_cost:
-            print(f"  [ARUC] Incremental objective: commitment costs for "
+            print(f"  [ARUC] Incremental objective{gated_label}: commitment costs for "
                   f"additional units only, worst-case dispatch scaled by {dispatch_cost_scale}")
         else:
-            print(f"  [ARUC] Incremental objective: commitment costs for "
+            print(f"  [ARUC] Incremental objective{gated_label}: commitment costs for "
                   f"additional units only, dispatch scaled by {dispatch_cost_scale}")
         for i in range(I):
             for t in range(T):
                 if u_dam_arr[i, t] < 0.5:  # not committed by DAM
+                    # If gating_mask provided, only penalize gated periods
+                    if gating_mask is not None and not gating_mask[i, t]:
+                        continue
                     obj.addTerms(C_NL[i] * dt[t], u[i, t])
                     obj.addTerms(C_SU[i], v[i, t])
                     obj.addTerms(C_SD[i], w[i, t])

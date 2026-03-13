@@ -944,6 +944,20 @@ def fig3b_4b_hyperparameter_sweeps(
     df_sweep = _load_sweep_results(feature_set_dir)
     nll_global = df_sweep.iloc[0]["val_nll_global"]
 
+    # Consistency check: compare k-NN sweep NLL with sweep_results k-NN NLL
+    nll_knn_from_sweep = df_sweep.iloc[0].get("val_nll_euclidean_knn")
+    if nll_knn_from_sweep is not None:
+        best_knn_from_k_sweep = nll_mean_k[best_k_idx]
+        rel_diff = abs(best_knn_from_k_sweep - nll_knn_from_sweep) / abs(nll_knn_from_sweep)
+        if rel_diff > 0.05:
+            print(
+                f"  WARNING: k-NN NLL mismatch between data sources! "
+                f"knn_k_sweep best={best_knn_from_k_sweep:.3f}, "
+                f"sweep_results knn={nll_knn_from_sweep:.3f} "
+                f"(rel diff={rel_diff:.1%}). "
+                f"The two sweeps may use different features, splits, or data."
+            )
+
     ax_k.axhline(
         nll_learned_best,
         linestyle="--",

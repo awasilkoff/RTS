@@ -10,10 +10,10 @@ Usage:
 
 Outputs saved to: data/viz_artifacts/paper_final/
     figures/
-        fig1_kernel_distance.pdf    - Kernel distance: Learned (k=64, τ=1) vs Euclidean k-NN
+        fig1_kernel_distance.pdf    - Kernel distance: Learned (k=64, κ=1) vs Euclidean k-NN
         fig2_ellipsoid_3d.pdf       - 3D side-by-side: Global vs Learned, k-NN vs Learned
         fig3_nll_vs_k.pdf           - NLL vs k sweep for k-NN
-        fig4_nll_vs_tau.pdf         - NLL vs tau sweep for learned omega (16D)
+        fig4_nll_vs_kappa.pdf       - NLL vs kappa sweep for learned omega (16D)
         fig5_nll_16d.pdf            - NLL comparison bar chart (16D features)
         fig5b_nll_boxplot.pdf       - NLL box and whisker plot (16D features)
         fig6_calibration.pdf        - Global conformal calibration (with tolerance + error bars)
@@ -27,15 +27,15 @@ Outputs saved to: data/viz_artifacts/paper_final/
         fig10_ellipse_overlay.pdf   - Ellipse overlay (k=16, 512, global)
         fig10b_ellipse_overlay_two_hours.pdf        - Two-hour overlay (normal+extreme) across k=16, 512, Global
         fig10b_ellipse_overlay_two_hours_learned.pdf - Same with Learned ω as 4th panel
-        fig11_tau_sweep_unconstrained.pdf - NLL vs tau (no constraint, no reg, 16D)
+        fig11_kappa_sweep_unconstrained.pdf - NLL vs kappa (no constraint, no reg, 16D)
         fig_nll_heatmap_focused_2d.pdf  - Per-point NLL scatter (k-NN vs Learned, 2D)
         fig_nll_heatmap_high_dim_16d.pdf - Per-point NLL scatter (k-NN vs Learned, 16D projected)
         fig_nll_delta_high_dim_16d.pdf  - Smoothed ΔNLL surface (learned ω improvement over k-NN)
     tables/
-        tab_nll_vs_tau.tex          - NLL at different tau values
+        tab_nll_vs_kappa.tex        - NLL at different kappa values
         tab_nll_vs_k.tex            - NLL at different k values
         tab_omega_weights.tex       - Learned omega per feature set
-        tab_nll_summary.tex         - Learned (best tau) vs k-NN (k=16, k=512) vs global
+        tab_nll_summary.tex         - Learned (best kappa) vs k-NN (k=16, k=512) vs global
     figure_metadata.json
 
 Required prerequisites:
@@ -143,16 +143,16 @@ def _load_feature_config(feature_set_dir: Path) -> dict:
 
 def _filter_diverged_taus(tau_values, nll_values, *other_arrays, factor=2.0,
                           nll_std=None, std_factor=0.5):
-    """Filter out tau values where NLL diverged or has high variance.
+    """Filter out kappa values where NLL diverged or has high variance.
 
-    Very small tau can produce near-singular covariance estimates with
+    Very small kappa can produce near-singular covariance estimates with
     pathologically large NLL or highly variable results across seeds.
     This filters those points from charts.
 
     Parameters
     ----------
     nll_std : array, optional
-        If provided, also filter taus where std > std_factor * median_nll
+        If provided, also filter kappas where std > std_factor * median_nll
         (coefficient of variation too high for reliable estimates).
     std_factor : float
         Threshold for std filter: drop if std > std_factor * median(nll).
@@ -167,7 +167,7 @@ def _filter_diverged_taus(tau_values, nll_values, *other_arrays, factor=2.0,
     n_dropped = (~keep).sum()
     if n_dropped > 0:
         dropped_taus = tau_values[~keep]
-        print(f"  Divergence filter: dropped {n_dropped} tau(s) {dropped_taus.tolist()} "
+        print(f"  Divergence filter: dropped {n_dropped} kappa(s) {dropped_taus.tolist()} "
               f"(NLL > {factor}x median {median_nll:.1f}"
               f"{f' or std > {std_factor}x median' if nll_std is not None else ''})")
     result = [tau_values[keep], nll_values[keep]]
@@ -206,7 +206,7 @@ def fig1_kernel_distance_comparison(
     Generate kernel distance comparison figure.
 
     Shows side-by-side: Euclidean k-NN (uniform) vs Learned omega kernel weights.
-    Uses optimal hyperparameters: k=64, tau=1.0.
+    Uses optimal hyperparameters: k=64, kappa=1.0.
     """
     from viz_kernel_distance import (
         compute_kernel_weights,
@@ -511,7 +511,7 @@ def fig2_3d_ellipsoid_comparison(
             color="w",
             markerfacecolor=color_learned,
             markersize=8,
-            label=f"Learned ω (τ={tau})",
+            label=f"Learned ω (κ={tau})",
         ),
     ]
     ax1.legend(handles=legend_elements, loc="upper left", fontsize=7)
@@ -581,7 +581,7 @@ def fig2_3d_ellipsoid_comparison(
             color="w",
             markerfacecolor=color_learned,
             markersize=8,
-            label=f"Learned ω (τ={tau})",
+            label=f"Learned ω (κ={tau})",
         ),
     ]
     ax2.legend(handles=legend_elements_r, loc="upper left", fontsize=7)
@@ -725,7 +725,7 @@ def fig3_nll_vs_k(
 
 
 # ============================================================================
-# FIGURE 4: NLL vs tau Sweep (multi-seed)
+# FIGURE 4: NLL vs kappa Sweep (multi-seed)
 # ============================================================================
 
 
@@ -734,7 +734,7 @@ def fig4_nll_vs_tau(
     output_path: Path = None,
 ) -> plt.Figure:
     """
-    Plot learned omega NLL as function of tau, with multi-seed error bars.
+    Plot learned omega NLL as function of kappa, with multi-seed error bars.
 
     Reads multi_seed_stats.csv from the feature set directory (e.g. high_dim_16d/).
     Falls back to single-seed sweep_results.csv if multi-seed data unavailable.
@@ -742,7 +742,7 @@ def fig4_nll_vs_tau(
     if feature_set_dir is None:
         feature_set_dir = HIGH_DIM_16D_DIR
     if output_path is None:
-        output_path = OUTPUT_DIR / "figures" / "fig4_nll_vs_tau"
+        output_path = OUTPUT_DIR / "figures" / "fig4_nll_vs_kappa"
 
     # Try multi-seed data first
     stats_path = feature_set_dir / "multi_seed_stats.csv"
@@ -755,7 +755,7 @@ def fig4_nll_vs_tau(
         nll_min = stats["val_nll_min"].values
         nll_max = stats["val_nll_max"].values
 
-        # Filter diverged taus (very small tau -> near-singular covariance)
+        # Filter diverged kappas (very small kappa -> near-singular covariance)
         tau_values, nll_mean, nll_std, nll_min, nll_max = _filter_diverged_taus(
             tau_values, nll_mean, nll_std, nll_min, nll_max, nll_std=nll_std
         )
@@ -793,10 +793,10 @@ def fig4_nll_vs_tau(
             zorder=10,
             edgecolors="black",
             linewidths=1,
-            label=f"Best: τ={tau_values[best_idx]}",
+            label=f"Best: κ={tau_values[best_idx]}",
         )
 
-        print(f"  Multi-seed data: {len(tau_values)} tau values")
+        print(f"  Multi-seed data: {len(tau_values)} kappa values")
     else:
         # Fallback: single-seed sweep results
         print(
@@ -808,7 +808,7 @@ def fig4_nll_vs_tau(
         tau_nll = df_filtered.groupby("tau")["val_nll_learned"].min().reset_index()
         tau_nll = tau_nll.sort_values("tau")
 
-        # Filter diverged taus
+        # Filter diverged kappas
         _tau_arr = tau_nll["tau"].values
         _nll_arr = tau_nll["val_nll_learned"].values
         _tau_arr, _nll_arr = _filter_diverged_taus(_tau_arr, _nll_arr)
@@ -838,10 +838,10 @@ def fig4_nll_vs_tau(
             zorder=5,
             edgecolors="black",
             linewidths=1,
-            label=f"Best: τ={best_tau}",
+            label=f"Best: κ={best_tau}",
         )
 
-    ax.set_xlabel("τ (Kernel Bandwidth)")
+    ax.set_xlabel("κ (Kernel Bandwidth)")
     ax.set_ylabel("Validation NLL")
     ax.set_xscale("log")
     ax.legend(fontsize=7, loc="upper left")
@@ -861,11 +861,11 @@ def fig3b_4b_hyperparameter_sweeps(
     output_path: Path = None,
 ) -> plt.Figure:
     """
-    Two-panel figure: (a) NLL vs k with baselines, (b) NLL vs tau with baselines.
+    Two-panel figure: (a) NLL vs k with baselines, (b) NLL vs kappa with baselines.
 
     Shares y-axis range across panels for direct visual comparison.
     Panel (a) enhances fig3 with learned omega + global horizontal lines.
-    Panel (b) merges fig4 + fig11: multi-seed tau sweep with baselines.
+    Panel (b) merges fig4 + fig11: multi-seed kappa sweep with baselines.
     """
     if feature_set_dir is None:
         feature_set_dir = HIGH_DIM_16D_DIR
@@ -949,7 +949,7 @@ def fig3b_4b_hyperparameter_sweeps(
         linestyle="--",
         linewidth=1.5,
         color=COLORS["learned"],
-        label=f"Learned ω (τ={best_tau:g})",
+        label=f"Learned ω (κ={best_tau:g})",
     )
     ax_k.axhline(
         nll_global,
@@ -975,7 +975,7 @@ def fig3b_4b_hyperparameter_sweeps(
     )
 
     # ------------------------------------------------------------------
-    # Panel (b): NLL vs tau  (learned omega sweep + baselines)
+    # Panel (b): NLL vs kappa  (learned omega sweep + baselines)
     # ------------------------------------------------------------------
     if tau_stats_path.exists():
         tau_stats = pd.read_csv(tau_stats_path)
@@ -992,7 +992,7 @@ def fig3b_4b_hyperparameter_sweeps(
         nll_mean_tau = df_filt["val_nll_learned"].values
         nll_std_tau = np.zeros_like(nll_mean_tau)
 
-    # Filter diverged taus (also filter high-variance points by std)
+    # Filter diverged kappas (also filter high-variance points by std)
     tau_vals, nll_mean_tau, nll_std_tau = _filter_diverged_taus(
         tau_vals, nll_mean_tau, nll_std_tau, nll_std=nll_std_tau
     )
@@ -1014,7 +1014,7 @@ def fig3b_4b_hyperparameter_sweeps(
         color=COLORS["learned"],
     )
 
-    # Mark best tau
+    # Mark best kappa
     best_tau_idx = np.argmin(nll_mean_tau)
     ax_tau.scatter(
         [tau_vals[best_tau_idx]],
@@ -1025,7 +1025,7 @@ def fig3b_4b_hyperparameter_sweeps(
         zorder=10,
         edgecolors="black",
         linewidths=1,
-        label=f"Best: τ={tau_vals[best_tau_idx]:g}",
+        label=f"Best: κ={tau_vals[best_tau_idx]:g}",
     )
 
     # Baselines: best k-NN and global
@@ -1045,7 +1045,7 @@ def fig3b_4b_hyperparameter_sweeps(
         label="Global",
     )
 
-    ax_tau.set_xlabel("τ (Kernel Bandwidth)")
+    ax_tau.set_xlabel("κ (Kernel Bandwidth)")
     ax_tau.set_xscale("log")
     ax_tau.legend(fontsize=6, loc="upper left")
     ax_tau.grid(True, alpha=0.3)
@@ -2211,7 +2211,7 @@ def fig10b_ellipse_overlay_two_hours(
             omega=omega, tau=tau, k=k_learned,
             zero_mean=(ACTUAL_COL == "RESIDUAL"),
         )
-        methods.append(("learned", f"Learned ω (τ={tau})"))
+        methods.append(("learned", f"Learned ω (κ={tau})"))
 
     n_panels = len(methods)
     color_normal  = "#2A9D8F"  # teal  — matches fig8 col 0
@@ -2277,21 +2277,21 @@ def fig10b_ellipse_overlay_two_hours(
 
 
 # ============================================================================
-# FIGURE 11: Tau Sweep for Learned Omega (unconstrained, no regularization)
+# FIGURE 11: Kappa Sweep for Learned Omega (unconstrained, no regularization)
 # ============================================================================
 def fig11_tau_sweep_unconstrained(
     feature_set_dir: Path = None,  # resolved at call time via HIGH_DIM_16D_DIR
     output_path: Path = None,
 ) -> plt.Figure:
     """
-    NLL vs tau for learned omega with omega_constraint=none, L2 reg=0, 16D features.
+    NLL vs kappa for learned omega with omega_constraint=none, L2 reg=0, 16D features.
 
     Shows learned omega NLL alongside k-NN (k=16) and global baselines.
     """
     if feature_set_dir is None:
         feature_set_dir = HIGH_DIM_16D_DIR
     if output_path is None:
-        output_path = OUTPUT_DIR / "figures" / "fig11_tau_sweep_unconstrained"
+        output_path = OUTPUT_DIR / "figures" / "fig11_kappa_sweep_unconstrained"
 
     df = _load_sweep_results(feature_set_dir)
 
@@ -2321,7 +2321,7 @@ def fig11_tau_sweep_unconstrained(
     nll_knn = df_filtered["val_nll_euclidean_knn"].values
     nll_global = df_filtered["val_nll_global"].values
 
-    # Filter diverged taus
+    # Filter diverged kappas
     tau_values, nll_learned, nll_knn, nll_global = _filter_diverged_taus(
         tau_values, nll_learned, nll_knn, nll_global
     )
@@ -2339,7 +2339,7 @@ def fig11_tau_sweep_unconstrained(
         label="Learned ω",
     )
 
-    # k-NN baseline (horizontal — same value at all tau)
+    # k-NN baseline (horizontal — same value at all kappa)
     ax.axhline(
         nll_knn[0],
         linestyle="--",
@@ -2357,7 +2357,7 @@ def fig11_tau_sweep_unconstrained(
         label="Global",
     )
 
-    # Mark best tau
+    # Mark best kappa
     best_idx = np.argmin(nll_learned)
     ax.scatter(
         [tau_values[best_idx]],
@@ -2368,10 +2368,10 @@ def fig11_tau_sweep_unconstrained(
         zorder=10,
         edgecolors="black",
         linewidths=1,
-        label=f"Best: τ={tau_values[best_idx]}",
+        label=f"Best: κ={tau_values[best_idx]}",
     )
 
-    ax.set_xlabel("τ (Kernel Bandwidth)")
+    ax.set_xlabel("κ (Kernel Bandwidth)")
     ax.set_ylabel("Validation NLL")
     ax.set_xscale("log")
     ax.legend(fontsize=7, loc="upper right")
@@ -2391,7 +2391,7 @@ def table_nll_summary(
     output_path: Path = None,
 ) -> str:
     """
-    LaTeX table: learned omega (best tau), k-NN (k=16, k=512), and global NLL.
+    LaTeX table: learned omega (best kappa), k-NN (k=16, k=512), and global NLL.
 
     Reads learned NLL from multi-seed stats in the feature set directory if available,
     otherwise falls back to single-seed sweep_results.csv.
@@ -2401,7 +2401,7 @@ def table_nll_summary(
     if output_path is None:
         output_path = OUTPUT_DIR / "tables" / "tab_nll_summary.tex"
 
-    # Learned omega NLL — prefer multi-seed data (has finer tau grid)
+    # Learned omega NLL — prefer multi-seed data (has finer kappa grid)
     best_tau = None
     nll_learned = None
     multi_seed_path = feature_set_dir / "multi_seed_stats.csv"
@@ -2411,7 +2411,7 @@ def table_nll_summary(
         best_tau = best_row["tau"]
         nll_learned = best_row["val_nll_mean"]
 
-    # Global NLL from sweep_results (same across all tau)
+    # Global NLL from sweep_results (same across all kappa)
     df = _load_sweep_results(feature_set_dir)
     if nll_learned is None:
         mask = (df["omega_constraint"] == "none") & (df["omega_l2_reg"] == 0.0)
@@ -2433,7 +2433,7 @@ def table_nll_summary(
         if not k512.empty:
             nll_knn512 = k512.iloc[0]["nll_mean"]
 
-    print(f"  Learned ω (τ={best_tau}): {nll_learned:.3f}")
+    print(f"  Learned ω (κ={best_tau}): {nll_learned:.3f}")
     print(f"  k-NN (k=16):        {nll_knn16:.3f}")
     if nll_knn512 is not None:
         print(f"  k-NN (k=512):       {nll_knn512:.3f}")
@@ -2449,7 +2449,7 @@ def table_nll_summary(
 Method & NLL \\
 \hline
 """
-    latex += f"Learned $\\omega$ ($\\tau={tau_str}$) & {nll_learned:.3f} \\\\\n"
+    latex += f"Learned $\\omega$ ($\\kappa={tau_str}$) & {nll_learned:.3f} \\\\\n"
     latex += f"$k$-NN ($k=16$) & {nll_knn16:.3f} \\\\\n"
     if nll_knn512 is not None:
         latex += f"$k$-NN ($k=512$) & {nll_knn512:.3f} \\\\\n"
@@ -2475,12 +2475,12 @@ def table_nll_vs_tau(
     output_path: Path = None,
 ) -> str:
     """
-    Generate LaTeX table: NLL at different tau values.
+    Generate LaTeX table: NLL at different kappa values.
     """
     if feature_set_dir is None:
         feature_set_dir = HIGH_DIM_16D_DIR
     if output_path is None:
-        output_path = OUTPUT_DIR / "tables" / "tab_nll_vs_tau.tex"
+        output_path = OUTPUT_DIR / "tables" / "tab_nll_vs_kappa.tex"
 
     df = _load_sweep_results(feature_set_dir)
 
@@ -2492,7 +2492,7 @@ def table_nll_vs_tau(
         median_nll = df["val_nll_learned"].median()
         df = df[df["val_nll_learned"] <= 2.0 * median_nll].copy()
 
-    # Get unique tau values
+    # Get unique kappa values
     tau_values = sorted(df["tau"].unique())
 
     # Build table rows
@@ -2512,12 +2512,12 @@ def table_nll_vs_tau(
 
     # Generate LaTeX
     latex = r"""\begin{table}[htbp]
-\caption{Validation NLL vs Kernel Bandwidth $\tau$}
-\label{tab:nll_vs_tau}
+\caption{Validation NLL vs Kernel Bandwidth $\kappa$}
+\label{tab:nll_vs_kappa}
 \centering
 \begin{tabular}{lcccc}
 \toprule
-$\tau$ & Learned $\omega$ & Kernel (ω=1) & k-NN & Global \\
+$\kappa$ & Learned $\omega$ & Kernel (ω=1) & k-NN & Global \\
 \midrule
 """
 
@@ -2777,7 +2777,7 @@ def fig_nll_heatmap(
 
     for ax, nll, title in [
         (ax_left, nll_knn, "Euclidean k-NN (k=64)"),
-        (ax_right, nll_learned, f"Learned ω (τ={tau}, k={k})"),
+        (ax_right, nll_learned, f"Learned ω (κ={tau}, k={k})"),
     ]:
         sc = ax.scatter(
             xs,
@@ -3129,11 +3129,11 @@ def generate_all_figures(use_residuals: bool = False):
     except Exception as e:
         print(f"  Error: {e}")
 
-    # Figure 4: NLL vs tau
-    print("\n[4/15] NLL vs tau sweep...")
+    # Figure 4: NLL vs kappa
+    print("\n[4/15] NLL vs kappa sweep...")
     try:
         fig4_nll_vs_tau()
-        figures_generated.append("fig4_nll_vs_tau")
+        figures_generated.append("fig4_nll_vs_kappa")
     except Exception as e:
         print(f"  Error: {e}")
 
@@ -3253,11 +3253,11 @@ def generate_all_figures(use_residuals: bool = False):
     except Exception as e:
         print(f"  Error: {e}")
 
-    # Figure 11: Tau sweep (unconstrained, no regularization)
-    print("\n[11/15] Tau sweep (unconstrained, no reg, 16D)...")
+    # Figure 11: Kappa sweep (unconstrained, no regularization)
+    print("\n[11/15] Kappa sweep (unconstrained, no reg, 16D)...")
     try:
         fig11_tau_sweep_unconstrained()
-        figures_generated.append("fig11_tau_sweep_unconstrained")
+        figures_generated.append("fig11_kappa_sweep_unconstrained")
     except Exception as e:
         print(f"  Error: {e}")
 
@@ -3292,11 +3292,11 @@ def generate_all_figures(use_residuals: bool = False):
     print("GENERATING LATEX TABLES")
     print("-" * 40)
 
-    # Table 1: NLL vs tau
-    print("\n[1/3] NLL vs tau table...")
+    # Table 1: NLL vs kappa
+    print("\n[1/3] NLL vs kappa table...")
     try:
         table_nll_vs_tau()
-        tables_generated.append("tab_nll_vs_tau")
+        tables_generated.append("tab_nll_vs_kappa")
     except Exception as e:
         print(f"  Error: {e}")
 

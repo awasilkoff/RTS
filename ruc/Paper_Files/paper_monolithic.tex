@@ -1,0 +1,1016 @@
+\documentclass[journal]{IEEEtran}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\interdisplaylinepenalty=2500
+
+\hyphenation{op-tical net-works semi-conduc-tor}
+
+\begin{document}
+
+\title{Notification-Gated Reliability Unit Commitment:\\ Least-Distortionary Out-of-Market Interventions}
+
+\author{Author~One,~\IEEEmembership{Member,~IEEE,}
+        Author~Two,
+        and~Author~Three,~\IEEEmembership{Senior~Member,~IEEE}%
+\thanks{Affiliations and funding acknowledgments.}%
+\thanks{Manuscript received XXXX; revised XXXX.}}
+
+\markboth{IEEE Transactions on Power Systems}%
+{Authors: Notification-Gated Reliability Unit Commitment}
+
+\maketitle
+
+\begin{abstract}
+System operators routinely commit generation resources outside of the
+energy market to ensure reliability, but existing reliability unit
+commitment (RUC) formulations optimize over the full planning horizon
+without distinguishing decisions that must be made immediately from
+those that can be deferred to subsequent market processes.
+This scope mismatch leads to systematic over-commitment, displacing
+market-scheduled resources and distorting price signals.
+We propose a notification-gated RUC formulation that uses physical
+generator startup lead times to identify the minimal set of
+non-deferrable commitment decisions at each operational stage.
+The formulation is a mixed-integer second-order cone program (MISOCP)
+that minimizes reliability intervention costs over the gating window
+while enforcing worst-case dispatch feasibility under ellipsoidal
+uncertainty via linear decision rules.
+The gating framework generalizes across operational horizons ---
+multi-day assessment, day-ahead RUC, and intra-day RUC are all
+instances with different parameterizations --- and recovers standard
+DARUC as a limiting case.
+Numerical experiments on the RTS-GMLC test case demonstrate
+significant reductions in out-of-market commitments while maintaining
+system reliability under worst-case uncertainty.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Reliability unit commitment, robust optimization, market design,
+notification time, linear decision rules.
+\end{IEEEkeywords}
+
+\IEEEpeerreviewmaketitle
+
+
+%% ===================================================================
+%%  SECTION 1 — INTRODUCTION
+%% ===================================================================
+\section{Introduction}
+
+\IEEEPARstart{R}{eliability} processes are required in power system
+operations due to a
+fundamental market failure in the provision of reliability. To address
+this, system operators routinely commit generation resources outside of
+the energy market through reliability-driven commitment actions.
+While effective in preserving system feasibility, empirical evidence
+and operational experience indicate that the heuristics used to trigger
+these commitments are often overly conservative, leading to systematic
+over-commitment and distortion of price signals in both the day-ahead
+and real-time markets.
+
+Motivated by this gap, this work proposes a robust optimization
+framework to identify the minimal set of generation commitment decisions
+that are strictly necessary prior to the next day-ahead market clearing
+to ensure system reliability. Rather than optimizing all commitment and
+dispatch decisions under uncertainty, the proposed methodology focuses
+exclusively on commitment decisions that cannot be deferred without
+risking infeasibility under adverse realizations of load and renewable
+generation.
+
+System reliability is enforced with respect to a worst-case forecast
+model of net demand, capturing uncertainty in both load and renewable
+production. Commitment decisions are selected so as to guarantee
+feasibility for all realizations within this uncertainty set, while
+minimizing the extent of out-of-market intervention. In this sense, the
+resulting commitments may be interpreted as the least-distortionary
+reliability actions, providing a principled defense of operator
+interventions while preserving market signals to the greatest extent
+possible.
+
+\subsection{Contributions}
+
+This paper makes the following contributions.
+
+First, we develop a notification-gated formulation for reliability unit
+commitment that explicitly models the interaction between physical
+generator lead times and the sequencing of market and operational
+decision processes. The proposed framework identifies the subset of
+commitment decisions that cannot be deferred to subsequent market stages
+and restricts out-of-market interventions to this non-deferrable
+decision set.
+
+Second, we introduce a minimal-intervention reliability objective that
+minimizes only startup actions and associated no-load costs induced by
+non-deferrable commitments, while enforcing worst-case dispatch
+feasibility under ellipsoidal uncertainty through linear decision rules.
+The resulting mixed-integer second-order cone program jointly optimizes
+commitment and robust dispatch, decoupling reliability enforcement from
+full economic re-optimization while preserving market-based outcomes.
+
+Third, we demonstrate that the proposed formulation generalizes
+naturally across operational horizons, including multi-day reliability
+assessment and day-ahead reliability unit commitment, enabling
+coordinated treatment of long-lead thermal resources and near-term
+reliability adjustments within a unified optimization framework.
+
+Fourth, we conduct a comprehensive numerical evaluation comparing the
+proposed approach against standard reliability unit commitment and
+integrated market-reliability formulations. Results show significant
+reductions in early commitment interventions and redispatch magnitude
+without compromising system reliability.
+
+
+%% ===================================================================
+%%  SECTION 2 — LITERATURE REVIEW
+%% ===================================================================
+\section{Literature Review}
+
+\subsection{Reliability Commitment in Practice}
+
+Every North American RTO operates a reliability unit commitment
+process following the day-ahead market clearing.
+The Southwest Power Pool (SPP) runs a DARUC with a 48-hour
+look-ahead that may commit additional resources beyond the
+day-ahead market solution~[cite SPP market protocols].
+The Midcontinent ISO (MISO) executes a similar reliability
+assessment commitment (RAC) process to ensure resource adequacy
+over the next operating day~[cite MISO BPM-002].
+CAISO's residual unit commitment (RUC) procures capacity to
+close any gap between day-ahead scheduled supply and the
+operator's demand forecast~[cite CAISO BPM].
+PJM, NYISO, and ERCOT employ analogous processes under varying
+nomenclature~[cite PJM manual 11; NYISO OATT; ERCOT protocols].
+
+Despite the ubiquity of these processes, their mathematical
+formulations are largely proprietary and vary considerably across
+operators.
+FERC Order~2222 and subsequent technical conferences have drawn
+attention to the market impact of reliability commitments, noting
+that out-of-market actions can suppress energy prices and
+create uplift charges~[cite FERC].
+The academic literature has given comparatively little attention
+to the formulation of the reliability commitment problem itself,
+typically treating it as a standard unit commitment solved
+after the market clears.
+The sequential nature of the decision process --- and in
+particular the question of \emph{which} decisions must be made
+at each stage --- has received almost no formal treatment.
+
+\subsection{Robust and Stochastic Unit Commitment}
+
+The robust optimization approach to unit commitment was
+pioneered by Bertsimas et~al.~[cite Bertsimas 2012], who
+introduced a polyhedral uncertainty set for net load and solved
+the two-stage problem via Benders decomposition.
+Subsequent work by Jiang et~al.~[cite Jiang 2012] developed
+column-and-constraint generation methods that avoid the need for
+dual-based decomposition and demonstrated improved computational
+performance.
+Zhao and Guan~[cite Zhao Guan 2013] extended the framework to
+multi-stage settings and established finite convergence results
+for the CCG procedure.
+
+Stochastic unit commitment provides an alternative treatment of
+uncertainty through scenario-based formulations.
+Papavasiliou et~al.~[cite Papavasiliou 2011] demonstrated the
+value of stochastic optimization for wind integration, and
+Zheng et~al.~[cite Zheng 2015] developed decomposition methods
+for large-scale stochastic UC problems.
+Distributionally robust approaches, which optimize over
+ambiguity sets of probability distributions, have been explored
+by Xiong et~al.~[cite Xiong 2017] and others.
+
+Linear decision rules (LDR) provide a tractable approximation of
+the recourse policy in robust and adaptive optimization.
+Ben-Tal et~al.~[cite Ben-Tal 2004] established the affine
+adjustable robust counterpart framework, and Lorca and
+Sun~[cite Lorca Sun 2016] applied LDR to unit commitment with
+ellipsoidal uncertainty sets, obtaining second-order cone
+reformulations.
+The present work builds on the LDR-based robust UC framework
+developed in~[paper~2], which introduces learned covariance
+estimation and conformal prediction for uncertainty set
+calibration.
+
+A common feature of the existing robust UC literature is that
+the formulation scope encompasses \emph{all} commitment decisions
+over the planning horizon.
+The contribution of this paper is orthogonal to the choice of
+uncertainty model: rather than proposing a new uncertainty
+representation, we introduce a \emph{decision scope} restriction
+that limits the reliability optimization to non-deferrable
+commitments, regardless of whether the underlying model is
+deterministic, robust, or stochastic.
+
+\subsection{Market Efficiency and Out-of-Market Actions}
+
+Out-of-market reliability actions have well-documented effects on
+market efficiency.
+Reliability commitments that deviate from the market solution
+create make-whole payments (uplift) to committed generators,
+representing costs that are not reflected in locational marginal
+prices~[cite Hogan 2003; O'Neill 2005].
+The convex hull pricing literature~[cite Gribik 2007;
+Schiro 2016] has established that pricing in the presence of
+non-convexities (including commitment decisions) cannot
+simultaneously achieve revenue adequacy and cost recovery without
+some form of side payment.
+
+Reducing the number of out-of-market commitments directly
+reduces the magnitude of uplift and improves the extent to which
+energy prices reflect the true marginal cost of supply.
+Andrianesis et~al.~[cite Andrianesis 2020] quantify the
+relationship between commitment interventions and uplift in
+ISO-NE, finding that reliability commitments account for a
+substantial fraction of total uplift payments.
+Ela et~al.~[cite Ela 2011] analyze the operational and market
+impacts of wind integration on commitment processes, noting that
+conservative commitment practices designed to hedge against
+renewable forecast errors contribute to over-commitment and
+price distortion.
+
+\subsection{Research Gap}
+
+The existing literature treats the reliability commitment problem
+as a monolithic optimization over the full planning horizon:
+once the market clears, the reliability process re-optimizes all
+remaining commitment decisions under its chosen uncertainty model.
+No existing formulation distinguishes between commitment decisions
+that must be finalized at the current stage and those that can be
+deferred to subsequent processes.
+
+This paper addresses this gap by introducing the gating set, which
+uses physical generator notification times to partition the
+decision space into deferrable and non-deferrable components.
+The result is a principled restriction of the reliability
+optimization scope that preserves market outcomes to the greatest
+extent permitted by physical constraints.
+
+
+%% ===================================================================
+%%  SECTION 3 — THE RELIABILITY COMMITMENT PROBLEM
+%% ===================================================================
+\section{The Reliability Commitment Problem}
+
+\subsection{Operational Timeline}
+
+North American RTOs share a common sequential structure in their
+commitment and dispatch processes, though specific timing and
+nomenclature vary across operators.
+For notational clarity, we refer to the \emph{Operating Day}~(OD)
+as the day for which the operation plan is being generated.
+The following sequence is representative of the general pattern;
+specific timing parameters are given in
+Section~\ref{sec:casestudy}.
+
+The earliest commitment decisions are made through a
+\emph{multi-day reliability assessment}~(MDRA), an advisory process
+run several days before OD with a look-ahead horizon of four to
+seven days.
+The MDRA identifies long-lead resources --- typically large thermal
+units requiring multi-day advance notice --- that must be committed
+to ensure system adequacy.
+
+The principal scheduling process is the \emph{Day-Ahead
+Market}~(DAMKT), which clears on OD$-$1 and produces a binding
+commitment and dispatch schedule for~OD.
+Following the DAMKT, the \emph{Day-Ahead Reliability Unit
+Commitment}~(DARUC) reviews the market solution and commits
+additional resources as needed to ensure reliability over a horizon
+covering OD and, in many implementations, OD$+$1.
+
+During the operating day itself, \emph{Intra-Day RUC}~(ID-RUC)
+processes run on a rolling basis, making near-term commitment
+adjustments as updated forecasts become available.
+
+The complete sequence --- MDRA, DAMKT, DARUC, ID-RUC --- forms a
+nested hierarchy in which each successive process operates over a
+shorter horizon with more current information, and may revise or
+supplement the decisions of its predecessor.
+
+\subsection{Unit Commitment Formulation}
+
+% State the canonical UC formulation ONCE. Both DAMKT and standard
+% DARUC share these constraints; they differ only in objective.
+
+The following formulation captures the core unit commitment
+constraints common to both the day-ahead market and reliability
+processes. Let $\mathcal{I}$ index generating resources,
+$\mathcal{T} = \{1,\dots,T\}$ index operating periods,
+$\mathcal{N}$ index buses, and $\mathcal{L}$ index transmission
+lines.
+
+\begin{subequations}\label{eq:uc_base}
+\begin{align}
+%--- power balance ---
+&\sum_{i} p_{i,t} + s_t^{p} = \sum_n d_{n,t},
+  \quad \forall t, \label{eq:uc_bal} \\
+%--- transmission ---
+&-\bar{F}^l \leq \sum_n S_n^l
+  \Big(\sum_{i\in\mathcal{I}_n} p_{i,t} - d_{n,t}\Big)
+  \leq \bar{F}^l,
+  \quad \forall l,t, \label{eq:uc_flow} \\
+%--- block dispatch ---
+&p_{i,t,b} \leq \bar{P}_{i,b}\, u_{i,t},
+  \;\; \forall i,t,b, \quad
+  p_{i,t} = \textstyle\sum_b p_{i,t,b},
+  \;\; \forall i,t, \label{eq:uc_block} \\
+%--- renewable limit ---
+&p_{j,t} \leq \bar{p}^{\text{fcst}}_{j,t},
+  \quad \forall j \in \mathcal{I}^{\text{ren}},\; t, \label{eq:uc_ren} \\
+%--- capacity ---
+&\underline{P}_i\, u_{i,t} \leq p_{i,t}
+  \leq \bar{P}_i\, u_{i,t},
+  \quad \forall i,t, \label{eq:uc_cap} \\
+%--- ramp up ---
+&p_{i,t} - p_{i,t-1} \leq R_i^U (u_{i,t-1} + v_{i,t}),
+  \quad \forall i,t, \label{eq:uc_ru} \\
+%--- ramp down ---
+&p_{i,t-1} - p_{i,t} \leq R_i^D (u_{i,t} + w_{i,t}),
+  \quad \forall i,t, \label{eq:uc_rd} \\
+%--- logic ---
+&u_{i,t} - u_{i,t-1} = v_{i,t} - w_{i,t},
+  \quad \forall i,t, \label{eq:uc_logic} \\
+%--- MUT ---
+&\sum_{t'=t-\text{MUT}_i+1}^{t} v_{i,t'} \leq u_{i,t},
+  \quad \forall i,\; t \geq \text{MUT}_i, \label{eq:uc_mut} \\
+%--- MDT ---
+&\sum_{t'=t-\text{MDT}_i+1}^{t} w_{i,t'} \leq 1 - u_{i,t},
+  \quad \forall i,\; t \geq \text{MDT}_i, \label{eq:uc_mdt} \\
+%--- initial conditions ---
+&\sum_{t'=1}^{UT_i} u_{i,t'} = UT_i, \quad
+  \sum_{t'=1}^{DT_i} u_{i,t'} = 0,
+  \quad \forall i, \label{eq:uc_init} \\
+%--- domains ---
+&\mathbf{p},\, \mathbf{s} \geq 0, \quad
+  \mathbf{u},\, \mathbf{v},\, \mathbf{w} \in \{0,1\}.
+  \label{eq:uc_domain}
+\end{align}
+\end{subequations}
+
+We denote this shared constraint set as $\mathcal{X}^{\text{UC}}$.
+
+\subsection{Day-Ahead Market (DAMKT)}
+
+The DAMKT minimizes total production cost including energy,
+no-load, startup, and shutdown costs over all generators and periods:
+\begin{align}\label{eq:damkt_obj}
+\min_{\mathbf{p},\mathbf{u},\mathbf{v},\mathbf{w},\mathbf{s}}
+\quad &\sum_{i,t} \Big[
+  C_i^{NL} u_{i,t} + C_i^{SU} v_{i,t} + C_i^{SD} w_{i,t}
+  + \sum_b C_{i,b}^p\, p_{i,t,b}
+\Big] \nonumber\\
+&+ \sum_t M^p s_t^p \\
+\text{s.t.} \quad
+& \eqref{eq:uc_base}. \nonumber
+\end{align}
+
+\subsection{Standard Day-Ahead RUC (DARUC)}
+
+The standard DARUC uses the same constraint set
+$\mathcal{X}^{\text{UC}}$ but removes energy costs from the
+objective, retaining only commitment-related costs:
+\begin{align}\label{eq:daruc_obj}
+\min_{\mathbf{p},\mathbf{u},\mathbf{v},\mathbf{w},\mathbf{s}}
+\quad &\sum_{i,t} \Big[
+  C_i^{NL} u_{i,t} + C_i^{SU} v_{i,t} + C_i^{SD} w_{i,t}
+\Big]
++ \sum_t M^p s_t^p \\
+\text{s.t.} \quad
+& \eqref{eq:uc_base}. \nonumber
+\end{align}
+
+In practice, the DARUC typically inherits the DAMKT commitment
+schedule as a lower bound, permitting additional commitments but
+prohibiting de-commitment of market-cleared resources.
+The specific implementation varies across operators; some fix the
+market schedule entirely, while others allow limited modifications.
+This no-decommitment convention is formalized in
+Section~\ref{sec:decomp}.
+
+\subsection{Why Standard DARUC Over-Commits}\label{sec:overcommit}
+
+The standard DARUC formulation optimizes commitment decisions
+$u_{i,t}$ for every generator~$i$ across every period~$t$ in the
+planning horizon.
+However, the vast majority of these decisions will be revisited ---
+and potentially revised --- by subsequent processes: the next DAMKT
+clearing for periods beyond~OD, and intra-day RUC for near-term
+adjustments.
+The DARUC thus solves an optimization problem whose scope extends
+well beyond the decisions that are genuinely its to make.
+
+This scope mismatch creates a systematic bias toward early
+commitment.
+Because the DARUC minimizes total commitment cost over the full
+horizon, it may find it optimal to start a unit in an early period
+to avoid a more expensive startup in a later period --- even when
+the later decision falls within the purview of a subsequent process
+that will have access to updated forecasts.
+The DARUC has no mechanism to recognize that such deferred decisions
+carry no immediate cost: from its perspective, the entire horizon
+is a single optimization to be solved jointly.
+
+The result is commitment decisions that are feasible but premature.
+Units are started hours or days before they are operationally
+required, displacing resources that were optimally scheduled by the
+market and distorting the price signals that the market was designed
+to produce.
+
+The fundamental issue is not that the DARUC commits the wrong units
+in an absolute sense, but that it commits units whose startup
+decisions could have been deferred without jeopardizing reliability.
+The formulation lacks a notion of \emph{deferrability}: it treats
+every commitment decision as equally urgent, regardless of whether
+the physical lead time of the generator demands an immediate
+decision or permits deferral to a later stage.
+Section~\ref{sec:gating} introduces the gating set to formalize
+this distinction.
+
+
+%% ===================================================================
+%%  SECTION 4 — NOTIFICATION-GATED RUC (THE CONTRIBUTION)
+%% ===================================================================
+\section{Notification-Gated Reliability Commitment}
+
+The proposed formulation jointly optimizes commitment decisions and
+robust dispatch in a single mixed-integer second-order cone program
+(MISOCP).
+The gating set restricts the reliability objective to non-deferrable
+interventions, while linear decision rules and ellipsoidal uncertainty
+sets enforce worst-case dispatch feasibility across all constraint
+families.
+
+\subsection{Gating Sets}\label{sec:gating}
+
+The notification (lead) time of a generating unit determines which
+commitment decisions must be finalized at the current decision stage
+and which can be deferred to subsequent market or operational
+processes.
+Commitment decisions should be made binding only when deferral would
+violate physical feasibility.
+
+Let decision process $k$ represent the current reliability or market
+commitment stage (e.g., MDRA, DA-RUC, ID-RUC), and let
+$t^{\text{next}}$ denote the first operating period whose commitment
+decisions can be modified by the next available process.
+Let $t \in \mathcal{T}^k = \{1,\dots,T\}$ index the physical
+operating periods in the look-ahead horizon considered at stage~$k$.
+
+For generating resource~$i$ with startup notification time
+$L_i^{SU}$, a startup decision affecting operating period~$t$ must
+be issued at the current stage if it cannot be deferred to the next
+process.
+This condition defines the \emph{gating set}:
+\begin{equation}\label{eq:gating_set}
+    \mathcal{T}_{i}^{\text{gate}} \;:=\;
+    \bigl\{\, t \in \mathcal{T}^k \;\big|\;
+            t - L_i^{SU} < t^{\text{next}} \bigr\}.
+\end{equation}
+
+Periods in $\mathcal{T}_{i}^{\text{gate}}$ correspond to startup
+decisions that must be initiated before the next commitment process
+in order to preserve feasibility.
+Startup decisions outside this set may be deferred and are excluded
+from the current reliability optimization.
+
+Because $t - L_i^{SU}$ is increasing in~$t$, the gating set is a
+contiguous block of early periods: if period~$t$ is gated, then every
+earlier period $t' < t$ is also gated.
+Generators with longer notification times have larger gating sets,
+reflecting the greater advance notice required to start them.
+
+The gating set restricts \emph{startup} decisions ($v_{i,t}$), not
+commitment status ($u_{i,t}$).
+A unit already committed by the market does not require a new startup
+decision and is therefore not subject to gating.
+
+\subsection{Market-Reliability Decomposition}\label{sec:decomp}
+
+Let $(\mathbf{u}^m, \mathbf{v}^m, \mathbf{w}^m)$ denote the
+commitment schedule from the preceding DAMKT solution.
+The reliability process operates on the \emph{total} commitment
+variables $(u_{i,t}, v_{i,t}, w_{i,t})$, which are constrained to
+preserve all market-decided commitments:
+\begin{equation}\label{eq:nodecommit}
+    u_{i,t} \;\geq\; u_{i,t}^m, \qquad \forall\, i,t.
+\end{equation}
+The startup and shutdown variables $v_{i,t}$ and $w_{i,t}$ are
+determined by the logic constraint~\eqref{eq:uc_logic} applied to the
+total commitment~$u_{i,t}$ and are not independently decomposed.
+
+The \emph{incremental commitment} is defined as
+\begin{equation}\label{eq:uprime}
+    u'_{i,t} \;:=\; u_{i,t} - u_{i,t}^m \;\in\; \{0,1\},
+    \qquad \forall\, i,t,
+\end{equation}
+where $u'_{i,t} = 1$ indicates a reliability intervention: a unit
+brought online beyond the market solution.
+
+A reliability startup at period~$t$ may \emph{absorb} a market
+startup at a later period: if the market planned to start unit~$i$ at
+period~$t{+}2$, but the reliability process starts it at~$t$, the
+unit is already online at~$t{+}2$ and the market startup is
+superseded.
+This interaction is handled automatically by the logic
+constraint~\eqref{eq:uc_logic} operating on total~$u$.
+
+\subsection{Uncertainty Model}\label{sec:uncertainty}
+
+Let $\mathbf{r} \in \mathbb{R}^K$ represent deviations of renewable
+generation from the mean forecast, where $K$ is the number of
+uncertain renewable sources.
+The uncertainty set is an ellipsoid parameterized by a positive
+definite covariance matrix
+$\boldsymbol{\Sigma} \in \mathbb{R}^{K \times K}$ and a scalar
+budget~$\rho > 0$:
+\begin{equation}\label{eq:uset}
+    \mathcal{U} \;:=\;
+    \bigl\{\, \mathbf{r} \in \mathbb{R}^K \;\big|\;
+    \mathbf{r}^\top \boldsymbol{\Sigma}^{-1} \mathbf{r}
+    \leq \rho^2 \bigr\}.
+\end{equation}
+The construction of $\boldsymbol{\Sigma}$ and calibration of~$\rho$
+via conformal prediction are detailed in~[paper~2]; here we treat
+$(\boldsymbol{\Sigma}, \rho)$ as given inputs.
+
+Dispatch is modeled as an affine function of the uncertainty
+realization via linear decision rules (LDR):
+\begin{equation}\label{eq:ldr}
+    p_{i,t}(\mathbf{r})
+    \;=\; p_{i,t}^0
+    \;+\; \mathbf{z}_{i,t}^\top \mathbf{r},
+    \qquad \forall\, i,t,
+\end{equation}
+where $p_{i,t}^0$ is the nominal dispatch and
+$\mathbf{z}_{i,t} \in \mathbb{R}^K$ are the LDR coefficients
+governing the response of generator~$i$ at period~$t$ to the
+uncertainty realization.
+
+For a generic constraint of the form
+$\mathbf{z}_{i,t}^\top \mathbf{r} \leq b_{i,t}$ that must hold for
+every $\mathbf{r} \in \mathcal{U}$, the worst case yields the
+second-order cone (SOC) condition
+\begin{equation}\label{eq:soc_generic}
+    \rho\,
+    \bigl\lVert
+      \boldsymbol{\Sigma}^{1/2} \mathbf{z}_{i,t}
+    \bigr\rVert_2
+    \;\leq\; b_{i,t}.
+\end{equation}
+
+
+\subsection{Gated Robust LD-RUC Formulation}\label{sec:ldruc}
+
+The notification-gated LD-RUC is formulated as a single MISOCP that
+simultaneously determines the minimum-cost set of non-deferrable
+reliability commitments and a dispatch policy that is feasible under
+all uncertainty realizations.
+The commitment variables $(\mathbf{u}, \mathbf{v}, \mathbf{w})$ are
+binary; the nominal dispatch~$\mathbf{p}^0$ and LDR
+coefficients~$\mathbf{Z}$ are continuous.
+
+\begin{subequations}\label{eq:ldruc}
+\begin{align}
+\min_{\substack{
+  \mathbf{u},\mathbf{v},\mathbf{w},\\
+  \mathbf{p}^0,\mathbf{Z},\mathbf{s}}} \quad
+& \sum_{i \in \mathcal{I}}
+  \sum_{t \in \mathcal{T}_i^{\text{gate}}}
+  \!\Big[\,
+    C_i^{SU}\, v_{i,t}
+    \;+\; C_i^{NL}\, u'_{i,t}
+  \Big]
+  \;+\; M \!\sum_{t} s_t
+  \label{eq:ldruc_obj} \\[4pt]
+\text{s.t.}\quad
+%--- no decommitment ---
+& u_{i,t} \geq u_{i,t}^m,
+  \quad \forall\, i,t,
+  \label{eq:ldruc_lock} \\
+%--- incremental commitment ---
+& u'_{i,t} = u_{i,t} - u_{i,t}^m,
+  \quad \forall\, i,t,
+  \label{eq:ldruc_uprime} \\
+%--- nominal power balance ---
+& \sum_{i} p_{i,t}^0 + s_t = \sum_n d_{n,t},
+  \quad \forall\, t,
+  \label{eq:ldruc_bal_nom} \\
+%--- recourse balance ---
+& \sum_{i} z_{i,t,k} = 0,
+  \quad \forall\, k,t,
+  \label{eq:ldruc_bal_rec} \\
+%--- capacity upper (SOC) ---
+& p_{i,t}^0
+  + \rho \lVert \boldsymbol{\Sigma}^{1/2} \mathbf{z}_{i,t} \rVert_2
+  \leq \bar{P}_i\, u_{i,t},
+  \quad \forall\, i,t,
+  \label{eq:ldruc_cap_up} \\
+%--- capacity lower (SOC) ---
+& \underline{P}_i\, u_{i,t}
+  \leq p_{i,t}^0
+  - \rho \lVert \boldsymbol{\Sigma}^{1/2} \mathbf{z}_{i,t} \rVert_2,
+  \quad \forall\, i,t,
+  \label{eq:ldruc_cap_lo} \\
+%--- ramp up (SOC) ---
+& (p_{i,t}^0 - p_{i,t-1}^0)
+  + \rho \lVert \boldsymbol{\Sigma}^{1/2}
+    (\mathbf{z}_{i,t} - \mathbf{z}_{i,t-1}) \rVert_2
+  \nonumber\\
+& \qquad\qquad
+  \leq R_i^U (u_{i,t-1} + v_{i,t}),
+  \quad \forall\, i,t,
+  \label{eq:ldruc_ramp_up} \\
+%--- ramp down (SOC) ---
+& (p_{i,t-1}^0 - p_{i,t}^0)
+  + \rho \lVert \boldsymbol{\Sigma}^{1/2}
+    (\mathbf{z}_{i,t-1} - \mathbf{z}_{i,t}) \rVert_2
+  \nonumber\\
+& \qquad\qquad
+  \leq R_i^D (u_{i,t} + w_{i,t}),
+  \quad \forall\, i,t,
+  \label{eq:ldruc_ramp_dn} \\
+%--- transmission (SOC) ---
+& \Big|\sum_n S_n^l
+  \Big(\sum_{i \in \mathcal{I}_n} p_{i,t}^0 - d_{n,t}\Big)\Big|
+  + \rho \Big\lVert \boldsymbol{\Sigma}^{1/2}
+    \sum_{i \in \mathcal{I}_n} S_n^l\, \mathbf{z}_{i,t}
+  \Big\rVert_2
+  \nonumber\\
+& \qquad\qquad
+  \leq \bar{F}^l,
+  \quad \forall\, l,t,
+  \label{eq:ldruc_flow} \\
+%--- renewable limit (SOC) ---
+& p_{j,t}^0
+  + \rho \lVert \boldsymbol{\Sigma}^{1/2}
+    (\mathbf{z}_{j,t} - \mathbf{e}_{j,t}) \rVert_2
+  \leq \mu_{j,t},
+  \nonumber\\
+& \qquad\qquad
+  \forall\, j \in \mathcal{I}^{\text{ren}},\; t,
+  \label{eq:ldruc_ren} \\
+%--- logic ---
+& u_{i,t} - u_{i,t-1} = v_{i,t} - w_{i,t},
+  \quad \forall\, i,t,
+  \label{eq:ldruc_logic} \\
+%--- MUT/MDT ---
+& \text{MUT/MDT constraints}~\eqref{eq:uc_mut}\text{--}\eqref{eq:uc_mdt},
+  \label{eq:ldruc_mutmdt} \\
+%--- initial conditions ---
+& \text{initial conditions}~\eqref{eq:uc_init},
+  \label{eq:ldruc_init} \\
+%--- domains ---
+& \mathbf{p}^0 \geq 0,\; \mathbf{s} \geq 0, \quad
+  \mathbf{u},\, \mathbf{v},\, \mathbf{w} \in \{0,1\}.
+  \label{eq:ldruc_domain}
+\end{align}
+\end{subequations}
+
+Here $\mathbf{e}_{j,t} \in \mathbb{R}^K$ is the unit vector
+selecting the uncertainty dimension corresponding to renewable
+source~$j$ at period~$t$, so that the available renewable output
+under realization~$\mathbf{r}$ is $\mu_{j,t} + \mathbf{e}_{j,t}^\top
+\mathbf{r}$.
+Constraint~\eqref{eq:ldruc_bal_rec} ensures that the aggregate
+dispatch response to any realization sums to zero: when renewable
+output deviates, the remaining fleet absorbs the imbalance.
+
+\emph{Structure.}
+Formulation~\eqref{eq:ldruc} is a mixed-integer second-order cone
+program (MISOCP).
+The integer variables arise from the commitment decisions
+$(\mathbf{u}, \mathbf{v}, \mathbf{w})$; the continuous variables
+$(\mathbf{p}^0, \mathbf{Z})$ determine the robust dispatch policy.
+The SOC constraints~\eqref{eq:ldruc_cap_up}--\eqref{eq:ldruc_ren}
+couple the commitment and dispatch decisions: when a unit is
+de-committed ($u_{i,t} = 0$), the corresponding capacity and ramp
+bounds force $p_{i,t}^0 = 0$ and $\mathbf{z}_{i,t} = \mathbf{0}$.
+Modern MISOCP solvers (e.g., Gurobi) handle this structure via
+branch-and-bound with SOCP relaxations at each node.
+
+\emph{Objective-only gating.}
+The objective~\eqref{eq:ldruc_obj} penalizes startup and
+incremental no-load costs only within each generator's gating window
+$\mathcal{T}_i^{\text{gate}}$.
+However, the \emph{constraints} apply over the full horizon: the
+optimizer is free to add non-gated commitments when forced by
+minimum-up-time propagation or system feasibility, but receives no
+objective incentive to do so.
+This design ensures that the formulation accounts for the physical
+consequences of gated decisions (e.g., a gated startup at period~$t$
+commits the unit through $t + \text{MUT}_i - 1$) without penalizing
+those consequences beyond the gating window.
+
+\emph{Windowed no-load variant.}
+A gated startup at period~$t$ commits unit~$i$ for at least
+$\text{MUT}_i$ periods, some of which may fall beyond the gating
+window.
+A refined objective attributes no-load cost over the irrevocable
+commitment window rather than period-by-period:
+\begin{equation}\label{eq:obj_window}
+\sum_{i \in \mathcal{I}}
+\sum_{t \in \mathcal{T}_i^{\text{gate}}}
+\!\left[
+  C_i^{SU}\, v_{i,t}
+  \;+\;
+  \sum_{\tau=t}^{\min\{t+\text{MUT}_i-1,\,T\}}
+    \!\! C_i^{NL}\, v'_{i,t}
+\right]
++ M \!\sum_t s_t,
+\end{equation}
+where $v'_{i,t} := v_{i,t}\,(1 - v_{i,t}^m)$ isolates reliability
+startups from market startups.
+
+\emph{Relationship to existing formulations.}
+The LD-RUC formulation~\eqref{eq:ldruc} differs from the standard
+robust DARUC in two respects:
+\begin{enumerate}
+\item \emph{Gated objective.} Only commitment costs within the
+  gating window contribute to the objective. The standard DARUC
+  penalizes commitment costs over the full horizon.
+\item \emph{No-decommitment floor.} The market commitment
+  $\mathbf{u}^m$ is preserved as a lower bound via~\eqref{eq:ldruc_lock}.
+  While this constraint also appears in standard DARUC implementations,
+  its interaction with the gated objective is what produces the
+  least-interventionist behavior.
+\end{enumerate}
+The robust dispatch constraints
+\eqref{eq:ldruc_cap_up}--\eqref{eq:ldruc_ren} are identical to
+those used in the adaptive robust UC (ARUC) framework
+of~[paper~2].
+The contribution here is the decision scope restriction, not the
+uncertainty model.
+
+
+\subsection{Summary}\label{sec:formulation_summary}
+
+The complete LD-RUC procedure is:
+\begin{enumerate}
+  \item Solve the DAMKT~\eqref{eq:damkt_obj} to obtain the market
+    commitment $\mathbf{u}^m$.
+  \item Compute gating sets $\mathcal{T}_i^{\text{gate}}$ from
+    notification times and $t^{\text{next}}$
+    via~\eqref{eq:gating_set}.
+  \item Solve the gated robust LD-RUC~\eqref{eq:ldruc}: a single
+    MISOCP that jointly determines incremental commitments and a
+    worst-case feasible dispatch policy.
+\end{enumerate}
+
+The formulation requires no iterative procedure: the MISOCP is
+solved once and the resulting commitment schedule is guaranteed to be
+robust-feasible by construction.
+This is a direct consequence of jointly optimizing commitment and
+dispatch under the SOC robust counterpart --- the same approach used
+by the ARUC framework, but with the objective restricted to the
+gating window.
+
+
+%% ===================================================================
+%%  SECTION 5 — GENERALIZATION ACROSS DECISION STAGES
+%% ===================================================================
+\section{Generalization Across Decision Stages}\label{sec:general}
+
+The gating set~\eqref{eq:gating_set} is parameterized by the
+decision stage~$k$ (through $t^{\text{next}}$) and the generator
+notification times~$L_i^{SU}$.
+By varying these parameters, the LD-RUC framework instantiates
+naturally across the operational planning sequence.
+
+\subsection{Multi-Day Reliability Assessment (MDRA)}
+
+The MDRA is an advisory process run several days before the operating
+day, with a horizon of four to seven days.
+At this stage, $t^{\text{next}}$ corresponds to the first period of
+OD$-$1 (the day before the operating day), when the DAMKT will
+clear.
+Only generators with very long notification times --- those whose
+startup lead time exceeds the interval between the MDRA and the
+DAMKT --- have non-empty gating sets.
+In practice, this restricts the MDRA's binding decisions to large
+coal, nuclear, and combined-cycle units requiring multi-day advance
+notice.
+
+\subsection{Day-Ahead RUC (DA-RUC)}
+
+The DA-RUC runs after the DAMKT clears for the operating day.
+Here $t^{\text{next}}$ is the first period of OD$+$1 (the next
+operating day), since the next DAMKT will cover that horizon.
+Generators with notification times shorter than 24~hours have gating
+sets that cover only the operating day itself; those with longer lead
+times may also gate periods on OD$+$1.
+This is the primary application of the LD-RUC framework developed in
+Section~\ref{sec:ldruc}.
+
+\subsection{Intra-Day RUC (ID-RUC)}
+
+Intra-day reliability processes run on a rolling basis during the
+operating day.
+At each invocation, $t^{\text{next}}$ is the earliest period that can
+still be modified by the next intra-day run (typically the current
+period plus the process cycle time).
+The gating sets shrink as the operating day progresses and more
+decisions become irrevocable, leaving only fast-start resources with
+non-empty gating windows.
+
+\subsection{Relationship to Standard DARUC}
+
+The standard DARUC formulation~\eqref{eq:daruc_obj} can be viewed as
+the limiting case of the gating framework in which
+$\mathcal{T}_i^{\text{gate}} = \mathcal{T}$ for all~$i$ --- that is,
+every commitment decision is treated as non-deferrable.
+This occurs when $t^{\text{next}} \to \infty$ (no subsequent process
+exists) or equivalently when $L_i^{SU} \to \infty$ for all
+generators.
+
+Conversely, the pure market outcome (no reliability intervention)
+corresponds to $\mathcal{T}_i^{\text{gate}} = \varnothing$ for
+all~$i$, which occurs when $L_i^{SU} = 0$ (all units can be started
+instantaneously) or $t^{\text{next}} = 1$ (the next process can
+modify every period).
+The gating framework thus spans a continuum between no intervention
+and full re-optimization, with the physical notification times
+determining the appropriate point on this spectrum.
+
+
+%% ===================================================================
+%%  SECTION 6 — CASE STUDY
+%% ===================================================================
+\section{Case Study}\label{sec:casestudy}
+
+\subsection{Setup}
+
+The proposed LD-RUC formulation is evaluated on the RTS-GMLC test
+case, a three-area system with 73~generating units (thermal, wind,
+solar, and hydro) and 120~transmission lines.
+Wind forecast data are drawn from the Southwest Power Pool (SPP)
+constellation forecast dataset, scaled to the RTS-GMLC wind fleet
+capacities.
+The ellipsoidal uncertainty set parameters
+$(\boldsymbol{\Sigma}, \rho)$ are constructed using the learned
+covariance and conformal prediction methodology developed
+in~[paper~2].
+
+Notification times $L_i^{SU}$ are assigned to the generator fleet
+based on fuel type and capacity:
+% TODO: Table of notification time assignments.
+% Coal/nuclear: 24-48 hours
+% Combined cycle: 8-12 hours
+% Combustion turbine: 1-4 hours
+% Wind/solar/hydro: 0 hours (no startup lead time)
+
+The DA-RUC decision stage is used as the primary test case, with
+$t^{\text{next}}$ set to the first period of OD$+$1 (period~25 for a
+48-hour horizon starting at OD hour~1).
+All experiments are solved using Gurobi~11 on [hardware description].
+
+\subsection{Standard DARUC vs.\ LD-RUC}\label{sec:results_daruc}
+
+% TODO: Primary comparison results.
+% Expected structure:
+% - Table: number of reliability commitments (startups) by fuel type
+%   for standard DARUC vs LD-RUC
+% - Figure: commitment heatmap showing which generators are committed
+%   differently between the two approaches
+% - Key finding: long-lead units (coal, CC) have identical commitments
+%   since they are gated in both formulations; short-lead units (CT)
+%   differ significantly
+% - Total commitment cost comparison
+% - Feasibility verification: confirm no load shedding (s = 0)
+%   in both cases
+
+\subsection{Comparison with Integrated Robust UC}
+\label{sec:results_aruc}
+
+% TODO: Compare LD-RUC against the integrated ARUC from paper 2.
+% - ARUC jointly optimizes all commitment and dispatch decisions
+%   under uncertainty (no gating, no decomposition)
+% - Metrics: total cost, commitment count, wind curtailment,
+%   computation time
+% - Key point: LD-RUC produces fewer out-of-market interventions
+%   than ARUC by construction, at the potential cost of higher
+%   total system cost
+% - The cost gap between LD-RUC and ARUC represents the price of
+%   minimal intervention: how much more expensive is the
+%   least-distortionary solution?
+
+\subsection{Sensitivity to Notification Times}
+\label{sec:results_sensitivity}
+
+% TODO: This section demonstrates the gating set's value directly.
+% - Sweep L_i^SU for the fleet (or sweep t^next)
+% - For each setting: report number of gated decisions, number of
+%   reliability commitments, total cost
+% - Figure: commitments and cost vs notification time or t^next
+% - Limiting cases as validation:
+%   L_i -> 0: no gated decisions, zero reliability cost
+%   L_i -> infinity: all decisions gated, recovers standard DARUC
+% - Intermediate values: demonstrate smooth transition and
+%   quantify the marginal value of each hour of notification time
+
+
+%% ===================================================================
+%%  SECTION 7 — CONCLUSION
+%% ===================================================================
+\section{Conclusion}\label{sec:conclusion}
+
+This paper introduced a notification-gated formulation for
+reliability unit commitment that restricts out-of-market interventions
+to the minimal set of commitment decisions that cannot be deferred to
+subsequent market or operational processes.
+The gating set, derived from physical generator notification times and
+the timing of sequential decision stages, provides a principled
+criterion for distinguishing non-deferrable reliability actions from
+decisions that can be left to the market.
+
+The formulation is a mixed-integer second-order cone program that
+jointly optimizes incremental commitment decisions and robust dispatch
+via linear decision rules.
+By restricting the reliability objective to the gating window while
+enforcing worst-case feasibility over the full horizon, the LD-RUC
+produces the least-interventionist commitment schedule that guarantees
+system reliability under the specified uncertainty set.
+
+The gating framework generalizes across operational horizons.
+Multi-day reliability assessment, day-ahead RUC, and intra-day RUC
+are all instances of the same formulation with different
+parameterizations of the gating set.
+Standard DARUC is recovered as a limiting case in which all decisions
+are treated as non-deferrable.
+
+% TODO: Summarize numerical findings once case study is complete.
+% Expected: significant reduction in reliability commitments,
+% LD-RUC commitment schedule is robust-feasible by construction,
+% computation times comparable to standard DARUC.
+
+Future work includes analysis of market efficiency impacts (LMP
+changes and uplift costs resulting from reduced reliability
+interventions), extension to chance-constrained and distributionally
+robust uncertainty models, and application to multi-settlement market
+structures where the interaction between reliability processes and
+real-time pricing is most consequential.
+
+
+%% ===================================================================
+%%  BACK MATTER
+%% ===================================================================
+
+\appendices
+\section{Nomenclature}\label{app:nomenclature}
+
+\begin{table}[h]
+\renewcommand{\arraystretch}{1.15}
+\centering
+\begin{tabular}{ll}
+\hline
+\textbf{Symbol} & \textbf{Description} \\
+\hline
+\multicolumn{2}{l}{\emph{Sets and indices}} \\
+$\mathcal{I}$, $i$ & Generating resources \\
+$\mathcal{I}^{\text{ren}}$, $j$ & Renewable generators \\
+$\mathcal{I}_n$ & Generators at bus $n$ \\
+$\mathcal{N}$, $n$ & Buses \\
+$\mathcal{L}$, $l$ & Transmission lines \\
+$\mathcal{T}$, $t$ & Operating periods \\
+$\mathcal{T}_i^{\text{gate}}$ & Gating set for generator $i$ \\
+$\mathcal{U}$ & Uncertainty set \\
+$K$, $k$ & Uncertainty dimensions \\
+$b$ & Dispatch blocks \\
+\hline
+\multicolumn{2}{l}{\emph{Parameters}} \\
+$C_i^{NL},C_i^{SU},C_i^{SD}$ & No-load, startup, shutdown cost \\
+$C_{i,b}^p$ & Block energy cost \\
+$\bar{P}_i$, $\underline{P}_i$ & Max/min capacity \\
+$\bar{P}_{i,b}$ & Block capacity \\
+$R_i^U$, $R_i^D$ & Ramp-up/down rate \\
+$\text{MUT}_i$, $\text{MDT}_i$ & Min up/down time \\
+$L_i^{SU}$ & Startup notification time \\
+$d_{n,t}$ & Nodal demand \\
+$\bar{F}^l$ & Line flow limit \\
+$S_n^l$ & PTDF entry \\
+$\mu_{j,t}$ & Mean renewable forecast \\
+$\boldsymbol{\Sigma}$ & Uncertainty covariance matrix \\
+$\rho$ & Uncertainty budget \\
+$M$ & Slack penalty \\
+$u_{i,t}^m$, $v_{i,t}^m$ & DAMKT commitment/startup \\
+$t^{\text{next}}$ & First period modifiable by next process \\
+\hline
+\multicolumn{2}{l}{\emph{Variables}} \\
+$u_{i,t}$ & Commitment status (binary) \\
+$v_{i,t}$, $w_{i,t}$ & Startup/shutdown (binary) \\
+$u'_{i,t}$ & Incremental commitment \\
+$p_{i,t}^0$ & Nominal dispatch (MW) \\
+$\mathbf{z}_{i,t}$ & LDR coefficients \\
+$s_t$ & Power balance slack \\
+\hline
+\end{tabular}
+\end{table}
+
+\section*{Acknowledgment}
+The authors would like to thank\ldots
+
+%\bibliographystyle{IEEEtran}
+%\bibliography{IEEEabrv,../bib/paper}
+
+\end{document}

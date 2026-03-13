@@ -64,7 +64,7 @@ def setup_plotting():
 
         # Figure
         "figure.dpi": FIGURE_DEFAULTS["dpi"],
-        "savefig.dpi": FIGURE_DEFAULTS["dpi"],
+        "savefig.dpi": FIGURE_DEFAULTS["dpi_pdf"],
         "savefig.bbox": "tight",
 
         # Lines

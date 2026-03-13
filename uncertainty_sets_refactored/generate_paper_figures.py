@@ -861,20 +861,21 @@ def fig3b_4b_hyperparameter_sweeps(
     output_path: Path = None,
 ) -> plt.Figure:
     """
-    Two-panel figure: (a) NLL vs k with baselines, (b) NLL vs kappa with baselines.
+    Three-panel figure: (a) NLL vs k, (b) NLL vs κ softmax, (c) NLL vs κ unconstrained.
 
     Shares y-axis range across panels for direct visual comparison.
-    Panel (a) enhances fig3 with learned omega + global horizontal lines.
-    Panel (b) merges fig4 + fig11: multi-seed kappa sweep with baselines.
+    Panel (a): k-NN sweep with learned omega + global baselines.
+    Panel (b): Softmax-constrained learned omega NLL vs κ with k-NN + global baselines.
+    Panel (c): Unconstrained learned omega NLL vs κ with k-NN + global baselines.
     """
     if feature_set_dir is None:
         feature_set_dir = HIGH_DIM_16D_DIR
     if output_path is None:
         output_path = OUTPUT_DIR / "figures" / "fig3b_4b_hyperparameter_sweeps"
 
-    fig, (ax_k, ax_tau) = plt.subplots(
+    fig, (ax_k, ax_softmax, ax_unconst) = plt.subplots(
         1,
-        2,
+        3,
         figsize=(IEEE_TWO_COL_WIDTH, 2.8),
         sharey=True,
     )
@@ -925,22 +926,7 @@ def fig3b_4b_hyperparameter_sweeps(
         label=f"Best: k={k_vals[best_k_idx]}",
     )
 
-    # Baselines: learned omega and global
-    tau_stats_path = feature_set_dir / "multi_seed_stats.csv"
-    if tau_stats_path.exists():
-        tau_stats = pd.read_csv(tau_stats_path)
-        best_learned = tau_stats.loc[tau_stats["val_nll_mean"].idxmin()]
-        nll_learned_best = best_learned["val_nll_mean"]
-        best_tau = best_learned["tau"]
-    else:
-        df_sweep = _load_sweep_results(feature_set_dir)
-        mask = (df_sweep["omega_constraint"] == "none") & (
-            df_sweep["omega_l2_reg"] == 0.0
-        )
-        best_row = df_sweep[mask].sort_values("val_nll_learned").iloc[0]
-        nll_learned_best = best_row["val_nll_learned"]
-        best_tau = best_row["tau"]
-
+    # Load sweep data for baselines and kappa panels
     df_sweep = _load_sweep_results(feature_set_dir)
     nll_global = df_sweep.iloc[0]["val_nll_global"]
 
@@ -958,12 +944,17 @@ def fig3b_4b_hyperparameter_sweeps(
                 f"The two sweeps may use different features, splits, or data."
             )
 
+    # Best learned omega (across all constraints) for panel (a) baseline
+    best_row_all = df_sweep.sort_values("val_nll_learned").iloc[0]
+    nll_learned_best = best_row_all["val_nll_learned"]
+    best_tau_all = best_row_all["tau"]
+
     ax_k.axhline(
         nll_learned_best,
         linestyle="--",
         linewidth=1.5,
         color=COLORS["learned"],
-        label=f"Learned ω (κ={best_tau:g})",
+        label=f"Learned ω (κ={best_tau_all:g})",
     )
     ax_k.axhline(
         nll_global,
@@ -988,90 +979,102 @@ def fig3b_4b_hyperparameter_sweeps(
         va="top",
     )
 
-    # ------------------------------------------------------------------
-    # Panel (b): NLL vs kappa  (learned omega sweep + baselines)
-    # ------------------------------------------------------------------
-    if tau_stats_path.exists():
-        tau_stats = pd.read_csv(tau_stats_path)
-        tau_vals = tau_stats["tau"].values
-        nll_mean_tau = tau_stats["val_nll_mean"].values
-        nll_std_tau = tau_stats["val_nll_std"].values
-    else:
-        df_sweep = _load_sweep_results(feature_set_dir)
-        mask = (df_sweep["omega_constraint"] == "none") & (
-            df_sweep["omega_l2_reg"] == 0.0
-        )
-        df_filt = df_sweep[mask].sort_values("tau")
-        tau_vals = df_filt["tau"].values
-        nll_mean_tau = df_filt["val_nll_learned"].values
-        nll_std_tau = np.zeros_like(nll_mean_tau)
-
-    # Filter diverged kappas (also filter high-variance points by std)
-    tau_vals, nll_mean_tau, nll_std_tau = _filter_diverged_taus(
-        tau_vals, nll_mean_tau, nll_std_tau, nll_std=nll_std_tau
-    )
-
-    ax_tau.plot(
-        tau_vals,
-        nll_mean_tau,
-        "o-",
-        linewidth=2,
-        markersize=5,
-        color=COLORS["learned"],
-        label="Learned ω",
-    )
-    ax_tau.fill_between(
-        tau_vals,
-        nll_mean_tau - nll_std_tau,
-        nll_mean_tau + nll_std_tau,
-        alpha=0.25,
-        color=COLORS["learned"],
-    )
-
-    # Mark best kappa
-    best_tau_idx = np.argmin(nll_mean_tau)
-    ax_tau.scatter(
-        [tau_vals[best_tau_idx]],
-        [nll_mean_tau[best_tau_idx]],
-        s=150,
-        c=COLORS["learned"],
-        marker="*",
-        zorder=10,
-        edgecolors="black",
-        linewidths=1,
-        label=f"Best: κ={tau_vals[best_tau_idx]:g}",
-    )
-
-    # Baselines: best k-NN and global
+    # Best k-NN NLL for baselines on kappa panels
     nll_knn_best = nll_mean_k[best_k_idx]
-    ax_tau.axhline(
-        nll_knn_best,
-        linestyle="--",
-        linewidth=1.5,
-        color=COLORS["knn"],
-        label=f"k-NN (k={k_vals[best_k_idx]})",
-    )
-    ax_tau.axhline(
-        nll_global,
-        linestyle=":",
-        linewidth=1.5,
-        color=COLORS["global"],
-        label="Global",
-    )
 
-    ax_tau.set_xlabel("κ (Kernel Bandwidth)")
-    ax_tau.set_xscale("log")
-    ax_tau.legend(fontsize=6, loc="upper left")
-    ax_tau.grid(True, alpha=0.3)
-    ax_tau.text(
-        0.02,
-        0.98,
-        "(b)",
-        transform=ax_tau.transAxes,
-        fontsize=10,
-        fontweight="bold",
-        va="top",
-    )
+    # ------------------------------------------------------------------
+    # Helper: plot a kappa sweep panel
+    # ------------------------------------------------------------------
+    def _plot_kappa_panel(ax, constraint_name, constraint_filter, panel_label):
+        """Plot NLL vs kappa for a specific omega constraint on the given axis."""
+        mask = (df_sweep["omega_constraint"] == constraint_filter)
+        df_filt = df_sweep[mask].copy()
+        if df_filt.empty:
+            print(f"  WARNING: No rows with omega_constraint='{constraint_filter}' "
+                  f"in sweep_results — panel {panel_label} will be empty")
+            ax.text(0.5, 0.5, "No data", transform=ax.transAxes,
+                    ha="center", va="center", fontsize=10, color="gray")
+            return
+
+        # Best NLL per kappa value
+        df_filt = (
+            df_filt.sort_values("val_nll_learned")
+            .groupby("tau", as_index=False)
+            .first()
+            .sort_values("tau")
+        )
+        tau_vals = df_filt["tau"].values
+        nll_vals = df_filt["val_nll_learned"].values
+        nll_std = np.zeros_like(nll_vals)
+
+        # Filter diverged kappas
+        tau_vals, nll_vals, nll_std = _filter_diverged_taus(
+            tau_vals, nll_vals, nll_std, nll_std=nll_std
+        )
+
+        ax.plot(
+            tau_vals,
+            nll_vals,
+            "o-",
+            linewidth=2,
+            markersize=5,
+            color=COLORS["learned"],
+            label=f"Learned ω ({constraint_name})",
+        )
+
+        # Mark best kappa
+        best_idx = np.argmin(nll_vals)
+        ax.scatter(
+            [tau_vals[best_idx]],
+            [nll_vals[best_idx]],
+            s=150,
+            c=COLORS["learned"],
+            marker="*",
+            zorder=10,
+            edgecolors="black",
+            linewidths=1,
+            label=f"Best: κ={tau_vals[best_idx]:g}",
+        )
+
+        # Baselines: best k-NN and global
+        ax.axhline(
+            nll_knn_best,
+            linestyle="--",
+            linewidth=1.5,
+            color=COLORS["knn"],
+            label=f"k-NN (k={k_vals[best_k_idx]})",
+        )
+        ax.axhline(
+            nll_global,
+            linestyle=":",
+            linewidth=1.5,
+            color=COLORS["global"],
+            label="Global",
+        )
+
+        ax.set_xlabel("κ (Kernel Bandwidth)")
+        ax.set_xscale("log")
+        ax.legend(fontsize=6, loc="upper left")
+        ax.grid(True, alpha=0.3)
+        ax.text(
+            0.02,
+            0.98,
+            f"({panel_label})",
+            transform=ax.transAxes,
+            fontsize=10,
+            fontweight="bold",
+            va="top",
+        )
+
+    # ------------------------------------------------------------------
+    # Panel (b): NLL vs kappa (softmax-constrained)
+    # ------------------------------------------------------------------
+    _plot_kappa_panel(ax_softmax, "softmax", "softmax", "b")
+
+    # ------------------------------------------------------------------
+    # Panel (c): NLL vs kappa (unconstrained)
+    # ------------------------------------------------------------------
+    _plot_kappa_panel(ax_unconst, "unconstrained", "none", "c")
 
     plt.tight_layout()
     _save_figure(fig, output_path)

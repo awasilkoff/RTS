@@ -1364,7 +1364,7 @@ def fig3b_4b_hyperparameter_sweeps_combined(
     ax_kappa.set_xlabel("κ (Kernel Bandwidth)")
     ax_kappa.set_xscale("log")
     ax_kappa.grid(True, alpha=0.3)
-    ax_kappa.legend(loc="upper right")
+    ax_kappa.legend(loc="center left")
     ax_kappa.text(0.02, 0.98, "(b)", transform=ax_kappa.transAxes,
                   fontsize=10, fontweight="bold", va="top")
 

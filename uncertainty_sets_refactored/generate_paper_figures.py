@@ -2079,6 +2079,174 @@ def fig7c_lower_bound_decomposition(
 
 
 # ============================================================================
+# FIGURE 6c+7c Combined: Calibration + Lower Bound Decomposition
+# ============================================================================
+def fig6c7c_calibration_and_decomposition(
+    output_path: Path = None,
+    alpha_values: list[float] = None,
+) -> plt.Figure:
+    """
+    Two-panel figure combining calibration curve (left) and
+    lower-bound stacked-bar decomposition (right).
+
+    Shares a single data load and conformal training loop.
+    """
+    from conformal_prediction import train_wind_lower_model_conformal_binned
+    from data_processing import build_conformal_totals_df
+
+    if output_path is None:
+        output_path = OUTPUT_DIR / "figures" / "fig6c7c_calibration_decomposition"
+
+    if alpha_values is None:
+        alpha_values = [0.80, 0.85, 0.90, 0.95, 0.99]
+
+    # Load data (shared)
+    actuals = pd.read_parquet(ACTUALS_PARQUET)
+    forecasts = pd.read_parquet(
+        DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
+    )
+    df_tot = build_conformal_totals_df(actuals, forecasts, value_col=ACTUAL_COL)
+
+    feature_cols = [
+        "ens_mean",
+        "ens_std",
+        "ens_min",
+        "ens_max",
+        "n_models",
+        "hour",
+        "dow",
+    ]
+
+    # Extract raw test-set ens_mean / ens_std (same split as conformal training)
+    df_sorted = df_tot.sort_values("TIME_HOURLY").reset_index(drop=True)
+    df_sorted = df_sorted[df_sorted["y"].notna()].reset_index(drop=True)
+    n_total = len(df_sorted)
+    n_test = int(0.25 * n_total)
+    test_start = n_total - n_test
+    ens_mean_test = df_sorted["ens_mean"].values[test_start:]
+    ens_std_test = df_sorted["ens_std"].values[test_start:]
+    valid = ens_std_test > 1e-6
+
+    # Train conformal models for each alpha (single loop for both panels)
+    calibration_results = []
+    decomposition_results = []
+    for alpha in alpha_values:
+        bundle, metrics, df_test = train_wind_lower_model_conformal_binned(
+            df_tot,
+            feature_cols=feature_cols,
+            target_col="y",
+            scale_col="ens_std",
+            alpha_target=float(alpha),
+            binning="y_pred",
+            n_bins=1,
+            cal_frac=0.35,
+        )
+
+        # Calibration data (fig6c)
+        calibration_results.append(
+            {
+                "alpha_target": float(alpha),
+                "coverage": float(metrics["coverage"]),
+            }
+        )
+
+        # Decomposition data (fig7c)
+        q_hat = bundle.q_hat_global_r
+        y_pred_base = df_test["y_pred_base"].values
+        base_component = float(
+            np.mean((ens_mean_test[valid] - y_pred_base[valid]) / ens_std_test[valid])
+        )
+        decomposition_results.append(
+            {
+                "alpha": alpha,
+                "base": base_component,
+                "conformal": q_hat,
+                "total": base_component + q_hat,
+            }
+        )
+        print(
+            f"    α={alpha:.2f}: coverage={metrics['coverage']:.3f}, "
+            f"base={base_component:.3f}, conformal={q_hat:.3f}, total={base_component + q_hat:.3f}"
+        )
+
+    # --- Two-panel figure ---
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(IEEE_TWO_COL_WIDTH, 2.8))
+
+    # --- Left panel: Calibration curve (fig6c) ---
+    alpha_targets = np.array([r["alpha_target"] for r in calibration_results])
+    coverages = np.array([r["coverage"] for r in calibration_results])
+
+    diag = np.linspace(0.75, 1.0, 100)
+    ax1.plot(diag, diag, "k--", linewidth=1.5, label="Perfect Calibration")
+    ax1.scatter(
+        alpha_targets,
+        coverages,
+        s=60,
+        c=COLORS["learned"],
+        marker="o",
+        edgecolors="black",
+        linewidths=1,
+        zorder=5,
+    )
+
+    ax1.set_xlabel("Target Coverage (α)", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax1.set_ylabel("Empirical Coverage", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax1.set_xlim(0.75, 1.0)
+    ax1.set_ylim(0.75, 1.0)
+    ax1.set_aspect("equal", adjustable="box")
+    ax1.legend(loc="lower right", fontsize=FONT_SIZES_TWO_COL["small"])
+    ax1.tick_params(labelsize=FONT_SIZES_TWO_COL["small"])
+    ax1.grid(True, alpha=0.3)
+
+    # --- Right panel: Stacked bar decomposition (fig7c) ---
+    alphas = [r["alpha"] for r in decomposition_results]
+    bases = [r["base"] for r in decomposition_results]
+    conforals = [r["conformal"] for r in decomposition_results]
+    totals = [r["total"] for r in decomposition_results]
+
+    x = np.arange(len(alphas))
+    width = 0.5
+
+    ax2.bar(
+        x,
+        bases,
+        width,
+        label="Base Quantile",
+        color=COLORS["knn"],
+        edgecolor="black",
+        linewidth=0.5,
+    )
+    ax2.bar(
+        x,
+        conforals,
+        width,
+        bottom=bases,
+        label="Conformal Correction",
+        color=COLORS["learned"],
+        edgecolor="black",
+        linewidth=0.5,
+    )
+
+    # Total labels on top
+    for i, tot in enumerate(totals):
+        ax2.text(x[i], tot + 0.03, f"{tot:.2f}", ha="center", va="bottom",
+                 fontsize=FONT_SIZES_TWO_COL["small"])
+
+    ax2.set_xticks(x)
+    ax2.set_xticklabels([f"{a:.2f}" for a in alphas])
+    ax2.set_xlabel("Target Coverage (α)", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax2.set_ylabel("Std. Deviations Below Mean", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax2.tick_params(labelsize=FONT_SIZES_TWO_COL["small"])
+    ax2.legend(loc="upper left", fontsize=FONT_SIZES_TWO_COL["small"])
+    ax2.grid(axis="y", alpha=0.3)
+
+    plt.tight_layout()
+    _save_figure(fig, output_path)
+
+    return fig
+
+
+# ============================================================================
 # FIGURE 8: 2D Ellipse Grid (different k values)
 # ============================================================================
 def fig8_ellipse_grid(
@@ -3385,6 +3553,14 @@ def generate_all_figures(use_residuals: bool = False):
     try:
         fig7c_lower_bound_decomposition()
         figures_generated.append("fig7c_lb_decomposition")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+    # Figure 6c+7c combined: Calibration + Decomposition (two-panel)
+    print("\n[7c+/15] Calibration + decomposition (two-panel)...")
+    try:
+        fig6c7c_calibration_and_decomposition()
+        figures_generated.append("fig6c7c_calibration_decomposition")
     except Exception as e:
         print(f"  Error: {e}")
 

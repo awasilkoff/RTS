@@ -271,8 +271,8 @@ def fig1_kernel_distance_comparison(
         zorder=10,
         label="Query",
     )
-    ax.set_xlabel(x_cols[0])
-    ax.set_ylabel(x_cols[1])
+    ax.set_xlabel("System Mean")
+    ax.set_ylabel("System STD")
     # ax.set_title(f"Euclidean k-NN (k={k})")  # caption in paper
     ax.legend(loc="upper right", fontsize=7)
     ax.grid(True, alpha=0.3)
@@ -301,8 +301,8 @@ def fig1_kernel_distance_comparison(
         zorder=10,
         label="Query",
     )
-    ax.set_xlabel(x_cols[0])
-    ax.set_ylabel(x_cols[1])
+    ax.set_xlabel("System Mean")
+    ax.set_ylabel("System STD")
     # Title omitted — caption in paper
     ax.legend(loc="upper right", fontsize=7)
     ax.grid(True, alpha=0.3)

@@ -316,16 +316,13 @@ def fig1_kernel_distance_comparison(
     )
 
     ax_right.set_xlabel("System Mean")
-    ax_right.tick_params(axis="y", labelleft=False)  # hide tick labels but keep ticks/grid
+    ax_right.yaxis.tick_right()
+    ax_right.yaxis.set_label_position("right")
+    ax_right.set_ylabel("System Standard Deviation")
     ax_right.legend(loc="upper right")
     ax_right.grid(True, alpha=0.3)
 
     fig.tight_layout()
-
-    # Shared y-axis label between the two panels
-    mid_x = (ax_left.get_position().x1 + ax_right.get_position().x0) / 2
-    fig.text(mid_x, 0.5, "System Standard Deviation",
-             va="center", ha="center", rotation=90)
 
     # Save
     _save_figure(fig, output_path)

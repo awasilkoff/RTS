@@ -1076,6 +1076,138 @@ def fig3b_4b_hyperparameter_sweeps(
 
 
 # ============================================================================
+# FIGURE 3b/4b ALT: Two-panel version — k-NN sweep + combined kappa sweep
+# ============================================================================
+def fig3b_4b_hyperparameter_sweeps_combined(
+    feature_set_dir: Path = None,
+    output_path: Path = None,
+) -> plt.Figure:
+    """
+    Two-panel figure: (a) NLL vs k, (b) NLL vs κ with both softmax and
+    unconstrained lines overlaid on the same axes.
+    """
+    if feature_set_dir is None:
+        feature_set_dir = HIGH_DIM_16D_DIR
+    if output_path is None:
+        output_path = OUTPUT_DIR / "figures" / "fig3b_4b_hyperparameter_sweeps_combined"
+
+    fig, (ax_k, ax_kappa) = plt.subplots(
+        1,
+        2,
+        figsize=(IEEE_TWO_COL_WIDTH, 2.8),
+        sharey=True,
+    )
+
+    # ------------------------------------------------------------------
+    # Panel (a): NLL vs k  (identical to original)
+    # ------------------------------------------------------------------
+    multi_stats_path = KNN_SWEEP_DIR / "multi_split_k_stats.csv"
+    if multi_stats_path.exists():
+        stats = pd.read_csv(multi_stats_path)
+        k_vals = stats["k"].values
+        nll_mean_k = stats["nll_mean"].values
+        nll_std_k = stats["nll_std"].values
+    else:
+        knn_df = _load_knn_sweep()
+        k_vals = knn_df["k"].values
+        nll_mean_k = knn_df["nll"].values
+        nll_std_k = np.zeros_like(nll_mean_k)
+
+    ax_k.plot(
+        k_vals, nll_mean_k, "o-",
+        linewidth=2, markersize=5, color=COLORS["knn"],
+    )
+    ax_k.fill_between(
+        k_vals, nll_mean_k - nll_std_k, nll_mean_k + nll_std_k,
+        alpha=0.25, color=COLORS["knn"],
+    )
+
+    # Mark best k
+    best_k_idx = np.argmin(nll_mean_k)
+    ax_k.scatter(
+        [k_vals[best_k_idx]], [nll_mean_k[best_k_idx]],
+        s=150, c=COLORS["knn"], marker="*", zorder=10,
+        edgecolors="black", linewidths=1,
+    )
+
+    # Load sweep data for baselines and kappa panel
+    df_sweep = _load_sweep_results(feature_set_dir)
+    nll_global = df_sweep.iloc[0]["val_nll_global"]
+
+    # Best learned omega (across all constraints) for panel (a) baseline
+    best_row_all = df_sweep.sort_values("val_nll_learned").iloc[0]
+    nll_learned_best = best_row_all["val_nll_learned"]
+
+    ax_k.axhline(nll_learned_best, linestyle="--", linewidth=1.5, color=COLORS["learned"])
+    ax_k.axhline(nll_global, linestyle=":", linewidth=1.5, color=COLORS["global"])
+
+    ax_k.set_xlabel("k (Number of Neighbors)")
+    ax_k.set_ylabel("Validation NLL")
+    ax_k.set_xscale("log")
+    ax_k.grid(True, alpha=0.3)
+    ax_k.text(0.02, 0.98, "(a)", transform=ax_k.transAxes,
+              fontsize=10, fontweight="bold", va="top")
+
+    # Best k-NN NLL for baselines on kappa panel
+    nll_knn_best = nll_mean_k[best_k_idx]
+
+    # ------------------------------------------------------------------
+    # Panel (b): NLL vs κ — both constraints on same axes
+    # ------------------------------------------------------------------
+    for constraint_filter, label, color in [
+        ("softmax", "Constrained", COLORS["learned"]),
+        ("none", "Unconstrained", COLORS["unconstrained"]),
+    ]:
+        mask = df_sweep["omega_constraint"] == constraint_filter
+        df_filt = df_sweep[mask].copy()
+        if df_filt.empty:
+            continue
+
+        df_filt = (
+            df_filt.sort_values("val_nll_learned")
+            .groupby("tau", as_index=False)
+            .first()
+            .sort_values("tau")
+        )
+        tau_vals = df_filt["tau"].values
+        nll_vals = df_filt["val_nll_learned"].values
+        nll_std = np.zeros_like(nll_vals)
+
+        tau_vals, nll_vals, nll_std = _filter_diverged_taus(
+            tau_vals, nll_vals, nll_std, nll_std=nll_std
+        )
+
+        ax_kappa.plot(
+            tau_vals, nll_vals, "o-",
+            linewidth=2, markersize=5, color=color, label=label,
+        )
+
+        # Mark best kappa for this constraint
+        best_idx = np.argmin(nll_vals)
+        ax_kappa.scatter(
+            [tau_vals[best_idx]], [nll_vals[best_idx]],
+            s=150, c=color, marker="*", zorder=10,
+            edgecolors="black", linewidths=1,
+        )
+
+    # Baselines
+    ax_kappa.axhline(nll_knn_best, linestyle="--", linewidth=1.5, color=COLORS["knn"])
+    ax_kappa.axhline(nll_global, linestyle=":", linewidth=1.5, color=COLORS["global"])
+
+    ax_kappa.set_xlabel("κ (Kernel Bandwidth)")
+    ax_kappa.set_xscale("log")
+    ax_kappa.grid(True, alpha=0.3)
+    ax_kappa.legend(loc="upper right", fontsize=8)
+    ax_kappa.text(0.02, 0.98, "(b)", transform=ax_kappa.transAxes,
+                  fontsize=10, fontweight="bold", va="top")
+
+    plt.tight_layout()
+    _save_figure(fig, output_path)
+
+    return fig
+
+
+# ============================================================================
 # FIGURE 5: NLL Comparison Bar Chart (16D)
 # ============================================================================
 def fig5_nll_16d_comparison(
@@ -3152,6 +3284,12 @@ def generate_all_figures(use_residuals: bool = False):
     try:
         fig3b_4b_hyperparameter_sweeps()
         figures_generated.append("fig3b_4b_hyperparameter_sweeps")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+    try:
+        fig3b_4b_hyperparameter_sweeps_combined()
+        figures_generated.append("fig3b_4b_hyperparameter_sweeps_combined")
     except Exception as e:
         print(f"  Error: {e}")
 

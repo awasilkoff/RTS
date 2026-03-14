@@ -41,7 +41,8 @@ FIGURE_DEFAULTS = {
 COLORS = {
     "global": "#6c757d",      # Gray - baseline
     "knn": "#2A9D8F",         # Teal - k-NN
-    "learned": "#E63946",     # Red - learned omega
+    "learned": "#E63946",     # Red - learned omega (softmax/constrained)
+    "unconstrained": "#E76F51", # Orange - unconstrained learned omega
     "actual": "#32CD32",      # Lime green - actual observation
 }
 

@@ -612,10 +612,14 @@ def fig2_3d_ellipsoid_comparison(
     xlim_ = xlim if xlim is not None else _nice_lim(all_x.min(), all_x.max())
     ylim_ = ylim if ylim is not None else _nice_lim(all_y.min(), all_y.max())
     zlim_ = zlim if zlim is not None else _nice_lim(all_z.min(), all_z.max())
+    from matplotlib.ticker import MaxNLocator
     for ax in [ax1, ax2]:
         ax.set_xlim(*xlim_)
         ax.set_ylim(*ylim_)
         ax.set_zlim(*zlim_)
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True, nbins=5))
+        ax.yaxis.set_major_locator(MaxNLocator(integer=True, nbins=5))
+        ax.zaxis.set_major_locator(MaxNLocator(integer=True, nbins=5))
 
     # Shared legend at bottom
     from matplotlib.lines import Line2D

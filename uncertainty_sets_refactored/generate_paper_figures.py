@@ -307,8 +307,11 @@ def fig1_kernel_distance_comparison(
     ax.legend(loc="upper right", fontsize=8)
     ax.grid(True, alpha=0.3)
 
-    # Colorbar
-    cbar = plt.colorbar(scatter, ax=ax)
+    # Colorbar (appended outside the axes so both plots stay equal width)
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cbar = fig.colorbar(scatter, cax=cax)
     cbar.set_label("Kernel Weight", fontsize=10)
     cbar.ax.tick_params(labelsize=7)
 

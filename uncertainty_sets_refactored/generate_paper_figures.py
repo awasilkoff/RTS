@@ -245,13 +245,17 @@ def fig1_kernel_distance_comparison(
     weights_knn = compute_knn_binary_weights(X_target, Xs, k=k)
     weights_learned = compute_kernel_weights(X_target, Xs, omega_learned, tau)
 
-    # Create figure (IEEE two-column width)
-    # Layout: [colorbar | learned kernel | shared y-label | k-NN]
-    fig, axes = plt.subplots(1, 2, figsize=(IEEE_TWO_COL_WIDTH, 3.5), sharey=True)
+    # Create figure with GridSpec: [colorbar | learned kernel | k-NN]
+    # Colorbar gets its own narrow column so both plot axes are equal width.
+    from matplotlib.gridspec import GridSpec
+    fig = plt.figure(figsize=(IEEE_TWO_COL_WIDTH, 3.5))
+    gs = GridSpec(1, 3, figure=fig, width_ratios=[0.03, 1, 1], wspace=0.05)
+    cax = fig.add_subplot(gs[0, 0])
+    ax_left = fig.add_subplot(gs[0, 1])
+    ax_right = fig.add_subplot(gs[0, 2], sharey=ax_left)
 
     # Left: Learned kernel weights
-    ax = axes[0]
-    scatter = ax.scatter(
+    scatter = ax_left.scatter(
         Xs[:, 0],
         Xs[:, 1],
         c=weights_learned,
@@ -262,7 +266,7 @@ def fig1_kernel_distance_comparison(
             vmin=max(weights_learned.min(), 1e-6), vmax=weights_learned.max()
         ),
     )
-    ax.scatter(
+    ax_left.scatter(
         X_target[0],
         X_target[1],
         c=COLORS["learned"],
@@ -273,18 +277,15 @@ def fig1_kernel_distance_comparison(
         zorder=10,
         label="Target Hour",
     )
-    ax.set_xlabel("System Mean")
+    ax_left.set_xlabel("System Mean")
     # Move y-axis ticks to the right side of the left plot
-    ax.yaxis.tick_right()
-    ax.yaxis.set_label_position("right")
-    ax.set_ylabel("")
-    ax.legend(loc="upper right")
-    ax.grid(True, alpha=0.3)
+    ax_left.yaxis.tick_right()
+    ax_left.yaxis.set_label_position("right")
+    ax_left.set_ylabel("")
+    ax_left.legend(loc="upper right")
+    ax_left.grid(True, alpha=0.3)
 
-    # Colorbar on the far left
-    from mpl_toolkits.axes_grid1 import make_axes_locatable
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("left", size="5%", pad=0.45)
+    # Colorbar in its own dedicated column on the far left
     cbar = fig.colorbar(scatter, cax=cax)
     cbar.set_label("Kernel Weight")
     cbar.ax.tick_params(labelsize=7)
@@ -292,10 +293,9 @@ def fig1_kernel_distance_comparison(
     cbar.ax.yaxis.set_label_position("left")
 
     # Right: k-NN binary weights
-    ax = axes[1]
     knn_mask = weights_knn == 1.0
-    ax.scatter(Xs[~knn_mask, 0], Xs[~knn_mask, 1], c="lightgray", s=15, alpha=0.4)
-    ax.scatter(
+    ax_right.scatter(Xs[~knn_mask, 0], Xs[~knn_mask, 1], c="lightgray", s=15, alpha=0.4)
+    ax_right.scatter(
         X_target[0],
         X_target[1],
         c=COLORS["learned"],
@@ -306,7 +306,7 @@ def fig1_kernel_distance_comparison(
         zorder=10,
         label="Target Hour",
     )
-    ax.scatter(
+    ax_right.scatter(
         Xs[knn_mask, 0],
         Xs[knn_mask, 1],
         c=COLORS["knn"],
@@ -315,15 +315,16 @@ def fig1_kernel_distance_comparison(
         label=f"k={k} neighbors",
     )
 
-    ax.set_xlabel("System Mean")
-    ax.tick_params(axis="y", labelleft=False)  # hide tick labels but keep ticks/grid
-    ax.legend(loc="upper right")
-    ax.grid(True, alpha=0.3)
+    ax_right.set_xlabel("System Mean")
+    ax_right.tick_params(axis="y", labelleft=False)  # hide tick labels but keep ticks/grid
+    ax_right.legend(loc="upper right")
+    ax_right.grid(True, alpha=0.3)
 
-    plt.tight_layout()
+    fig.tight_layout()
 
-    # Shared y-axis label between the two panels, matching axis label style
-    fig.text(0.56, 0.5, "System Standard Deviation",
+    # Shared y-axis label between the two panels
+    mid_x = (ax_left.get_position().x1 + ax_right.get_position().x0) / 2
+    fig.text(mid_x, 0.5, "System Standard Deviation",
              va="center", ha="center", rotation=90)
 
     # Save

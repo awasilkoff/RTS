@@ -316,14 +316,14 @@ def fig1_kernel_distance_comparison(
     )
 
     ax.set_xlabel("System Mean")
-    ax.yaxis.set_visible(False)  # ticks shown on left plot's right side
+    ax.tick_params(axis="y", labelleft=False)  # hide tick labels but keep ticks/grid
     ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
 
     # Shared y-axis label between the two panels
-    fig.text(0.52, 0.5, "System Standard Deviation",
+    fig.text(0.56, 0.5, "System Standard Deviation",
              va="center", ha="center", rotation=90, fontsize=plt.rcParams["axes.labelsize"])
 
     # Save

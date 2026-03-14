@@ -434,7 +434,7 @@ def fig2_3d_ellipsoid_comparison(
     def _labels(ax):
         ax.set_xlabel(f"{WIND_LABELS[0]} (MW)", labelpad=2)
         ax.set_ylabel(f"{WIND_LABELS[1]} (MW)", labelpad=2)
-        ax.set_zlabel(f"{WIND_LABELS[2]} (MW)", labelpad=2)
+        ax.set_zlabel(f"{WIND_LABELS[2]} (MW)", labelpad=2, rotation=90)
         ax.tick_params(labelsize=6)
 
     n_pts = 25
@@ -501,7 +501,7 @@ def fig2_3d_ellipsoid_comparison(
         zorder=6,
     )
 
-    ax1.set_title(r"Global vs Learned $\boldsymbol{\omega}$", fontsize=9, pad=4)
+    ax1.set_title(r"Global vs. Learned $\boldsymbol{\omega}$", fontsize=9, pad=4)
     # Left panel: x/y labels only, skip z-label (right panel covers it)
     ax1.set_xlabel(f"{WIND_LABELS[0]} (MW)", labelpad=2)
     ax1.set_ylabel(f"{WIND_LABELS[1]} (MW)", labelpad=2)
@@ -554,7 +554,7 @@ def fig2_3d_ellipsoid_comparison(
         zorder=6,
     )
 
-    ax2.set_title(r"k-NN vs Learned $\boldsymbol{\omega}$", fontsize=9, pad=4)
+    ax2.set_title(r"k-NN vs. Learned $\boldsymbol{\omega}$", fontsize=9, pad=4)
     _labels(ax2)
     ax2.view_init(elev=20, azim=45)
 

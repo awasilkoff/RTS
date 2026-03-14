@@ -1104,7 +1104,7 @@ def fig3b_4b_hyperparameter_sweeps_combined(
     if output_path is None:
         output_path = OUTPUT_DIR / "figures" / "fig3b_4b_hyperparameter_sweeps_combined"
 
-    fig, (ax_k, ax_kappa) = plt.subplots(
+    fig, (ax_kappa, ax_k) = plt.subplots(
         1,
         2,
         figsize=(IEEE_TWO_COL_WIDTH, IEEE_TWO_COL_WIDTH / 2),
@@ -1112,7 +1112,7 @@ def fig3b_4b_hyperparameter_sweeps_combined(
     )
 
     # ------------------------------------------------------------------
-    # Panel (a): NLL vs k  (identical to original)
+    # Panel (b): NLL vs k
     # ------------------------------------------------------------------
     multi_stats_path = KNN_SWEEP_DIR / "multi_split_k_stats.csv"
     if multi_stats_path.exists():
@@ -1165,7 +1165,7 @@ def fig3b_4b_hyperparameter_sweeps_combined(
     nll_knn_best = nll_mean_k[best_k_idx]
 
     # ------------------------------------------------------------------
-    # Panel (b): NLL vs κ — both constraints on same axes
+    # Panel (a): NLL vs κ — both constraints on same axes
     # ------------------------------------------------------------------
     for constraint_filter, label, color in [
         ("softmax", r"Constrained $\boldsymbol{\omega}$", COLORS["unconstrained"]),

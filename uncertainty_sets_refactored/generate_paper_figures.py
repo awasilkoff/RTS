@@ -247,7 +247,7 @@ def fig1_kernel_distance_comparison(
 
     # Create figure (IEEE two-column width)
     # Layout: [colorbar | learned kernel | shared y-label | k-NN]
-    fig, axes = plt.subplots(1, 2, figsize=(IEEE_TWO_COL_WIDTH, 3.0), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(IEEE_TWO_COL_WIDTH, 3.5), sharey=True)
 
     # Left: Learned kernel weights
     ax = axes[0]
@@ -277,8 +277,7 @@ def fig1_kernel_distance_comparison(
     # Move y-axis ticks to the right side of the left plot
     ax.yaxis.tick_right()
     ax.yaxis.set_label_position("right")
-    ax.set_ylabel("System Standard Deviation")
-    ax.set_aspect("equal", adjustable="datalim")
+    ax.set_ylabel("")
     ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
 
@@ -318,11 +317,14 @@ def fig1_kernel_distance_comparison(
 
     ax.set_xlabel("System Mean")
     ax.tick_params(axis="y", labelleft=False)  # hide tick labels but keep ticks/grid
-    ax.set_aspect("equal", adjustable="datalim")
     ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
+
+    # Shared y-axis label between the two panels, matching axis label style
+    fig.text(0.56, 0.5, "System Standard Deviation",
+             va="center", ha="center", rotation=90)
 
     # Save
     _save_figure(fig, output_path)

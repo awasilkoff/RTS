@@ -54,6 +54,7 @@ import matplotlib.pyplot as plt
 
 from plot_config import (
     setup_plotting,
+    FONT_SIZES_TWO_COL,
     IEEE_COL_WIDTH,
     IEEE_TWO_COL_WIDTH,
     COLORS,
@@ -2060,17 +2061,18 @@ def fig7c_lower_bound_decomposition(
 
     # Total labels on top
     for i, tot in enumerate(totals):
-        ax.text(x[i], tot + 0.03, f"{tot:.2f}", ha="center", va="bottom")
+        ax.text(x[i], tot + 0.03, f"{tot:.2f}", ha="center", va="bottom",
+                fontsize=FONT_SIZES_TWO_COL["small"])
 
     ax.set_xticks(x)
     ax.set_xticklabels([f"{a:.2f}" for a in alphas])
-    ax.set_xlabel("Target Coverage (α)")
-    ax.set_ylabel("Std. Deviations Below Mean")
-    ax.legend(loc="upper left")
+    ax.set_xlabel("Target Coverage (α)", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax.set_ylabel("Std. Deviations Below Mean", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax.tick_params(labelsize=FONT_SIZES_TWO_COL["small"])
+    ax.legend(loc="upper left", fontsize=FONT_SIZES_TWO_COL["small"])
     ax.grid(axis="y", alpha=0.3)
 
     plt.tight_layout()
-    fig.subplots_adjust(left=0.18)
     _save_figure(fig, output_path)
 
     return fig

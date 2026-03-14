@@ -1322,8 +1322,8 @@ def fig3b_4b_hyperparameter_sweeps_combined(
     # Panel (b): NLL vs κ — both constraints on same axes
     # ------------------------------------------------------------------
     for constraint_filter, label, color in [
-        ("softmax", "Constrained", COLORS["learned"]),
-        ("none", "Unconstrained", COLORS["unconstrained"]),
+        ("softmax", "Constrained", COLORS["unconstrained"]),
+        ("none", "Unconstrained", COLORS["learned"]),
     ]:
         mask = df_sweep["omega_constraint"] == constraint_filter
         df_filt = df_sweep[mask].copy()

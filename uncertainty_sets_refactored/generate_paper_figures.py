@@ -274,7 +274,7 @@ def fig1_kernel_distance_comparison(
     ax.set_xlabel("System Mean")
     ax.set_ylabel("System Standard Deviation")
     # ax.set_title(f"Euclidean k-NN (k={k})")  # caption in paper
-    ax.legend(loc="upper right", fontsize=8)
+    ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
 
     # Right: Learned kernel weights
@@ -304,7 +304,7 @@ def fig1_kernel_distance_comparison(
     ax.set_xlabel("System Mean")
     ax.set_ylabel("System STD")
     # Title omitted — caption in paper
-    ax.legend(loc="upper right", fontsize=8)
+    ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
 
     # Colorbar (appended outside the axes so both plots stay equal width)
@@ -312,7 +312,7 @@ def fig1_kernel_distance_comparison(
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     cbar = fig.colorbar(scatter, cax=cax)
-    cbar.set_label("Kernel Weight", fontsize=10)
+    cbar.set_label("Kernel Weight")
     cbar.ax.tick_params(labelsize=7)
 
     plt.tight_layout()
@@ -422,9 +422,9 @@ def fig2_3d_ellipsoid_comparison(
     fig = plt.figure(figsize=(IEEE_TWO_COL_WIDTH, 3.5))
 
     def _labels(ax):
-        ax.set_xlabel(f"{WIND_LABELS[0]} (MW)", fontsize=7, labelpad=2)
-        ax.set_ylabel(f"{WIND_LABELS[1]} (MW)", fontsize=7, labelpad=2)
-        ax.set_zlabel(f"{WIND_LABELS[2]} (MW)", fontsize=7, labelpad=2)
+        ax.set_xlabel(f"{WIND_LABELS[0]} (MW)", labelpad=2)
+        ax.set_ylabel(f"{WIND_LABELS[1]} (MW)", labelpad=2)
+        ax.set_zlabel(f"{WIND_LABELS[2]} (MW)", labelpad=2)
         ax.tick_params(labelsize=6)
 
     n_pts = 25
@@ -491,7 +491,7 @@ def fig2_3d_ellipsoid_comparison(
         zorder=6,
     )
 
-    ax1.set_title("Global vs Learned ω", fontsize=9)
+    ax1.set_title("Global vs Learned ω")
     _labels(ax1)
     ax1.view_init(elev=20, azim=45)
     # Manual legend
@@ -517,7 +517,7 @@ def fig2_3d_ellipsoid_comparison(
             label=f"Learned ω (κ={tau})",
         ),
     ]
-    ax1.legend(handles=legend_elements, loc="upper left", fontsize=7)
+    ax1.legend(handles=legend_elements, loc="upper left")
 
     # --- Right panel: k-NN vs Learned ---
     ax2 = fig.add_subplot(122, projection="3d")
@@ -564,7 +564,7 @@ def fig2_3d_ellipsoid_comparison(
         zorder=6,
     )
 
-    ax2.set_title(f"k-NN (k={knn_k}) vs Learned ω", fontsize=9)
+    ax2.set_title(f"k-NN (k={knn_k}) vs Learned ω")
     _labels(ax2)
     ax2.view_init(elev=20, azim=45)
     legend_elements_r = [
@@ -587,7 +587,7 @@ def fig2_3d_ellipsoid_comparison(
             label=f"Learned ω (κ={tau})",
         ),
     ]
-    ax2.legend(handles=legend_elements_r, loc="upper left", fontsize=7)
+    ax2.legend(handles=legend_elements_r, loc="upper left")
 
     # Shared per-axis limits across both panels (each wind resource gets own range)
     all_surfaces = [
@@ -718,7 +718,7 @@ def fig3_nll_vs_k(
     ax.set_xlabel("k (Number of Neighbors)")
     ax.set_ylabel("Mean NLL")
     ax.set_xscale("log")
-    ax.legend(fontsize=7, loc="upper left")
+    ax.legend(loc="upper left")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -847,7 +847,7 @@ def fig4_nll_vs_tau(
     ax.set_xlabel("κ (Kernel Bandwidth)")
     ax.set_ylabel("Validation NLL")
     ax.set_xscale("log")
-    ax.legend(fontsize=7, loc="upper left")
+    ax.legend(loc="upper left")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -1197,7 +1197,7 @@ def fig3b_4b_hyperparameter_sweeps_combined(
     ax_kappa.set_xlabel("κ (Kernel Bandwidth)")
     ax_kappa.set_xscale("log")
     ax_kappa.grid(True, alpha=0.3)
-    ax_kappa.legend(loc="upper right", fontsize=8)
+    ax_kappa.legend(loc="upper right")
     ax_kappa.text(0.02, 0.98, "(b)", transform=ax_kappa.transAxes,
                   fontsize=10, fontweight="bold", va="top")
 
@@ -1249,7 +1249,6 @@ def fig5_nll_16d_comparison(
             f"{nll:.2f}",
             ha="center",
             va="bottom",
-            fontsize=8,
         )
 
     ax.set_ylabel("Validation NLL")
@@ -1511,7 +1510,7 @@ def fig6_calibration_curve(
     ax.set_xlim(0.75, 1.0)
     ax.set_ylim(0.75, 1.0)
     ax.set_aspect("equal", adjustable="box")
-    ax.legend(loc="lower right", fontsize=7)
+    ax.legend(loc="lower right")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -1620,7 +1619,7 @@ def fig6b_calibration_no_tolerance(
     ax.set_xlim(0.75, 1.0)
     ax.set_ylim(0.75, 1.0)
     ax.set_aspect("equal", adjustable="box")
-    ax.legend(loc="lower right", fontsize=7)
+    ax.legend(loc="lower right")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -1713,7 +1712,7 @@ def fig6c_calibration_points_only(
     ax.set_xlim(0.75, 1.0)
     ax.set_ylim(0.75, 1.0)
     ax.set_aspect("equal", adjustable="box")
-    ax.legend(loc="lower right", fontsize=7)
+    ax.legend(loc="lower right")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -1798,7 +1797,6 @@ def fig7_conformal_corrections(
             textcoords="offset points",
             xytext=(0, 8),
             ha="center",
-            fontsize=7,
         )
 
     ax.set_xlabel("Target Coverage (α)")
@@ -1908,7 +1906,6 @@ def fig7b_normalized_lower_bound(
             textcoords="offset points",
             xytext=(0, 8),
             ha="center",
-            fontsize=7,
         )
 
     ax.set_xlabel("Target Coverage (α)")
@@ -2037,13 +2034,13 @@ def fig7c_lower_bound_decomposition(
 
     # Total labels on top
     for i, tot in enumerate(totals):
-        ax.text(x[i], tot + 0.03, f"{tot:.2f}", ha="center", va="bottom", fontsize=7)
+        ax.text(x[i], tot + 0.03, f"{tot:.2f}", ha="center", va="bottom")
 
     ax.set_xticks(x)
     ax.set_xticklabels([f"{a:.2f}" for a in alphas])
     ax.set_xlabel("Target Coverage (α)")
     ax.set_ylabel("Std. Deviations Below Mean")
-    ax.legend(fontsize=7, loc="upper left")
+    ax.legend(loc="upper left")
     ax.grid(axis="y", alpha=0.3)
 
     plt.tight_layout()
@@ -2149,9 +2146,9 @@ def fig8_ellipse_grid(
             ax.fill(ex, ey, alpha=0.2, color=colors[col])
             ax.scatter([mu2[0]], [mu2[1]], s=50, c="black", marker="o", zorder=5)
 
-            ax.set_xlabel(WIND_LABELS[dims[0]] + " (MW)", fontsize=7)
-            ax.set_ylabel(WIND_LABELS[dims[1]] + " (MW)", fontsize=7)
-            ax.set_title(k_labels[col], fontsize=8)
+            ax.set_xlabel(WIND_LABELS[dims[0]] + " (MW)")
+            ax.set_ylabel(WIND_LABELS[dims[1]] + " (MW)")
+            ax.set_title(k_labels[col])
             ax.tick_params(labelsize=6)
             ax.grid(True, alpha=0.3)
             ax.set_xlim(xlim_lo, xlim_hi)
@@ -2268,7 +2265,7 @@ def fig10_ellipse_overlay(
     ax.set_xlabel(WIND_LABELS[dims[0]])
     ax.set_ylabel(WIND_LABELS[dims[1]])
     # ax.set_title(...)  # caption in paper
-    ax.legend(fontsize=7, loc="upper right")
+    ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
     ax.set_aspect("equal", adjustable="datalim")
 
@@ -2402,10 +2399,10 @@ def fig10b_ellipse_overlay_two_hours(
         # Single center dot at fixed artificial center
         ax.scatter([mu_common[0]], [mu_common[1]], s=30, c="black", marker="o", zorder=5)
 
-        ax.set_xlabel(WIND_LABELS[dims[0]] + " (MW)", fontsize=7)
+        ax.set_xlabel(WIND_LABELS[dims[0]] + " (MW)")
         if col == 0:
-            ax.set_ylabel(WIND_LABELS[dims[1]] + " (MW)", fontsize=7)
-        ax.set_title(label, fontsize=8)
+            ax.set_ylabel(WIND_LABELS[dims[1]] + " (MW)")
+        ax.set_title(label)
         ax.tick_params(labelsize=6)
         ax.grid(True, alpha=0.3)
         ax.set_xlim(*xlim)
@@ -2516,7 +2513,7 @@ def fig11_tau_sweep_unconstrained(
     ax.set_xlabel("κ (Kernel Bandwidth)")
     ax.set_ylabel("Validation NLL")
     ax.set_xscale("log")
-    ax.legend(fontsize=7, loc="upper right")
+    ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -2933,7 +2930,7 @@ def fig_nll_heatmap(
             rasterized=True,
         )
         ax.set_xlabel(xlabel)
-        ax.set_title(title, fontsize=9)
+        ax.set_title(title)
         ax.grid(True, alpha=0.3)
 
     ax_left.set_ylabel(ylabel)
@@ -2941,7 +2938,7 @@ def fig_nll_heatmap(
 
     # Colorbar in its own axis — no overlap
     cbar = fig.colorbar(sc, cax=cax)
-    cbar.set_label("NLL (per point)", fontsize=8)
+    cbar.set_label("NLL (per point)")
     cbar.ax.tick_params(labelsize=7)
 
     _save_figure(fig, output_path)
@@ -3152,15 +3149,12 @@ def fig_nll_delta_surface(
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    ax.set_title(
-        f"ΔNLL (k-NN k={knn_k} − Learned ω)",
-        fontsize=9,
-    )
+    ax.set_title(f"ΔNLL (k-NN k={knn_k} − Learned ω)")
     ax.grid(True, alpha=0.2)
 
     # Colorbar
     cbar = fig.colorbar(cf, cax=cax)
-    cbar.set_label("ΔNLL  (blue = learned wins)", fontsize=8)
+    cbar.set_label("ΔNLL  (blue = learned wins)")
     cbar.ax.tick_params(labelsize=7)
 
     _save_figure(fig, output_path)

@@ -299,11 +299,17 @@ def fig1_kernel_distance_comparison(
         zorder=10,
         label="Target Hour",
     )
+    print(f"Normalized features of target hour")
+    print(f"Normalized features: SYS_MEAN {X_target[0]:.2f} , SYS_STD {X_target[1]:.2f}")
+
     # Weight distribution summary
     n_total = len(weights_learned)
-    for thresh in [0.5, 0.1, 0.01, 0.001]:
+    for thresh in [0.9,0.8,0.7,0.65,0.6,0.5, 0.1, 0.01, 0.001]:
         n_above = int(np.sum(weights_learned > thresh))
-        print(f"  {n_above / n_total:.1%} of points have weight > {thresh}")
+        print(f"{n_above} points, i.e.  {n_above / n_total:.1%} of points have weight > {thresh}")
+    for thresh in [0.0001,1e-5,1e-6,1e-7,1e-8]:
+        n_above = int(np.sum(weights_learned < thresh))
+        print(f"{n_above} points, i.e.  {n_above / n_total:.1%} of points have weight < {thresh}")
     median_w = float(np.median(weights_learned))
     print(f"  50% of points have weight < {median_w:.2e}")
 
@@ -537,7 +543,7 @@ def fig2_3d_ellipsoid_comparison(
     ax1.set_xlabel(f"{WIND_LABELS[0]} (MW)", labelpad=2)
     ax1.set_ylabel(f"{WIND_LABELS[1]} (MW)", labelpad=2)
     ax1.set_zlabel("")
-    ax1.tick_params(labelsize=8)
+    ax1.tick_params(labelsize=9)
     ax1.view_init(elev=20, azim=45)
 
     # --- Right panel: k-NN vs Learned ---
@@ -618,7 +624,7 @@ def fig2_3d_ellipsoid_comparison(
         Line2D([0], [0], marker="o", color="w", markerfacecolor=color_knn,     markersize=8, label=f"k-NN (k={knn_k})"),
         Line2D([0], [0], marker="D", color="w", markerfacecolor=color_learned, markersize=8, label=r"Learned $\boldsymbol{\omega}$"),
     ]
-    fig.legend(handles=legend_handles, loc="lower center", ncol=3, fontsize=8,
+    fig.legend(handles=legend_handles, loc="lower center", ncol=3, fontsize=10,
                frameon=True, bbox_to_anchor=(0.5, 0.0))
 
     plt.tight_layout(rect=[0.0, 0.06, 1.0, 1.0])

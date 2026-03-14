@@ -413,10 +413,10 @@ def fig2_3d_ellipsoid_comparison(
     # Use global mean as the common center for all ellipsoids
     Mu_common = Mu_global + offset
 
-    # Colors: high-contrast, distinct hues
-    color_global = "#4361EE"  # Blue
-    color_knn = "#2A9D8F"  # Teal
-    color_learned = "#F77F00"  # Orange
+    # Use shared color scheme from plot_config
+    color_global = COLORS["global"]
+    color_knn = COLORS["knn"]
+    color_learned = COLORS["learned"]
 
     # Create side-by-side 3D figure
     fig = plt.figure(figsize=(IEEE_TWO_COL_WIDTH, 3.5))

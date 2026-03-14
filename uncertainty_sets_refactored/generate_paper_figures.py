@@ -1206,7 +1206,13 @@ def fig3b_4b_hyperparameter_sweeps_combined(
     ax_kappa.set_xlabel("κ (Kernel Bandwidth)")
     ax_kappa.set_xscale("log")
     ax_kappa.grid(True, alpha=0.3)
-    ax_kappa.legend(loc="center left")
+
+    # Position legend on the right, vertically between global and k-NN baselines
+    y_bot, y_top = ax_kappa.get_ylim()
+    y_mid_axes = ((nll_knn_best + nll_global) / 2 - y_bot) / (y_top - y_bot)
+    ax_kappa.legend(loc="center right", bbox_to_anchor=(0.98, y_mid_axes),
+                    fontsize=7)
+
     ax_kappa.text(0.02, 0.98, "(b)", transform=ax_kappa.transAxes,
                   fontsize=10, fontweight="bold", va="top")
 

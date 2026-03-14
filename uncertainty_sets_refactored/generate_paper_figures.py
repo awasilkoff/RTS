@@ -253,14 +253,6 @@ def fig1_kernel_distance_comparison(
     knn_mask = weights_knn == 1.0
     ax.scatter(Xs[~knn_mask, 0], Xs[~knn_mask, 1], c="lightgray", s=15, alpha=0.4)
     ax.scatter(
-        Xs[knn_mask, 0],
-        Xs[knn_mask, 1],
-        c=COLORS["knn"],
-        s=25,
-        alpha=0.8,
-        label=f"k={k} neighbors",
-    )
-    ax.scatter(
         X_target[0],
         X_target[1],
         c=COLORS["learned"],
@@ -271,6 +263,15 @@ def fig1_kernel_distance_comparison(
         zorder=10,
         label="Target Hour",
     )
+    ax.scatter(
+        Xs[knn_mask, 0],
+        Xs[knn_mask, 1],
+        c=COLORS["knn"],
+        s=25,
+        alpha=0.8,
+        label=f"k={k} neighbors",
+    )
+
     ax.set_xlabel("System Mean")
     ax.set_ylabel("System Standard Deviation")
     # ax.set_title(f"Euclidean k-NN (k={k})")  # caption in paper
@@ -596,7 +597,7 @@ def fig2_3d_ellipsoid_comparison_2x2(
     extreme_sample_idx: int = None,
     knn_k: int = 16,
     tau: float = 0.07,
-    rho: float = 1.0,
+    rho: float = 3.0,
     offset: float = 20.0,
 ) -> plt.Figure:
     """
@@ -1157,8 +1158,8 @@ def fig3b_4b_hyperparameter_sweeps_combined(
     ax_k.set_ylabel("Validation NLL")
     ax_k.set_xscale("log")
     ax_k.grid(True, alpha=0.3)
-    ax_k.text(0.02, 0.98, "(a)", transform=ax_k.transAxes,
-              fontsize=10, fontweight="bold", va="top")
+    # ax_k.text(0.02, 0.98, "(a)", transform=ax_k.transAxes,
+    #           fontsize=10, fontweight="bold", va="top")
 
     # Best k-NN NLL for baselines on kappa panel
     nll_knn_best = nll_mean_k[best_k_idx]
@@ -1216,8 +1217,8 @@ def fig3b_4b_hyperparameter_sweeps_combined(
     ax_kappa.legend(loc="center right", bbox_to_anchor=(0.98, y_mid_axes),
                     fontsize=7)
 
-    ax_kappa.text(0.02, 0.98, "(b)", transform=ax_kappa.transAxes,
-                  fontsize=10, fontweight="bold", va="top")
+    # ax_kappa.text(0.02, 0.98, "(b)", transform=ax_kappa.transAxes,
+    #               fontsize=10, fontweight="bold", va="top")
 
     plt.tight_layout()
     _save_figure(fig, output_path)
@@ -3268,7 +3269,7 @@ def generate_all_figures(use_residuals: bool = False):
     # Figure 2: 3D ellipsoid (Learned, k-NN k=16, Global)
     print("\n[2/15] 3D ellipsoid comparison (Learned, k-NN, Global)...")
     try:
-        fig2_3d_ellipsoid_comparison(knn_k=16, tau=0.07)
+        fig2_3d_ellipsoid_comparison(knn_k=16, tau=0.07,xlim=(0,50),ylim=(0,80),zlim=(20,100))
         figures_generated.append("fig2_ellipsoid_3d")
     except Exception as e:
         print(f"  Error: {e}")

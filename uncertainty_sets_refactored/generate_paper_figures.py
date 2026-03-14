@@ -74,7 +74,7 @@ VIZ_ARTIFACTS = DATA_DIR / "viz_artifacts"
 USE_RESIDUALS = False
 ACTUALS_PARQUET = DATA_DIR / "actuals_filtered_rts3_constellation_v1.parquet"
 ACTUAL_COL = "ACTUAL"
-OUTPUT_DIR = VIZ_ARTIFACTS / "paper_final"
+OUTPUT_DIR = VIZ_ARTIFACTS / "paper_final2"
 FOCUSED_2D_DIR = VIZ_ARTIFACTS / "focused_2d"
 HIGH_DIM_16D_DIR = VIZ_ARTIFACTS / "high_dim_16d"
 KNN_SWEEP_DIR = VIZ_ARTIFACTS / "knn_k_sweep"
@@ -269,12 +269,12 @@ def fig1_kernel_distance_comparison(
         edgecolors="black",
         linewidths=1,
         zorder=10,
-        label="Query",
+        label="Target Hour",
     )
     ax.set_xlabel("System Mean")
-    ax.set_ylabel("System STD")
+    ax.set_ylabel("System Standard Deviation")
     # ax.set_title(f"Euclidean k-NN (k={k})")  # caption in paper
-    ax.legend(loc="upper right", fontsize=7)
+    ax.legend(loc="upper right", fontsize=8)
     ax.grid(True, alpha=0.3)
 
     # Right: Learned kernel weights
@@ -299,17 +299,17 @@ def fig1_kernel_distance_comparison(
         edgecolors="black",
         linewidths=1,
         zorder=10,
-        label="Query",
+        label="Target Hour",
     )
     ax.set_xlabel("System Mean")
     ax.set_ylabel("System STD")
     # Title omitted — caption in paper
-    ax.legend(loc="upper right", fontsize=7)
+    ax.legend(loc="upper right", fontsize=8)
     ax.grid(True, alpha=0.3)
 
     # Colorbar
     cbar = plt.colorbar(scatter, ax=ax)
-    cbar.set_label("Kernel Weight", fontsize=8)
+    cbar.set_label("Kernel Weight", fontsize=10)
     cbar.ax.tick_params(labelsize=7)
 
     plt.tight_layout()

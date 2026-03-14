@@ -731,11 +731,14 @@ def fig2_3d_ellipsoid_comparison_2x2(
     from matplotlib.lines import Line2D
 
     row_configs = [
-        ("normal",  "Normal hour",  221, 222),
-        ("extreme", "Extreme hour", 223, 224),
+        ("normal",  "Normal",  221, 222),
+        ("extreme", "Extreme", 223, 224),
     ]
 
-    for row_label, row_title, sp_left, sp_right in row_configs:
+    col_titles = [r"Global vs Learned $\boldsymbol{\omega}$",
+                  r"k-NN vs Learned $\boldsymbol{\omega}$"]
+
+    for row_idx, (row_label, row_title, sp_left, sp_right) in enumerate(row_configs):
         surfs = surfaces_by_row[row_label]
         Xg, Yg, Zg = surfs["global"]
         Xl, Yl, Zl = surfs["learned"]
@@ -751,14 +754,13 @@ def fig2_3d_ellipsoid_comparison_2x2(
             ax_l.plot_wireframe(Xs, Ys, Zs, color=col, alpha=al_wire, linewidth=0.5, rstride=5, cstride=5)
         ax_l.scatter([Mu_common[0]], [Mu_common[1]], [Mu_common[2]],
                      s=50, c="black", marker="o", edgecolors="black", linewidths=0.5, zorder=6)
-        ax_l.set_title(f"{row_title}: Global vs Learned ω")
+        if row_idx == 0:
+            ax_l.set_title(col_titles[0], fontsize=8, pad=4)
+        ax_l.text2D(-0.02, 0.5, row_title, transform=ax_l.transAxes,
+                    fontsize=9, fontweight="bold", va="center", ha="right", rotation=90)
         _labels(ax_l)
         ax_l.view_init(elev=20, azim=45)
         ax_l.set_xlim(*xlim); ax_l.set_ylim(*ylim); ax_l.set_zlim(*zlim)
-        ax_l.legend(handles=[
-            Line2D([0], [0], marker="o", color="w", markerfacecolor=color_global,  markersize=8, label="Global"),
-            Line2D([0], [0], marker="D", color="w", markerfacecolor=color_learned, markersize=8, label=f"Learned ω (κ={tau})"),
-        ], loc="upper left")
 
         # Right panel: k-NN vs Learned
         ax_r = fig.add_subplot(sp_right, projection="3d")
@@ -770,16 +772,22 @@ def fig2_3d_ellipsoid_comparison_2x2(
             ax_r.plot_wireframe(Xs, Ys, Zs, color=col, alpha=al_wire, linewidth=0.5, rstride=5, cstride=5)
         ax_r.scatter([Mu_common[0]], [Mu_common[1]], [Mu_common[2]],
                      s=50, c="black", marker="o", edgecolors="black", linewidths=0.5, zorder=6)
-        ax_r.set_title(f"{row_title}: k-NN (k={knn_k}) vs Learned ω")
+        if row_idx == 0:
+            ax_r.set_title(col_titles[1], fontsize=8, pad=4)
         _labels(ax_r)
         ax_r.view_init(elev=20, azim=45)
         ax_r.set_xlim(*xlim); ax_r.set_ylim(*ylim); ax_r.set_zlim(*zlim)
-        ax_r.legend(handles=[
-            Line2D([0], [0], marker="o", color="w", markerfacecolor=color_knn,     markersize=8, label=f"k-NN (k={knn_k})"),
-            Line2D([0], [0], marker="D", color="w", markerfacecolor=color_learned, markersize=8, label=f"Learned ω (κ={tau})"),
-        ], loc="upper left")
 
-    plt.tight_layout()
+    # Shared legend at bottom
+    legend_handles = [
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=color_global,  markersize=8, label="Global"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=color_knn,     markersize=8, label=f"k-NN (k={knn_k})"),
+        Line2D([0], [0], marker="D", color="w", markerfacecolor=color_learned, markersize=8, label=r"Learned $\boldsymbol{\omega}$"),
+    ]
+    fig.legend(handles=legend_handles, loc="lower center", ncol=3, fontsize=8,
+               frameon=True, bbox_to_anchor=(0.5, 0.0))
+
+    plt.tight_layout(rect=[0.02, 0.05, 1.0, 1.0])
     _save_figure(fig, output_path)
     return fig
 

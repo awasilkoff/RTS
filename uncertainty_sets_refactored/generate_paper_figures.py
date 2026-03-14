@@ -299,12 +299,13 @@ def fig1_kernel_distance_comparison(
         zorder=10,
         label="Target Hour",
     )
-    # Effective neighborhood: points with weight > max_weight / k
-    w_max = weights_learned.max()
-    threshold = w_max / k
-    n_effective = int(np.sum(weights_learned > threshold))
-    print(f"  Learned kernel effective neighbors: {n_effective} / {len(weights_learned)} "
-          f"(weight > max/{k}, threshold={threshold:.2e})")
+    # Weight distribution summary
+    n_total = len(weights_learned)
+    for thresh in [0.5, 0.1, 0.01, 0.001]:
+        n_above = int(np.sum(weights_learned > thresh))
+        print(f"  {n_above / n_total:.1%} of points have weight > {thresh}")
+    median_w = float(np.median(weights_learned))
+    print(f"  50% of points have weight < {median_w:.2e}")
 
     ax_left.set_xlabel("System Mean")
     # Move y-axis ticks to the right side of the left plot

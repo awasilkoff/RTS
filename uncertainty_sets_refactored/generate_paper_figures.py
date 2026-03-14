@@ -282,14 +282,8 @@ def fig1_kernel_distance_comparison(
     w_max = weights_learned.max()
     threshold = w_max / k
     n_effective = int(np.sum(weights_learned > threshold))
-    ax_left.text(
-        0.03, 0.97,
-        f"Effective neighbors: {n_effective}\n(weight > max/{k})",
-        transform=ax_left.transAxes,
-        va="top", ha="left",
-        fontsize=FONT_SIZES_TWO_COL["small"],
-        bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8),
-    )
+    print(f"  Learned kernel effective neighbors: {n_effective} / {len(weights_learned)} "
+          f"(weight > max/{k}, threshold={threshold:.2e})")
 
     ax_left.set_xlabel("System Mean")
     # Move y-axis ticks to the right side of the left plot

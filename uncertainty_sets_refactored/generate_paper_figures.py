@@ -1261,7 +1261,7 @@ def fig3b_4b_hyperparameter_sweeps_combined(
     fig, (ax_k, ax_kappa) = plt.subplots(
         1,
         2,
-        figsize=(IEEE_TWO_COL_WIDTH, 2.8),
+        figsize=(IEEE_TWO_COL_WIDTH, IEEE_TWO_COL_WIDTH / 2),
         sharey=True,
     )
 

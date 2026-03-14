@@ -340,7 +340,7 @@ def fig2_3d_ellipsoid_comparison(
     knn_k: int = 16,
     tau: float = 0.07,
     rho: float = 1.0,
-    offset: float = 20.0,
+    offset: float = 0.0,
     xlim: tuple = None,
     ylim: tuple = None,
     zlim: tuple = None,
@@ -1221,7 +1221,7 @@ def fig3b_4b_hyperparameter_sweeps_combined(
     y_bot, y_top = ax_kappa.get_ylim()
     y_below_global = (nll_global - y_bot) / (y_top - y_bot) - 0.05
     ax_kappa.legend(loc="upper left", bbox_to_anchor=(0.02, y_below_global),
-                    fontsize=7)
+                    )
 
     # ax_kappa.text(0.02, 0.98, "(b)", transform=ax_kappa.transAxes,
     #               fontsize=10, fontweight="bold", va="top")
@@ -3275,7 +3275,9 @@ def generate_all_figures(use_residuals: bool = False):
     # Figure 2: 3D ellipsoid (Learned, k-NN k=16, Global)
     print("\n[2/15] 3D ellipsoid comparison (Learned, k-NN, Global)...")
     try:
-        fig2_3d_ellipsoid_comparison(knn_k=16, tau=0.07,xlim=(0,50),ylim=(0,80),zlim=(20,100))
+        fig2_3d_ellipsoid_comparison(knn_k=16, tau=0.07,
+                                     xlim=(0,15),ylim=(0,50),zlim=(0,100)
+                                     )
         figures_generated.append("fig2_ellipsoid_3d")
     except Exception as e:
         print(f"  Error: {e}")
@@ -3286,6 +3288,7 @@ def generate_all_figures(use_residuals: bool = False):
         fig2_3d_ellipsoid_comparison(
             knn_k=16,
             tau=0.07,
+            xlim=(0, 15), ylim=(0, 50), zlim=(0, 100),
             sample_idx=EXTREME_SAMPLE_IDX,
             output_path=OUTPUT_DIR / "figures" / "fig2_ellipsoid_3d_extreme",
         )

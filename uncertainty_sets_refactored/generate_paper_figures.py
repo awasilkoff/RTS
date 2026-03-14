@@ -10,7 +10,7 @@ Usage:
 
 Outputs saved to: data/viz_artifacts/paper_final/
     figures/
-        fig1_kernel_distance.pdf    - Kernel distance: Learned (k=64, κ=1) vs Euclidean k-NN
+        fig1_kernel_distance.pdf    - Kernel distance: Learned (k=64, best κ from sweep) vs Euclidean k-NN
         fig2_ellipsoid_3d.pdf       - 3D side-by-side: Global vs Learned, k-NN vs Learned
         fig3_nll_vs_k.pdf           - NLL vs k sweep for k-NN
         fig4_nll_vs_kappa.pdf       - NLL vs kappa sweep for learned omega (16D)
@@ -133,6 +133,24 @@ def _load_omega(feature_set_dir: Path) -> np.ndarray:
     return np.load(npy_path)
 
 
+def _load_best_tau(feature_set_dir: Path) -> float:
+    """Load best tau (kappa) from sweep results in a feature set directory.
+
+    Prefers multi-seed stats if available, otherwise falls back to sweep_results.csv.
+    """
+    multi_seed_path = feature_set_dir / "multi_seed_stats.csv"
+    if multi_seed_path.exists():
+        tau_stats = pd.read_csv(multi_seed_path)
+        best_row = tau_stats.loc[tau_stats["val_nll_mean"].idxmin()]
+        return float(best_row["tau"])
+
+    df = _load_sweep_results(feature_set_dir)
+    # For focused_2d: softmax constraint; for high_dim_16d: unconstrained
+    # Just pick the row with the best val_nll_learned
+    best = df.sort_values("val_nll_learned").iloc[0]
+    return float(best["tau"])
+
+
 def _load_feature_config(feature_set_dir: Path) -> dict:
     """Load feature_config.json from a feature set directory."""
     json_path = feature_set_dir / "feature_config.json"
@@ -201,13 +219,13 @@ def fig1_kernel_distance_comparison(
     feature_set_dir: Path = None,  # resolved at call time via FOCUSED_2D_DIR
     output_path: Path = None,
     k: int = 64,
-    tau: float = 1.0,
+    tau: float = None,
 ) -> plt.Figure:
     """
     Generate kernel distance comparison figure.
 
     Shows side-by-side: Euclidean k-NN (uniform) vs Learned omega kernel weights.
-    Uses optimal hyperparameters: k=64, kappa=1.0.
+    Uses best tau from sweep results (loaded automatically if tau=None).
     """
     from viz_kernel_distance import (
         compute_kernel_weights,
@@ -220,6 +238,9 @@ def fig1_kernel_distance_comparison(
         feature_set_dir = FOCUSED_2D_DIR
     if output_path is None:
         output_path = OUTPUT_DIR / "figures" / "fig1_kernel_distance"
+    if tau is None:
+        tau = _load_best_tau(feature_set_dir)
+        print(f"  Using best tau from sweep: {tau}")
 
     # Load data
     actuals = pd.read_parquet(ACTUALS_PARQUET)
@@ -3446,7 +3467,7 @@ def generate_all_figures(use_residuals: bool = False):
     # Figure 1: Kernel distance comparison
     print("\n[1/15] Kernel distance comparison (Learned vs k-NN)...")
     try:
-        fig1_kernel_distance_comparison(k=64, tau=1.0)
+        fig1_kernel_distance_comparison(k=64)
         figures_generated.append("fig1_kernel_distance")
     except Exception as e:
         print(f"  Error: {e}")

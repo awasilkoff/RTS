@@ -437,7 +437,7 @@ def fig2_3d_ellipsoid_comparison(
         ax.set_ylabel(f"{WIND_LABELS[1]} (MW)", labelpad=2)
         ax.zaxis.set_rotate_label(False)
         ax.set_zlabel(f"{WIND_LABELS[2]} (MW)", rotation=90, labelpad=2)
-        ax.tick_params(labelsize=6)
+        ax.tick_params(labelsize=8)
 
     n_pts = 25
 
@@ -508,7 +508,7 @@ def fig2_3d_ellipsoid_comparison(
     ax1.set_xlabel(f"{WIND_LABELS[0]} (MW)", labelpad=2)
     ax1.set_ylabel(f"{WIND_LABELS[1]} (MW)", labelpad=2)
     ax1.set_zlabel("")
-    ax1.tick_params(labelsize=6)
+    ax1.tick_params(labelsize=8)
     ax1.view_init(elev=20, azim=45)
 
     # --- Right panel: k-NN vs Learned ---

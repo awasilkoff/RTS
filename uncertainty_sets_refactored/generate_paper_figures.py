@@ -2390,7 +2390,8 @@ def fig10b_ellipse_overlay_two_hours(
     # Figure layout: square panels, width scales with panel count
     panel_size = 2.0  # inches per panel
     fig_w = panel_size * n_panels
-    fig, axes = plt.subplots(1, n_panels, figsize=(fig_w, panel_size))
+    fig, axes = plt.subplots(1, n_panels, figsize=(fig_w, panel_size),
+                             sharex=True, sharey=True)
 
     hour_specs = [
         (normal_sample_idx,  color_normal,  "Normal hour"),
@@ -2408,7 +2409,6 @@ def fig10b_ellipse_overlay_two_hours(
         # Single center dot at fixed artificial center
         ax.scatter([mu_common[0]], [mu_common[1]], s=30, c="black", marker="o", zorder=5)
 
-        ax.set_xlabel(WIND_LABELS[dims[0]] + " (MW)")
         if col == 0:
             ax.set_ylabel(WIND_LABELS[dims[1]] + " (MW)")
         ax.set_title(label)
@@ -2418,7 +2418,18 @@ def fig10b_ellipse_overlay_two_hours(
         ax.set_ylim(*ylim)
         ax.set_aspect("equal")
 
-    plt.tight_layout(pad=0.5, w_pad=0.8)
+    fig.supxlabel(WIND_LABELS[dims[0]] + " (MW)",
+                  fontsize=plt.rcParams.get("axes.labelsize", 10))
+
+    from matplotlib.lines import Line2D
+    hour_legend = [
+        Line2D([0], [0], color=color_normal, linewidth=1.5, label="Normal hour"),
+        Line2D([0], [0], color=color_extreme, linewidth=1.5, label="Extreme hour"),
+    ]
+    fig.legend(handles=hour_legend, loc="lower center", ncol=2, fontsize=7,
+               frameon=True, bbox_to_anchor=(0.5, -0.02))
+
+    plt.tight_layout(rect=[0.0, 0.08, 1.0, 1.0], pad=0.5, w_pad=0.8)
     _save_figure(fig, output_path)
 
     return fig

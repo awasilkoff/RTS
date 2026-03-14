@@ -2070,6 +2070,7 @@ def fig7c_lower_bound_decomposition(
     ax.grid(axis="y", alpha=0.3)
 
     plt.tight_layout()
+    fig.subplots_adjust(left=0.18)
     _save_figure(fig, output_path)
 
     return fig

@@ -248,38 +248,8 @@ def fig1_kernel_distance_comparison(
     # Create figure (IEEE two-column width)
     fig, axes = plt.subplots(1, 2, figsize=(IEEE_TWO_COL_WIDTH, 3.0))
 
-    # Left: k-NN binary weights
+    # Left: Learned kernel weights
     ax = axes[0]
-    knn_mask = weights_knn == 1.0
-    ax.scatter(Xs[~knn_mask, 0], Xs[~knn_mask, 1], c="lightgray", s=15, alpha=0.4)
-    ax.scatter(
-        X_target[0],
-        X_target[1],
-        c=COLORS["learned"],
-        s=150,
-        marker="*",
-        edgecolors="black",
-        linewidths=1,
-        zorder=10,
-        label="Target Hour",
-    )
-    ax.scatter(
-        Xs[knn_mask, 0],
-        Xs[knn_mask, 1],
-        c=COLORS["knn"],
-        s=25,
-        alpha=0.8,
-        label=f"k={k} neighbors",
-    )
-
-    ax.set_xlabel("System Mean")
-    ax.set_ylabel("System Standard Deviation")
-    # ax.set_title(f"Euclidean k-NN (k={k})")  # caption in paper
-    ax.legend(loc="upper right")
-    ax.grid(True, alpha=0.3)
-
-    # Right: Learned kernel weights
-    ax = axes[1]
     scatter = ax.scatter(
         Xs[:, 0],
         Xs[:, 1],
@@ -303,8 +273,7 @@ def fig1_kernel_distance_comparison(
         label="Target Hour",
     )
     ax.set_xlabel("System Mean")
-    ax.set_ylabel("System STD")
-    # Title omitted — caption in paper
+    ax.set_ylabel("System Standard Deviation")
     ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
 
@@ -315,6 +284,35 @@ def fig1_kernel_distance_comparison(
     cbar = fig.colorbar(scatter, cax=cax)
     cbar.set_label("Kernel Weight")
     cbar.ax.tick_params(labelsize=7)
+
+    # Right: k-NN binary weights
+    ax = axes[1]
+    knn_mask = weights_knn == 1.0
+    ax.scatter(Xs[~knn_mask, 0], Xs[~knn_mask, 1], c="lightgray", s=15, alpha=0.4)
+    ax.scatter(
+        X_target[0],
+        X_target[1],
+        c=COLORS["learned"],
+        s=150,
+        marker="*",
+        edgecolors="black",
+        linewidths=1,
+        zorder=10,
+        label="Target Hour",
+    )
+    ax.scatter(
+        Xs[knn_mask, 0],
+        Xs[knn_mask, 1],
+        c=COLORS["knn"],
+        s=25,
+        alpha=0.8,
+        label=f"k={k} neighbors",
+    )
+
+    ax.set_xlabel("System Mean")
+    ax.set_ylabel("System STD")
+    ax.legend(loc="upper right")
+    ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
 

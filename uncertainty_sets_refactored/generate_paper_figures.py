@@ -491,33 +491,13 @@ def fig2_3d_ellipsoid_comparison(
         zorder=6,
     )
 
-    ax1.set_title("Global vs Learned ω")
-    _labels(ax1)
+    ax1.set_title(r"Global vs Learned $\boldsymbol{\omega}$", fontsize=9, pad=4)
+    # Left panel: x/y labels only, skip z-label (right panel covers it)
+    ax1.set_xlabel(f"{WIND_LABELS[0]} (MW)", labelpad=2)
+    ax1.set_ylabel(f"{WIND_LABELS[1]} (MW)", labelpad=2)
+    ax1.set_zlabel("")
+    ax1.tick_params(labelsize=6)
     ax1.view_init(elev=20, azim=45)
-    # Manual legend
-    from matplotlib.lines import Line2D
-
-    legend_elements = [
-        Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="w",
-            markerfacecolor=color_global,
-            markersize=8,
-            label="Global",
-        ),
-        Line2D(
-            [0],
-            [0],
-            marker="D",
-            color="w",
-            markerfacecolor=color_learned,
-            markersize=8,
-            label=f"Learned ω (κ={tau})",
-        ),
-    ]
-    ax1.legend(handles=legend_elements, loc="upper left")
 
     # --- Right panel: k-NN vs Learned ---
     ax2 = fig.add_subplot(122, projection="3d")
@@ -564,32 +544,11 @@ def fig2_3d_ellipsoid_comparison(
         zorder=6,
     )
 
-    ax2.set_title(f"k-NN (k={knn_k}) vs Learned ω")
+    ax2.set_title(r"k-NN vs Learned $\boldsymbol{\omega}$", fontsize=9, pad=4)
     _labels(ax2)
     ax2.view_init(elev=20, azim=45)
-    legend_elements_r = [
-        Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="w",
-            markerfacecolor=color_knn,
-            markersize=8,
-            label=f"k-NN (k={knn_k})",
-        ),
-        Line2D(
-            [0],
-            [0],
-            marker="D",
-            color="w",
-            markerfacecolor=color_learned,
-            markersize=8,
-            label=f"Learned ω (κ={tau})",
-        ),
-    ]
-    ax2.legend(handles=legend_elements_r, loc="upper left")
 
-    # Shared per-axis limits across both panels (each wind resource gets own range)
+    # Shared per-axis limits across both panels
     all_surfaces = [
         (X_g, Y_g, Z_g),
         (X_l, Y_l, Z_l),
@@ -611,7 +570,17 @@ def fig2_3d_ellipsoid_comparison(
         ax.set_ylim(*ylim)
         ax.set_zlim(*zlim)
 
-    plt.tight_layout()
+    # Shared legend at bottom
+    from matplotlib.lines import Line2D
+    legend_handles = [
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=color_global,  markersize=8, label="Global"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=color_knn,     markersize=8, label=f"k-NN (k={knn_k})"),
+        Line2D([0], [0], marker="D", color="w", markerfacecolor=color_learned, markersize=8, label=r"Learned $\boldsymbol{\omega}$"),
+    ]
+    fig.legend(handles=legend_handles, loc="lower center", ncol=3, fontsize=8,
+               frameon=True, bbox_to_anchor=(0.5, 0.0))
+
+    plt.tight_layout(rect=[0.0, 0.06, 1.0, 1.0])
     _save_figure(fig, output_path)
 
     return fig
@@ -628,168 +597,33 @@ def fig2_3d_ellipsoid_comparison_2x2(
     offset: float = 20.0,
 ) -> plt.Figure:
     """
-    2x2 3D ellipsoid comparison with shared axis scales.
+    Generates two 1x2 3D ellipsoid figures (normal and extreme hour)
+    with shared axis scales. Delegates to fig2_3d_ellipsoid_comparison
+    for each row.
 
-    Row 1 (normal hour):  Global vs Learned ω  |  k-NN vs Learned ω
-    Row 2 (extreme hour): Global vs Learned ω  |  k-NN vs Learned ω
-
-    All four panels share the same x/y/z axis limits so ellipsoid sizes are
-    directly comparable across rows.
+    Saves as fig2a_ellipsoid_3d_normal and fig2b_ellipsoid_3d_extreme.
+    Returns the extreme-hour figure.
     """
-    from sweep_knn_k_values import (
-        ellipsoid_surface_3d,
-        sweep_k_values,
-        compute_learned_omega_baseline,
-    )
-    from data_processing_extended import FEATURE_BUILDERS
-    from utils import fit_scaler, apply_scaler
-
-    if feature_set_dir is None:
-        feature_set_dir = HIGH_DIM_16D_DIR
-    if output_path is None:
-        output_path = OUTPUT_DIR / "figures" / "fig2_ellipsoid_3d_2x2"
     if extreme_sample_idx is None:
         extreme_sample_idx = EXTREME_SAMPLE_IDX
+    if output_path is None:
+        output_path = OUTPUT_DIR / "figures"
 
-    # --- Load data (same as fig2) ---
-    forecasts = pd.read_parquet(
-        DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
-    )
-    actuals = pd.read_parquet(ACTUALS_PARQUET)
-
-    config = _load_feature_config(feature_set_dir)
-    feature_set_name = config.get("feature_set", "high_dim_16d")
-    build_fn = FEATURE_BUILDERS.get(feature_set_name, FEATURE_BUILDERS["high_dim_16d"])
-
-    X_raw, Y, times, x_cols, y_cols = build_fn(
-        forecasts, actuals, drop_any_nan_rows=True, actual_col=ACTUAL_COL
+    fig_normal = fig2_3d_ellipsoid_comparison(
+        feature_set_dir=feature_set_dir,
+        output_path=output_path / "fig2a_ellipsoid_3d_normal",
+        sample_idx=normal_sample_idx,
+        knn_k=knn_k, tau=tau, rho=rho, offset=offset,
     )
 
-    n = X_raw.shape[0]
-    rng = np.random.RandomState(42)
-    indices = rng.permutation(n)
-    n_train = int(0.5 * n)
-    n_val = int(0.25 * n)
-    train_idx = indices[:n_train]
-    eval_idx = indices[n_train : n_train + n_val]
-
-    scaler = fit_scaler(X_raw[train_idx], "standard")
-    X = apply_scaler(X_raw, scaler)
-    X_train, Y_train = X[train_idx], Y[train_idx]
-    X_eval, Y_eval = X[eval_idx], Y[eval_idx]
-
-    omega = _load_omega(feature_set_dir)
-    knn_results = sweep_k_values(X_train, Y_train, X_eval, Y_eval, [knn_k])
-    learned_result = compute_learned_omega_baseline(
-        X_train, Y_train, X_eval, Y_eval, omega=omega, tau=tau, k=128,
+    fig_extreme = fig2_3d_ellipsoid_comparison(
+        feature_set_dir=feature_set_dir,
+        output_path=output_path / "fig2b_ellipsoid_3d_extreme",
+        sample_idx=extreme_sample_idx,
+        knn_k=knn_k, tau=tau, rho=rho, offset=offset,
     )
 
-    ridge = 1e-4
-    Mu_global = np.mean(Y_train, axis=0)
-    Sigma_global = np.cov(Y_train, rowvar=False) + ridge * np.eye(Y_train.shape[1])
-    Mu_common = Mu_global + offset
-
-    color_global = "#4361EE"
-    color_knn = "#2A9D8F"
-    color_learned = "#F77F00"
-
-    # --- Pre-compute all surfaces for both rows ---
-    surfaces_by_row = {}
-    for label, sidx in [("normal", normal_sample_idx), ("extreme", extreme_sample_idx)]:
-        Sigma_learned = learned_result["Sigma"][sidx]
-        Sigma_knn = knn_results[knn_k]["Sigma"][sidx]
-        Xg, Yg, Zg = ellipsoid_surface_3d(Mu_common, Sigma_global, rho=rho, n_points=25)
-        Xl, Yl, Zl = ellipsoid_surface_3d(Mu_common, Sigma_learned, rho=rho, n_points=25)
-        Xk, Yk, Zk = ellipsoid_surface_3d(Mu_common, Sigma_knn, rho=rho, n_points=25)
-        surfaces_by_row[label] = {
-            "global": (Xg, Yg, Zg),
-            "learned": (Xl, Yl, Zl),
-            "knn": (Xk, Yk, Zk),
-        }
-
-    # Compute shared axis limits across ALL four panels
-    def _nice_lim(lo, hi, step=50):
-        return np.floor(lo / step) * step, np.ceil(hi / step) * step
-
-    all_x, all_y, all_z = [], [], []
-    for row_surfs in surfaces_by_row.values():
-        for Xs, Ys, Zs in row_surfs.values():
-            all_x.append(Xs.ravel()); all_y.append(Ys.ravel()); all_z.append(Zs.ravel())
-    xlim = _nice_lim(np.concatenate(all_x).min(), np.concatenate(all_x).max())
-    ylim = _nice_lim(np.concatenate(all_y).min(), np.concatenate(all_y).max())
-    zlim = _nice_lim(np.concatenate(all_z).min(), np.concatenate(all_z).max())
-
-    # --- Build figure ---
-    fig = plt.figure(figsize=(IEEE_TWO_COL_WIDTH, 7.0))
-
-    def _labels(ax):
-        ax.set_xlabel(f"{WIND_LABELS[0]} (MW)", labelpad=2)
-        ax.set_ylabel(f"{WIND_LABELS[1]} (MW)", labelpad=2)
-        ax.set_zlabel(f"{WIND_LABELS[2]} (MW)", labelpad=2)
-        ax.tick_params(labelsize=6)
-
-    from matplotlib.lines import Line2D
-
-    row_configs = [
-        ("normal",  "Normal",  221, 222),
-        ("extreme", "Extreme", 223, 224),
-    ]
-
-    col_titles = [r"Global vs Learned $\boldsymbol{\omega}$",
-                  r"k-NN vs Learned $\boldsymbol{\omega}$"]
-
-    for row_idx, (row_label, row_title, sp_left, sp_right) in enumerate(row_configs):
-        surfs = surfaces_by_row[row_label]
-        Xg, Yg, Zg = surfs["global"]
-        Xl, Yl, Zl = surfs["learned"]
-        Xk, Yk, Zk = surfs["knn"]
-
-        # Left panel: Global vs Learned
-        ax_l = fig.add_subplot(sp_left, projection="3d")
-        for Xs, Ys, Zs, col, al_surf, al_wire in [
-            (Xg, Yg, Zg, color_global,  0.15, 0.35),
-            (Xl, Yl, Zl, color_learned, 0.25, 0.50),
-        ]:
-            ax_l.plot_surface(Xs, Ys, Zs, color=col, alpha=al_surf, edgecolor=col, linewidth=0.3)
-            ax_l.plot_wireframe(Xs, Ys, Zs, color=col, alpha=al_wire, linewidth=0.5, rstride=5, cstride=5)
-        ax_l.scatter([Mu_common[0]], [Mu_common[1]], [Mu_common[2]],
-                     s=50, c="black", marker="o", edgecolors="black", linewidths=0.5, zorder=6)
-        if row_idx == 0:
-            ax_l.set_title(col_titles[0], fontsize=8, pad=4)
-        ax_l.text2D(-0.02, 0.5, row_title, transform=ax_l.transAxes,
-                    fontsize=9, fontweight="bold", va="center", ha="right", rotation=90)
-        _labels(ax_l)
-        ax_l.view_init(elev=20, azim=45)
-        ax_l.set_xlim(*xlim); ax_l.set_ylim(*ylim); ax_l.set_zlim(*zlim)
-
-        # Right panel: k-NN vs Learned
-        ax_r = fig.add_subplot(sp_right, projection="3d")
-        for Xs, Ys, Zs, col, al_surf, al_wire in [
-            (Xk, Yk, Zk, color_knn,    0.15, 0.35),
-            (Xl, Yl, Zl, color_learned, 0.25, 0.50),
-        ]:
-            ax_r.plot_surface(Xs, Ys, Zs, color=col, alpha=al_surf, edgecolor=col, linewidth=0.3)
-            ax_r.plot_wireframe(Xs, Ys, Zs, color=col, alpha=al_wire, linewidth=0.5, rstride=5, cstride=5)
-        ax_r.scatter([Mu_common[0]], [Mu_common[1]], [Mu_common[2]],
-                     s=50, c="black", marker="o", edgecolors="black", linewidths=0.5, zorder=6)
-        if row_idx == 0:
-            ax_r.set_title(col_titles[1], fontsize=8, pad=4)
-        _labels(ax_r)
-        ax_r.view_init(elev=20, azim=45)
-        ax_r.set_xlim(*xlim); ax_r.set_ylim(*ylim); ax_r.set_zlim(*zlim)
-
-    # Shared legend at bottom
-    legend_handles = [
-        Line2D([0], [0], marker="o", color="w", markerfacecolor=color_global,  markersize=8, label="Global"),
-        Line2D([0], [0], marker="o", color="w", markerfacecolor=color_knn,     markersize=8, label=f"k-NN (k={knn_k})"),
-        Line2D([0], [0], marker="D", color="w", markerfacecolor=color_learned, markersize=8, label=r"Learned $\boldsymbol{\omega}$"),
-    ]
-    fig.legend(handles=legend_handles, loc="lower center", ncol=3, fontsize=8,
-               frameon=True, bbox_to_anchor=(0.5, 0.0))
-
-    plt.tight_layout(rect=[0.02, 0.05, 1.0, 1.0])
-    _save_figure(fig, output_path)
-    return fig
+    return fig_extreme
 
 
 # ============================================================================

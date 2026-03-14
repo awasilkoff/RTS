@@ -731,8 +731,8 @@ def fig2_3d_ellipsoid_comparison_2x2(
     from matplotlib.lines import Line2D
 
     row_configs = [
-        ("normal",  "Normal hour",  121, 122),
-        ("extreme", "Extreme hour", 323, 324),
+        ("normal",  "Normal hour",  221, 222),
+        ("extreme", "Extreme hour", 223, 224),
     ]
 
     for row_label, row_title, sp_left, sp_right in row_configs:

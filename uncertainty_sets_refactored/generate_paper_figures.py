@@ -334,6 +334,9 @@ def fig2_3d_ellipsoid_comparison(
     tau: float = 0.07,
     rho: float = 1.0,
     offset: float = 20.0,
+    xlim: tuple = None,
+    ylim: tuple = None,
+    zlim: tuple = None,
 ) -> plt.Figure:
     """
     Side-by-side 3D ellipsoid comparison.
@@ -562,13 +565,13 @@ def fig2_3d_ellipsoid_comparison(
         """Round limits outward to nearest step for clean tick marks."""
         return np.floor(lo / step) * step, np.ceil(hi / step) * step
 
-    xlim = _nice_lim(all_x.min(), all_x.max())
-    ylim = _nice_lim(all_y.min(), all_y.max())
-    zlim = _nice_lim(all_z.min(), all_z.max())
+    xlim_ = xlim if xlim is not None else _nice_lim(all_x.min(), all_x.max())
+    ylim_ = ylim if ylim is not None else _nice_lim(all_y.min(), all_y.max())
+    zlim_ = zlim if zlim is not None else _nice_lim(all_z.min(), all_z.max())
     for ax in [ax1, ax2]:
-        ax.set_xlim(*xlim)
-        ax.set_ylim(*ylim)
-        ax.set_zlim(*zlim)
+        ax.set_xlim(*xlim_)
+        ax.set_ylim(*ylim_)
+        ax.set_zlim(*zlim_)
 
     # Shared legend at bottom
     from matplotlib.lines import Line2D

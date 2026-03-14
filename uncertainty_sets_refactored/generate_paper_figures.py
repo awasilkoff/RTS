@@ -246,7 +246,8 @@ def fig1_kernel_distance_comparison(
     weights_learned = compute_kernel_weights(X_target, Xs, omega_learned, tau)
 
     # Create figure (IEEE two-column width)
-    fig, axes = plt.subplots(1, 2, figsize=(IEEE_TWO_COL_WIDTH, 3.0))
+    # Layout: [colorbar | learned kernel | shared y-label | k-NN]
+    fig, axes = plt.subplots(1, 2, figsize=(IEEE_TWO_COL_WIDTH, 3.0), sharey=True)
 
     # Left: Learned kernel weights
     ax = axes[0]
@@ -273,17 +274,22 @@ def fig1_kernel_distance_comparison(
         label="Target Hour",
     )
     ax.set_xlabel("System Mean")
-    ax.set_ylabel("System Standard Deviation")
+    # Move y-axis ticks to the right side of the left plot
+    ax.yaxis.tick_right()
+    ax.yaxis.set_label_position("right")
+    ax.set_ylabel("")  # shared label added via fig.text below
     ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
 
-    # Colorbar (appended outside the axes so both plots stay equal width)
+    # Colorbar on the far left
     from mpl_toolkits.axes_grid1 import make_axes_locatable
     divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cax = divider.append_axes("left", size="5%", pad=0.45)
     cbar = fig.colorbar(scatter, cax=cax)
     cbar.set_label("Kernel Weight")
     cbar.ax.tick_params(labelsize=7)
+    cbar.ax.yaxis.set_ticks_position("left")
+    cbar.ax.yaxis.set_label_position("left")
 
     # Right: k-NN binary weights
     ax = axes[1]
@@ -310,11 +316,15 @@ def fig1_kernel_distance_comparison(
     )
 
     ax.set_xlabel("System Mean")
-    ax.set_ylabel("System STD")
+    ax.yaxis.set_visible(False)  # ticks shown on left plot's right side
     ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
+
+    # Shared y-axis label between the two panels
+    fig.text(0.52, 0.5, "System Standard Deviation",
+             va="center", ha="center", rotation=90, fontsize=plt.rcParams["axes.labelsize"])
 
     # Save
     _save_figure(fig, output_path)

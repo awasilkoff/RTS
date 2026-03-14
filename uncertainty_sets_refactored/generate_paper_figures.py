@@ -464,6 +464,17 @@ def fig2_3d_ellipsoid_comparison(
     color_knn = COLORS["knn"]
     color_learned = COLORS["learned"]
 
+    # Print covariance matrices
+    labels = [WIND_LABELS[i] for i in range(Sigma_global.shape[0])]
+    header = "          " + "  ".join(f"{l:>8s}" for l in labels)
+    for name, Sigma in [("Global", Sigma_global), ("Learned", Sigma_learned),
+                         (f"k-NN (k={knn_k})", knn_results[knn_k]["Sigma"][sample_idx])]:
+        print(f"\n  {name} covariance (MW²):")
+        print(header)
+        for i, row_label in enumerate(labels):
+            vals = "  ".join(f"{Sigma[i, j]:8.1f}" for j in range(Sigma.shape[1]))
+            print(f"    {row_label:>6s}  {vals}")
+
     # Create side-by-side 3D figure
     fig = plt.figure(figsize=(IEEE_TWO_COL_WIDTH, 3.5))
 

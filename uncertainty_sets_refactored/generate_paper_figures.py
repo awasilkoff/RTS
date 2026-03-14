@@ -1130,10 +1130,10 @@ def fig3b_4b_hyperparameter_sweeps_combined(
         k_vals, nll_mean_k, "o-",
         linewidth=2, markersize=5, color=COLORS["knn"],
     )
-    ax_k.fill_between(
-        k_vals, nll_mean_k - nll_std_k, nll_mean_k + nll_std_k,
-        alpha=0.25, color=COLORS["knn"],
-    )
+    # ax_k.fill_between(
+    #     k_vals, nll_mean_k - nll_std_k, nll_mean_k + nll_std_k,
+    #     alpha=0.25, color=COLORS["knn"],
+    # )fig3b_4b_hyperparameter_sweeps_combined
 
     # Mark best k
     best_k_idx = np.argmin(nll_mean_k)
@@ -3288,28 +3288,28 @@ def generate_all_figures(use_residuals: bool = False):
         print(f"  Error: {e}")
 
     # Figure 2 2x2: normal + extreme rows with shared axis scales
-    print("\n[2b/15] 3D ellipsoid comparison 2x2 (normal + extreme, shared axes)...")
-    try:
-        fig2_3d_ellipsoid_comparison_2x2(knn_k=16, tau=0.07)
-        figures_generated.append("fig2_ellipsoid_3d_2x2")
-    except Exception as e:
-        print(f"  Error: {e}")
+    # print("\n[2b/15] 3D ellipsoid comparison 2x2 (normal + extreme, shared axes)...")
+    # try:
+    #     fig2_3d_ellipsoid_comparison_2x2(knn_k=16, tau=0.07)
+    #     figures_generated.append("fig2_ellipsoid_3d_2x2")
+    # except Exception as e:
+    #     print(f"  Error: {e}")
 
     # Figure 3: NLL vs k
-    print("\n[3/15] NLL vs k sweep...")
-    try:
-        fig3_nll_vs_k()
-        figures_generated.append("fig3_nll_vs_k")
-    except Exception as e:
-        print(f"  Error: {e}")
+    # print("\n[3/15] NLL vs k sweep...")
+    # try:
+    #     fig3_nll_vs_k()
+    #     figures_generated.append("fig3_nll_vs_k")
+    # except Exception as e:
+    #     print(f"  Error: {e}")
 
     # Figure 4: NLL vs kappa
-    print("\n[4/15] NLL vs kappa sweep...")
-    try:
-        fig4_nll_vs_tau()
-        figures_generated.append("fig4_nll_vs_kappa")
-    except Exception as e:
-        print(f"  Error: {e}")
+    # print("\n[4/15] NLL vs kappa sweep...")
+    # try:
+    #     fig4_nll_vs_tau()
+    #     figures_generated.append("fig4_nll_vs_kappa")
+    # except Exception as e:
+    #     print(f"  Error: {e}")
 
     # Figure 3b+4b: Combined hyperparameter sweeps with baselines and shared y-axis
     print("\n[3b+4b] Hyperparameter sweeps with baselines (2-panel)...")

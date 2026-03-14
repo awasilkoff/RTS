@@ -434,9 +434,8 @@ def fig2_3d_ellipsoid_comparison(
     def _labels(ax):
         ax.set_xlabel(f"{WIND_LABELS[0]} (MW)", labelpad=2)
         ax.set_ylabel(f"{WIND_LABELS[1]} (MW)", labelpad=2)
-        ax.set_zlabel(f"{WIND_LABELS[2]} (MW)", labelpad=2)
-        ax.zaxis.label.set_rotation(-90)
-        ax.zaxis.label.set_ha("center")
+        ax.zaxis.set_rotate_label(False)
+        ax.set_zlabel(f"{WIND_LABELS[2]} (MW)", rotation=90, labelpad=2)
         ax.tick_params(labelsize=6)
 
     n_pts = 25

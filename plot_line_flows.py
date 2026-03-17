@@ -136,6 +136,7 @@ def plot_loading_heatmaps(
             vmax=vmax,
             interpolation="nearest",
         )
+        ax.grid(False)
         bind_arr = data_bind.values.astype(bool)
         ys, xs = np.where(bind_arr)
         ax.scatter(xs, ys, marker="s", s=18, c="black", alpha=0.6, label="binding")
@@ -190,6 +191,7 @@ def plot_binding_diff(
         figsize=(IEEE_TWO_COL_WIDTH, max(2.5, n_lines * 0.55 + 1)),
     )
     im = ax.imshow(cat, aspect="auto", cmap=cmap, norm=norm, interpolation="nearest")
+    ax.grid(False)
 
     ax.set_xticks(range(n_hours))
     ax.set_xticklabels(hours, rotation=90, fontsize=FONT_SIZES_TWO_COL["small"])

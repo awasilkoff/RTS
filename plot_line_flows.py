@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Line flow comparison visualizations: DAM+Reserve vs DARUC.
+Line flow comparison visualizations: DAM w/ Res vs DARUC.
 
 Generates four charts:
   1. Side-by-side worst-case loading heatmaps (lines x hours)
@@ -25,7 +25,7 @@ import pandas as pd
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent / "uncertainty_sets_refactored"))
-from plot_config import (
+from uncertainty_sets_refactored.plot_config import (
     setup_plotting,
     FONT_SIZES,
     FONT_SIZES_TWO_COL,
@@ -56,7 +56,7 @@ def _save_figure(fig: plt.Figure, path: Path):
 # ---------------------------------------------------------------------------
 
 def load_line_flow_analysis(case_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Load DAM+Reserve and DARUC line_flow_analysis CSVs."""
+    """Load DAM w/ Res and DARUC line_flow_analysis CSVs."""
     dam_path = case_dir / "dam_reserve" / "line_flows" / "line_flow_analysis_dam.csv"
     daruc_path = case_dir / "daruc" / "line_flows" / "line_flow_analysis.csv"
 
@@ -149,7 +149,7 @@ def plot_loading_heatmaps(
         ax.set_xlabel("Hour", fontsize=FONT_SIZES_TWO_COL["medium"])
 
     ax1.set_ylabel("Line", fontsize=FONT_SIZES_TWO_COL["medium"])
-    fig.suptitle("Worst-Case Line Loading: DAM+Reserve vs DARUC (Day 1)",
+    fig.suptitle("Worst-Case Line Loading: DAM w/ Res vs. DARUC ",
                  fontsize=FONT_SIZES_TWO_COL["xlarge"], y=1.02)
     fig.tight_layout()
     fig.colorbar(im, ax=[ax1, ax2], label="Worst-Case Loading %", shrink=0.8, pad=0.02)
@@ -199,14 +199,14 @@ def plot_binding_diff(
     ax.set_yticklabels(lines, fontsize=FONT_SIZES_TWO_COL["small"])
     ax.set_xlabel("Hour", fontsize=FONT_SIZES_TWO_COL["medium"])
     ax.set_ylabel("Line", fontsize=FONT_SIZES_TWO_COL["medium"])
-    ax.set_title("Binding Status: DAM+Reserve vs DARUC (Day 1)",
+    ax.set_title("Binding Status: DAM w/ Res vs. DARUC",
                  fontsize=FONT_SIZES_TWO_COL["large"])
 
     from matplotlib.patches import Patch
     legend_elements = [Patch(facecolor=c, edgecolor="gray", label=l) for c, l in zip(colors, labels)]
     ax.legend(handles=legend_elements, loc="upper center",
               fontsize=FONT_SIZES_TWO_COL["small"], ncol=4,
-              bbox_to_anchor=(0.5, -0.15))
+              bbox_to_anchor=(0.5, -0.4))
 
     fig.tight_layout()
     _save_figure(fig, out_dir / "fig_binding_diff")
@@ -223,7 +223,7 @@ def plot_flow_decomposition(
     out_dir: Path,
 ):
     """Horizontal stacked bars: |nominal| + margin for DARUC at each line's peak hour.
-    Overlays DAM+Reserve |nominal| for comparison."""
+    Overlays DAM w/ Res |nominal| for comparison."""
 
     # For each binding line, find the DARUC hour with max worst_case loading
     records = []
@@ -281,7 +281,7 @@ def plot_flow_decomposition(
     ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["medium"])
     ax.set_title("Flow Decomposition at Peak Hour (DARUC, Day 1)",
                  fontsize=FONT_SIZES_TWO_COL["large"])
-    ax.legend(loc="lower right", fontsize=FONT_SIZES_TWO_COL["small"])
+    ax.legend(loc="upper right", fontsize=FONT_SIZES_TWO_COL["small"])
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
 
     fig.tight_layout()
@@ -371,7 +371,7 @@ def plot_flow_decomposition_hour(
     ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["medium"])
     ax.set_title(f"Flow Decomposition — Hour {hour:02d}:00 (top {n} lines by loading)",
                  fontsize=FONT_SIZES_TWO_COL["large"])
-    ax.legend(loc="lower right", fontsize=FONT_SIZES_TWO_COL["small"])
+    ax.legend(loc="upper right", fontsize=FONT_SIZES_TWO_COL["small"])
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
 
     fig.tight_layout()
@@ -451,7 +451,7 @@ def plot_flow_decomposition_binding(
     ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["medium"])
     ax.set_title(f"Flow Decomposition — Binding Lines — Hour {hour:02d}:00",
                  fontsize=FONT_SIZES_TWO_COL["large"])
-    ax.legend(loc="lower right", fontsize=FONT_SIZES_TWO_COL["small"])
+    ax.legend(loc="upper right", fontsize=FONT_SIZES_TWO_COL["small"])
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
 
     fig.tight_layout()
@@ -1032,7 +1032,7 @@ def plot_network_commitment_map(
     """Network map showing line flows + additionally committed generators at a given hour.
 
     Uses deviation_summary.csv to identify which generators DARUC commits
-    beyond what DAM+Reserve committed, and highlights them on the map.
+    beyond what DAM w/ Res committed, and highlights them on the map.
     """
     from matplotlib.lines import Line2D
 
@@ -1185,7 +1185,7 @@ def main():
     print("Filtering to day-1, binding lines only...")
     dam, daruc, binding_lines = filter_day1_binding(dam_raw, daruc_raw)
     print(f"  {len(binding_lines)} binding lines: {binding_lines}")
-    print(f"  {dam['period'].nunique()} periods (day 1)")
+    print(f"  {dam['period'].nunique()} periods ")
 
     print("\nChart 1: Loading heatmaps...")
     plot_loading_heatmaps(dam, daruc, binding_lines, out_dir)

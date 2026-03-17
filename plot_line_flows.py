@@ -117,12 +117,17 @@ def plot_loading_heatmaps(
     n_hours = len(hours)
 
     fig, (ax1, ax2) = plt.subplots(
-        1, 2, figsize=(IEEE_TWO_COL_WIDTH, max(3, n_lines * 0.6 + 1.5)),
+        1, 2, figsize=(IEEE_TWO_COL_WIDTH * 1.4, max(3, n_lines * 0.6 + 1.5)),
         sharey=True,
     )
 
     vmin, vmax = 0, 100
     cmap = plt.cm.RdYlGn_r
+
+    # Show every 3rd hour to avoid cramping
+    tick_step = 3
+    tick_positions = range(0, n_hours, tick_step)
+    tick_labels = [hours[i] for i in tick_positions]
 
     for ax, data_load, data_bind, title in [
         (ax1, dam_load, dam_bind, "DAM + Reserve"),
@@ -141,8 +146,8 @@ def plot_loading_heatmaps(
         ys, xs = np.where(bind_arr)
         ax.scatter(xs, ys, marker="s", s=18, c="black", alpha=0.6, label="binding")
 
-        ax.set_xticks(range(n_hours))
-        ax.set_xticklabels(hours, rotation=90, fontsize=FONT_SIZES_TWO_COL["small"])
+        ax.set_xticks(list(tick_positions))
+        ax.set_xticklabels(tick_labels, rotation=45, ha="right", fontsize=FONT_SIZES_TWO_COL["small"])
         ax.set_yticks(range(n_lines))
         ax.set_yticklabels(lines, fontsize=FONT_SIZES_TWO_COL["small"])
         ax.set_title(title, fontsize=FONT_SIZES_TWO_COL["large"])

@@ -181,7 +181,7 @@ def plot_binding_diff(
     cat[~dam_bind & daruc_bind] = 2
     cat[dam_bind & daruc_bind] = 3
 
-    colors = ["#f5f5f5", "#4682B4", "#E08060", "#2F4F4F"]
+    colors = ["#f5f5f5", "#4682B4", "#2A9D8F", "#2F4F4F"]
     labels = ["Neither", "DAM+Res only", "DARUC only", "Both"]
     cmap = mcolors.ListedColormap(colors)
     bounds = [-0.5, 0.5, 1.5, 2.5, 3.5]

@@ -154,8 +154,7 @@ def plot_loading_heatmaps(
         ax.set_xlabel("Hour", fontsize=FONT_SIZES_TWO_COL["medium"])
 
     ax1.set_ylabel("Line", fontsize=FONT_SIZES_TWO_COL["medium"])
-    fig.suptitle("Worst-Case Line Loading: DAM w/ Res vs. DARUC ",
-                 fontsize=FONT_SIZES_TWO_COL["xlarge"], y=1.02)
+
     fig.tight_layout()
     fig.colorbar(im, ax=[ax1, ax2], label="Worst-Case Loading %", shrink=0.8, pad=0.02)
 
@@ -204,8 +203,7 @@ def plot_binding_diff(
     ax.set_yticklabels(lines, fontsize=FONT_SIZES_TWO_COL["small"])
     ax.set_xlabel("Hour", fontsize=FONT_SIZES_TWO_COL["medium"])
     ax.set_ylabel("Line", fontsize=FONT_SIZES_TWO_COL["medium"])
-    ax.set_title("Binding Status: DAM w/ Res vs. DARUC",
-                 fontsize=FONT_SIZES_TWO_COL["large"])
+
 
     from matplotlib.patches import Patch
     legend_elements = [Patch(facecolor=c, edgecolor="gray", label=l) for c, l in zip(colors, labels)]
@@ -284,8 +282,7 @@ def plot_flow_decomposition(
     ax.set_yticks(y_pos)
     ax.set_yticklabels(bar_labels, fontsize=FONT_SIZES_TWO_COL["small"])
     ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["medium"])
-    ax.set_title("Flow Decomposition at Peak Hour (DARUC, Day 1)",
-                 fontsize=FONT_SIZES_TWO_COL["large"])
+
     ax.legend(loc="upper right", fontsize=FONT_SIZES_TWO_COL["small"])
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
 
@@ -374,8 +371,7 @@ def plot_flow_decomposition_hour(
             ax.get_yticklabels()[i].set_fontweight("bold")
 
     ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["medium"])
-    ax.set_title(f"Flow Decomposition — Hour {hour:02d}:00 (top {n} lines by loading)",
-                 fontsize=FONT_SIZES_TWO_COL["large"])
+
     ax.legend(loc="upper right", fontsize=FONT_SIZES_TWO_COL["small"])
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
 
@@ -454,8 +450,7 @@ def plot_flow_decomposition_binding(
             ax.get_yticklabels()[i].set_fontweight("bold")
 
     ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["medium"])
-    ax.set_title(f"Flow Decomposition — Binding Lines — Hour {hour:02d}:00",
-                 fontsize=FONT_SIZES_TWO_COL["large"])
+
     ax.legend(loc="upper right", fontsize=FONT_SIZES_TWO_COL["small"])
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
 
@@ -725,9 +720,7 @@ def plot_network_maps(
     fig_a.legend(handles=legend_a, loc="lower center", ncol=4,
                  fontsize=FONT_SIZES_TWO_COL["small"],
                  bbox_to_anchor=(0.5, -0.01))
-    fig_a.suptitle(f"Parallel Lines — Hour {hour:02d}:00",
-                   fontsize=FONT_SIZES_TWO_COL["xlarge"])
-    fig_a.tight_layout(rect=[0, 0.04, 1, 0.96])
+    fig_a.tight_layout(rect=[0, 0.04, 1, 1.0])
     _save_figure(fig_a, out_dir / f"fig_map_A_parallel_h{hour:02d}")
 
     # --- Option B: Three panels (DAM wc | DARUC nominal | DARUC margin) ---
@@ -751,9 +744,7 @@ def plot_network_maps(
     fig_b.legend(handles=legend_b, loc="lower center", ncol=4,
                  fontsize=FONT_SIZES_TWO_COL["small"],
                  bbox_to_anchor=(0.5, -0.01))
-    fig_b.suptitle(f"Three Panels — Hour {hour:02d}:00",
-                   fontsize=FONT_SIZES_TWO_COL["xlarge"])
-    fig_b.tight_layout(rect=[0, 0.04, 1, 0.96])
+    fig_b.tight_layout(rect=[0, 0.04, 1, 1.0])
     _save_figure(fig_b, out_dir / f"fig_map_B_three_panel_h{hour:02d}")
 
     # --- Option C: Dual encoding (2 panels) ---
@@ -774,10 +765,7 @@ def plot_network_maps(
     fig_c.legend(handles=legend_c, loc="lower center", ncol=4,
                  fontsize=FONT_SIZES_TWO_COL["small"],
                  bbox_to_anchor=(0.5, -0.01))
-    fig_c.suptitle(
-        f"Color=Nominal%, Thickness=Worst-Case% — Hour {hour:02d}:00",
-        fontsize=FONT_SIZES_TWO_COL["xlarge"])
-    fig_c.tight_layout(rect=[0, 0.04, 1, 0.96])
+    fig_c.tight_layout(rect=[0, 0.04, 1, 1.0])
     _save_figure(fig_c, out_dir / f"fig_map_C_dual_encode_h{hour:02d}")
 
 
@@ -903,9 +891,6 @@ def plot_z_matrix(case_dir: Path, hour: int, out_dir: Path, threshold: float = 0
         ax.get_yticklabels()[i].set_color(c)
     ax.set_xlabel("Uncertainty Source (Wind Generator)", fontsize=FONT_SIZES_TWO_COL["medium"])
     fig_a.colorbar(im, ax=ax, label="Z coefficient", shrink=0.8)
-    ax.set_title(f"Z Matrix Heatmap — DARUC Hour {hour:02d}\n"
-                 f"({n_active} gens with |Z| > {threshold})",
-                 fontsize=FONT_SIZES_TWO_COL["large"])
     fig_a.tight_layout()
     _save_figure(fig_a, out_dir / f"fig_z_A_heatmap_h{hour:02d}")
 
@@ -926,9 +911,6 @@ def plot_z_matrix(case_dir: Path, hour: int, out_dir: Path, threshold: float = 0
         ax.get_yticklabels()[i].set_color(c)
     ax.set_xlabel("Z coefficient value", fontsize=FONT_SIZES_TWO_COL["medium"])
     ax.legend(fontsize=FONT_SIZES_TWO_COL["small"], loc="lower right", title="Wind Source")
-    ax.set_title(f"Z Coefficients by Wind Source — DARUC Hour {hour:02d}\n"
-                 f"({n_active} gens with |Z| > {threshold})",
-                 fontsize=FONT_SIZES_TWO_COL["large"])
     ax.invert_yaxis()
     fig_b.tight_layout()
     _save_figure(fig_b, out_dir / f"fig_z_B_bars_h{hour:02d}")
@@ -961,9 +943,6 @@ def plot_z_matrix(case_dir: Path, hour: int, out_dir: Path, threshold: float = 0
                title="Wind Source", title_fontsize=FONT_SIZES_TWO_COL["small"] - 2)
     cx2.set_title("Stacked |Z| by Source", fontsize=FONT_SIZES_TWO_COL["medium"])
 
-    fig_c.suptitle(f"Z Norm + Source Decomposition — DARUC Hour {hour:02d}\n"
-                   f"({n_active} gens with |Z| > {threshold})",
-                   fontsize=FONT_SIZES_TWO_COL["large"])
     fig_c.tight_layout()
     _save_figure(fig_c, out_dir / f"fig_z_C_norm_stack_h{hour:02d}")
 
@@ -996,10 +975,6 @@ def plot_z_matrix(case_dir: Path, hour: int, out_dir: Path, threshold: float = 0
         ax.legend(fontsize=FONT_SIZES_TWO_COL["small"], loc="lower right",
                   title="Wind Source", title_fontsize=FONT_SIZES_TWO_COL["small"])
         ax.invert_yaxis()
-        ax.set_title(
-            f"Thermal Response to Wind Uncertainty — DARUC Hour {hour:02d}\n"
-            f"({n_th} thermal gens with |Z| > {threshold})",
-            fontsize=FONT_SIZES_TWO_COL["large"])
         fig_d.tight_layout()
         _save_figure(fig_d, out_dir / f"fig_z_D_thermal_stack_h{hour:02d}")
     else:
@@ -1138,7 +1113,7 @@ def plot_network_commitment_map(
             zorder=9,
         )
 
-    _style_map_ax(ax, f"DARUC Flows + Extra Commitments — Hour {hour:02d}:00")
+    _style_map_ax(ax, "")
 
     legend_elements = [
         Line2D([0], [0], color="#4393c3", lw=3, label="Nominal flow"),

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Line flow comparison visualizations: DAM+Reserve vs DARUC.
+Line flow comparison visualizations: DAM w/ Res vs DARUC.
 
 Generates four charts:
   1. Side-by-side worst-case loading heatmaps (lines x hours)
@@ -23,13 +23,40 @@ import matplotlib.colors as mcolors
 import numpy as np
 import pandas as pd
 
+import sys
+sys.path.insert(0, str(Path(__file__).parent / "uncertainty_sets_refactored"))
+from uncertainty_sets_refactored.plot_config import (
+    setup_plotting,
+    FONT_SIZES,
+    FONT_SIZES_TWO_COL,
+    IEEE_COL_WIDTH,
+    IEEE_TWO_COL_WIDTH,
+    FIGURE_DEFAULTS,
+)
+
+setup_plotting()
+
+# Consistent save helper (PDF + PNG, tight bbox)
+def _save_figure(fig: plt.Figure, path: Path):
+    """Save figure as both PDF and PNG with paper-ready settings."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    for fmt in ("pdf", "png"):
+        fig.savefig(
+            path.with_suffix(f".{fmt}"),
+            dpi=FIGURE_DEFAULTS["dpi_pdf"] if fmt == "pdf" else FIGURE_DEFAULTS["dpi"],
+            bbox_inches="tight",
+        )
+    print(f"  Saved {path.stem}.pdf/png")
+    plt.close(fig)
+
 
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
 
 def load_line_flow_analysis(case_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Load DAM+Reserve and DARUC line_flow_analysis CSVs."""
+    """Load DAM w/ Res and DARUC line_flow_analysis CSVs."""
     dam_path = case_dir / "dam_reserve" / "line_flows" / "line_flow_analysis_dam.csv"
     daruc_path = case_dir / "daruc" / "line_flows" / "line_flow_analysis.csv"
 
@@ -90,12 +117,17 @@ def plot_loading_heatmaps(
     n_hours = len(hours)
 
     fig, (ax1, ax2) = plt.subplots(
-        1, 2, figsize=(max(14, n_hours * 0.45), max(3, n_lines * 0.6 + 1.5)),
+        1, 2, figsize=(IEEE_TWO_COL_WIDTH * 1.4, max(3, n_lines * 0.6 + 1.5)),
         sharey=True,
     )
 
     vmin, vmax = 0, 100
     cmap = plt.cm.RdYlGn_r
+
+    # Show every 3rd hour to avoid cramping
+    tick_step = 3
+    tick_positions = range(0, n_hours, tick_step)
+    tick_labels = [hours[i] for i in tick_positions]
 
     for ax, data_load, data_bind, title in [
         (ax1, dam_load, dam_bind, "DAM + Reserve"),
@@ -109,27 +141,24 @@ def plot_loading_heatmaps(
             vmax=vmax,
             interpolation="nearest",
         )
-        # Mark binding cells with a black dot
+        ax.grid(False)
         bind_arr = data_bind.values.astype(bool)
         ys, xs = np.where(bind_arr)
         ax.scatter(xs, ys, marker="s", s=18, c="black", alpha=0.6, label="binding")
 
-        ax.set_xticks(range(n_hours))
-        ax.set_xticklabels(hours, rotation=90, fontsize=7)
+        ax.set_xticks(list(tick_positions))
+        ax.set_xticklabels(tick_labels, rotation=45, ha="right", fontsize=FONT_SIZES_TWO_COL["small"])
         ax.set_yticks(range(n_lines))
-        ax.set_yticklabels(lines, fontsize=9)
-        ax.set_title(title, fontsize=11, fontweight="bold")
-        ax.set_xlabel("Hour")
+        ax.set_yticklabels(lines, fontsize=FONT_SIZES_TWO_COL["small"])
+        ax.set_title(title, fontsize=FONT_SIZES_TWO_COL["large"])
+        ax.set_xlabel("Hour", fontsize=FONT_SIZES_TWO_COL["medium"])
 
-    ax1.set_ylabel("Line")
-    fig.suptitle("Worst-Case Line Loading: DAM+Reserve vs DARUC (Day 1)", fontsize=13, y=1.02)
+    ax1.set_ylabel("Line", fontsize=FONT_SIZES_TWO_COL["medium"])
+
     fig.tight_layout()
     fig.colorbar(im, ax=[ax1, ax2], label="Worst-Case Loading %", shrink=0.8, pad=0.02)
 
-    for fmt in ("png", "pdf"):
-        fig.savefig(out_dir / f"fig_loading_heatmap.{fmt}", dpi=200, bbox_inches="tight")
-    print(f"  Saved fig_loading_heatmap.png/pdf")
-    plt.close(fig)
+    _save_figure(fig, out_dir / "fig_loading_heatmap")
 
 
 # ---------------------------------------------------------------------------
@@ -156,36 +185,34 @@ def plot_binding_diff(
     cat[~dam_bind & daruc_bind] = 2
     cat[dam_bind & daruc_bind] = 3
 
-    colors = ["#f0f0f0", "#4393c3", "#f4a582", "#d6604d"]
+    colors = ["#f5f5f5", "#4682B4", "#2A9D8F", "#2F4F4F"]
     labels = ["Neither", "DAM+Res only", "DARUC only", "Both"]
     cmap = mcolors.ListedColormap(colors)
     bounds = [-0.5, 0.5, 1.5, 2.5, 3.5]
     norm = mcolors.BoundaryNorm(bounds, cmap.N)
 
     fig, ax = plt.subplots(
-        figsize=(max(10, n_hours * 0.4), max(2.5, n_lines * 0.55 + 1)),
+        figsize=(IEEE_TWO_COL_WIDTH, max(2.5, n_lines * 0.55 + 1)),
     )
     im = ax.imshow(cat, aspect="auto", cmap=cmap, norm=norm, interpolation="nearest")
+    ax.grid(False)
 
     ax.set_xticks(range(n_hours))
-    ax.set_xticklabels(hours, rotation=90, fontsize=7)
+    ax.set_xticklabels(hours, rotation=90, fontsize=FONT_SIZES_TWO_COL["small"])
     ax.set_yticks(range(n_lines))
-    ax.set_yticklabels(lines, fontsize=9)
-    ax.set_xlabel("Hour")
-    ax.set_ylabel("Line")
-    ax.set_title("Binding Status: DAM+Reserve vs DARUC (Day 1)", fontsize=12)
+    ax.set_yticklabels(lines, fontsize=FONT_SIZES_TWO_COL["small"])
+    ax.set_xlabel("Hour", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax.set_ylabel("Line", fontsize=FONT_SIZES_TWO_COL["medium"])
 
-    # Legend outside the plot area
+
     from matplotlib.patches import Patch
     legend_elements = [Patch(facecolor=c, edgecolor="gray", label=l) for c, l in zip(colors, labels)]
-    ax.legend(handles=legend_elements, loc="upper center", fontsize=8, ncol=4,
-              bbox_to_anchor=(0.5, -0.15))
+    ax.legend(handles=legend_elements, loc="upper center",
+              fontsize=FONT_SIZES_TWO_COL["small"], ncol=4,
+              bbox_to_anchor=(0.5, -0.4))
 
     fig.tight_layout()
-    for fmt in ("png", "pdf"):
-        fig.savefig(out_dir / f"fig_binding_diff.{fmt}", dpi=200, bbox_inches="tight")
-    print(f"  Saved fig_binding_diff.png/pdf")
-    plt.close(fig)
+    _save_figure(fig, out_dir / "fig_binding_diff")
 
 
 # ---------------------------------------------------------------------------
@@ -199,7 +226,7 @@ def plot_flow_decomposition(
     out_dir: Path,
 ):
     """Horizontal stacked bars: |nominal| + margin for DARUC at each line's peak hour.
-    Overlays DAM+Reserve |nominal| for comparison."""
+    Overlays DAM w/ Res |nominal| for comparison."""
 
     # For each binding line, find the DARUC hour with max worst_case loading
     records = []
@@ -224,12 +251,11 @@ def plot_flow_decomposition(
 
     rec_df = pd.DataFrame(records).sort_values("wc_loading", ascending=True)
 
-    fig, ax = plt.subplots(figsize=(10, max(2.5, len(lines) * 0.6 + 1)))
+    fig, ax = plt.subplots(figsize=(IEEE_TWO_COL_WIDTH, max(2.5, len(lines) * 0.6 + 1)))
 
     y_pos = range(len(rec_df))
     bar_labels = [f"{r['line']} (h{r['hour']})" for _, r in rec_df.iterrows()]
 
-    # Stacked: nominal + margin
     ax.barh(
         y_pos, rec_df["nominal_abs"], height=0.6,
         color="#4393c3", label="DARUC |nominal flow|", zorder=2,
@@ -237,17 +263,16 @@ def plot_flow_decomposition(
     ax.barh(
         y_pos, rec_df["margin"], height=0.6,
         left=rec_df["nominal_abs"].values,
-        color="#f4a582", label="DARUC robust margin (ρ·‖Z_line‖)", zorder=2,
+        color="#f4a582", label=r"DARUC robust margin ($\rho \cdot \|Z_{\mathrm{line}}\|$)",
+        zorder=2,
     )
 
-    # Fmax reference
     ax.barh(
         y_pos, rec_df["Fmax"], height=0.65,
         color="none", edgecolor="black", linewidth=1.2,
         label="Fmax", zorder=3,
     )
 
-    # DAM+Reserve nominal as diamond markers
     ax.scatter(
         rec_df["dam_nominal_abs"], y_pos,
         marker="D", s=50, c="#2166ac", edgecolors="black", linewidths=0.5,
@@ -255,17 +280,14 @@ def plot_flow_decomposition(
     )
 
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(bar_labels, fontsize=9)
-    ax.set_xlabel("Flow (MW)")
-    ax.set_title("Flow Decomposition at Peak Hour (DARUC, Day 1)", fontsize=12)
-    ax.legend(loc="lower right", fontsize=8)
+    ax.set_yticklabels(bar_labels, fontsize=FONT_SIZES_TWO_COL["small"])
+    ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["medium"])
+
+    ax.legend(loc="upper right", fontsize=FONT_SIZES_TWO_COL["small"])
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
 
     fig.tight_layout()
-    for fmt in ("png", "pdf"):
-        fig.savefig(out_dir / f"fig_flow_decomposition.{fmt}", dpi=200, bbox_inches="tight")
-    print(f"  Saved fig_flow_decomposition.png/pdf")
-    plt.close(fig)
+    _save_figure(fig, out_dir / "fig_flow_decomposition")
 
 
 # ---------------------------------------------------------------------------
@@ -322,48 +344,39 @@ def plot_flow_decomposition_hour(
     rec_df = rec_df.iloc[::-1].reset_index(drop=True)
 
     n = len(rec_df)
-    fig, ax = plt.subplots(figsize=(10, max(3, n * 0.35 + 1.5)))
+    fig, ax = plt.subplots(figsize=(IEEE_TWO_COL_WIDTH, max(3, n * 0.35 + 1.5)))
 
     y_pos = np.arange(n)
 
-    # Stacked: nominal + margin
     ax.barh(y_pos, rec_df["nominal_abs"], height=0.6,
             color="#4393c3", label="DARUC |nominal|", zorder=2)
     ax.barh(y_pos, rec_df["margin"], height=0.6,
             left=rec_df["nominal_abs"].values,
             color="#e08060", label="DARUC robust margin", zorder=2)
 
-    # Fmax reference
     ax.barh(y_pos, rec_df["Fmax"], height=0.65,
             color="none", edgecolor="black", linewidth=1.0,
             label="Fmax", zorder=3)
 
-    # DAM+Reserve nominal as diamond markers
     ax.scatter(rec_df["dam_nominal_abs"], y_pos,
                marker="D", s=40, c="#2166ac", edgecolors="black", linewidths=0.4,
                zorder=4, label="DAM+Res |nominal|")
 
-    # Highlight binding lines in red on y-axis labels
     labels = rec_df["line"].tolist()
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(labels, fontsize=7)
+    ax.set_yticklabels(labels, fontsize=FONT_SIZES_TWO_COL["small"])
     for i, (_, row) in enumerate(rec_df.iterrows()):
         if row["binding"]:
             ax.get_yticklabels()[i].set_color("#b2182b")
             ax.get_yticklabels()[i].set_fontweight("bold")
 
-    ax.set_xlabel("Flow (MW)")
-    ax.set_title(f"Flow Decomposition — Hour {hour:02d}:00 (top {n} lines by loading)",
-                 fontsize=11)
-    ax.legend(loc="lower right", fontsize=7)
+    ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["medium"])
+
+    ax.legend(loc="upper right", fontsize=FONT_SIZES_TWO_COL["small"])
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
 
     fig.tight_layout()
-    for fmt in ("png", "pdf"):
-        fig.savefig(out_dir / f"fig_flow_decomp_h{hour:02d}.{fmt}",
-                    dpi=200, bbox_inches="tight")
-    print(f"  Saved fig_flow_decomp_h{hour:02d}.png/pdf")
-    plt.close(fig)
+    _save_figure(fig, out_dir / f"fig_flow_decomp_h{hour:02d}")
 
 
 def plot_flow_decomposition_binding(
@@ -411,46 +424,38 @@ def plot_flow_decomposition_binding(
     rec_df = pd.DataFrame(records).sort_values("wc_loading", ascending=True).reset_index(drop=True)
 
     n = len(rec_df)
-    fig, ax = plt.subplots(figsize=(10, max(2.5, n * 0.55 + 1.5)))
+    fig, ax = plt.subplots(figsize=(IEEE_TWO_COL_WIDTH, max(2.5, n * 0.55 + 1.5)))
     y_pos = np.arange(n)
 
-    # Stacked: nominal + margin
     ax.barh(y_pos, rec_df["nominal_abs"], height=0.6,
             color="#4393c3", label="DARUC |nominal|", zorder=2)
     ax.barh(y_pos, rec_df["margin"], height=0.6,
             left=rec_df["nominal_abs"].values,
             color="#e08060", label="DARUC robust margin", zorder=2)
 
-    # Fmax reference
     ax.barh(y_pos, rec_df["Fmax"], height=0.65,
             color="none", edgecolor="black", linewidth=1.0,
             label="Fmax", zorder=3)
 
-    # DAM+Reserve worst-case as diamond markers
     ax.scatter(rec_df["dam_wc_abs"], y_pos,
                marker="D", s=50, c="#2166ac", edgecolors="black", linewidths=0.5,
                zorder=4, label="DAM+Res worst-case")
 
-    # Highlight binding lines in red
     labels = rec_df["line"].tolist()
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(labels, fontsize=9)
+    ax.set_yticklabels(labels, fontsize=FONT_SIZES_TWO_COL["small"])
     for i, (_, row) in enumerate(rec_df.iterrows()):
         if row["binding"]:
             ax.get_yticklabels()[i].set_color("#b2182b")
             ax.get_yticklabels()[i].set_fontweight("bold")
 
-    ax.set_xlabel("Flow (MW)")
-    ax.set_title(f"Flow Decomposition — Binding Lines — Hour {hour:02d}:00", fontsize=11)
-    ax.legend(loc="lower right", fontsize=8)
+    ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["medium"])
+
+    ax.legend(loc="upper right", fontsize=FONT_SIZES_TWO_COL["small"])
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
 
     fig.tight_layout()
-    for fmt in ("png", "pdf"):
-        fig.savefig(out_dir / f"fig_flow_decomp_binding_h{hour:02d}.{fmt}",
-                    dpi=200, bbox_inches="tight")
-    print(f"  Saved fig_flow_decomp_binding_h{hour:02d}.png/pdf")
-    plt.close(fig)
+    _save_figure(fig, out_dir / f"fig_flow_decomp_binding_h{hour:02d}")
 
 
 def _find_hour_ts(df, hour):
@@ -553,9 +558,9 @@ def _label_binding(ax, x, y, uid, extra=""):
 
 def _style_map_ax(ax, title):
     """Common axis styling for map panels."""
-    ax.set_title(title, fontsize=10, fontweight="bold")
+    ax.set_title(title, fontsize=FONT_SIZES_TWO_COL["large"])
     ax.set_aspect("equal")
-    ax.tick_params(labelsize=6)
+    ax.tick_params(labelsize=FONT_SIZES_TWO_COL["small"] - 2)
     ax.set_xlabel("")
     ax.set_ylabel("")
 
@@ -700,7 +705,7 @@ def plot_network_maps(
     fmax_max = max(dam_hour["Fmax"].max(), daruc_hour["Fmax"].max())
 
     # --- Option A: Parallel offset (2 panels) ---
-    fig_a, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8))
+    fig_a, (ax1, ax2) = plt.subplots(1, 2, figsize=(IEEE_TWO_COL_WIDTH, 4.0))
     _draw_panel_parallel(ax1, bus, branch, dam_hour,
                          f"DAM + Reserve (h{hour:02d})")
     _draw_panel_parallel(ax2, bus, branch, daruc_hour,
@@ -712,18 +717,14 @@ def plot_network_maps(
         Line2D([0], [0], marker="^", color="w", markerfacecolor="#2ca02c",
                markeredgecolor="black", markersize=8, label="Wind gen"),
     ]
-    fig_a.legend(handles=legend_a, loc="lower center", ncol=4, fontsize=9,
+    fig_a.legend(handles=legend_a, loc="lower center", ncol=4,
+                 fontsize=FONT_SIZES_TWO_COL["small"],
                  bbox_to_anchor=(0.5, -0.01))
-    fig_a.suptitle(f"Option A: Parallel Lines — Hour {hour:02d}:00", fontsize=13)
-    fig_a.tight_layout(rect=[0, 0.04, 1, 0.96])
-    for fmt in ("png", "pdf"):
-        fig_a.savefig(out_dir / f"fig_map_A_parallel_h{hour:02d}.{fmt}",
-                      dpi=200, bbox_inches="tight")
-    print(f"  Saved fig_map_A_parallel_h{hour:02d}.png/pdf")
-    plt.close(fig_a)
+    fig_a.tight_layout(rect=[0, 0.04, 1, 1.0])
+    _save_figure(fig_a, out_dir / f"fig_map_A_parallel_h{hour:02d}")
 
     # --- Option B: Three panels (DAM wc | DARUC nominal | DARUC margin) ---
-    fig_b, (bx1, bx2, bx3) = plt.subplots(1, 3, figsize=(24, 7))
+    fig_b, (bx1, bx2, bx3) = plt.subplots(1, 3, figsize=(IEEE_TWO_COL_WIDTH * 1.5, 3.5))
     _draw_panel_single_metric(bx1, bus, branch, dam_hour,
                                f"DAM+Res worst-case (h{hour:02d})",
                                "worst_case_abs_flow", "#4393c3", vmax_mw=fmax_max)
@@ -740,18 +741,14 @@ def plot_network_maps(
         Line2D([0], [0], marker="^", color="w", markerfacecolor="#2ca02c",
                markeredgecolor="black", markersize=8, label="Wind gen"),
     ]
-    fig_b.legend(handles=legend_b, loc="lower center", ncol=4, fontsize=9,
+    fig_b.legend(handles=legend_b, loc="lower center", ncol=4,
+                 fontsize=FONT_SIZES_TWO_COL["small"],
                  bbox_to_anchor=(0.5, -0.01))
-    fig_b.suptitle(f"Option B: Three Panels — Hour {hour:02d}:00", fontsize=13)
-    fig_b.tight_layout(rect=[0, 0.04, 1, 0.96])
-    for fmt in ("png", "pdf"):
-        fig_b.savefig(out_dir / f"fig_map_B_three_panel_h{hour:02d}.{fmt}",
-                      dpi=200, bbox_inches="tight")
-    print(f"  Saved fig_map_B_three_panel_h{hour:02d}.png/pdf")
-    plt.close(fig_b)
+    fig_b.tight_layout(rect=[0, 0.04, 1, 1.0])
+    _save_figure(fig_b, out_dir / f"fig_map_B_three_panel_h{hour:02d}")
 
     # --- Option C: Dual encoding (2 panels) ---
-    fig_c, (cx1, cx2) = plt.subplots(1, 2, figsize=(18, 8))
+    fig_c, (cx1, cx2) = plt.subplots(1, 2, figsize=(IEEE_TWO_COL_WIDTH, 4.0))
     _draw_panel_dual_encode(cx1, bus, branch, dam_hour,
                             f"DAM + Reserve (h{hour:02d})")
     cmap_c, norm_c = _draw_panel_dual_encode(
@@ -765,17 +762,11 @@ def plot_network_maps(
         Line2D([0], [0], marker="^", color="w", markerfacecolor="#2ca02c",
                markeredgecolor="black", markersize=8, label="Wind gen"),
     ]
-    fig_c.legend(handles=legend_c, loc="lower center", ncol=4, fontsize=9,
+    fig_c.legend(handles=legend_c, loc="lower center", ncol=4,
+                 fontsize=FONT_SIZES_TWO_COL["small"],
                  bbox_to_anchor=(0.5, -0.01))
-    fig_c.suptitle(
-        f"Option C: Color=Nominal%, Thickness=Worst-Case% — Hour {hour:02d}:00",
-        fontsize=13)
-    fig_c.tight_layout(rect=[0, 0.04, 1, 0.96])
-    for fmt in ("png", "pdf"):
-        fig_c.savefig(out_dir / f"fig_map_C_dual_encode_h{hour:02d}.{fmt}",
-                      dpi=200, bbox_inches="tight")
-    print(f"  Saved fig_map_C_dual_encode_h{hour:02d}.png/pdf")
-    plt.close(fig_c)
+    fig_c.tight_layout(rect=[0, 0.04, 1, 1.0])
+    _save_figure(fig_c, out_dir / f"fig_map_C_dual_encode_h{hour:02d}")
 
 
 # ---------------------------------------------------------------------------
@@ -884,33 +875,27 @@ def plot_z_matrix(case_dir: Path, hour: int, out_dir: Path, threshold: float = 0
     vabs = np.max(np.abs(Z_active))
     im = ax.imshow(Z_active, aspect="auto", cmap="RdBu_r", vmin=-vabs, vmax=vabs,
                    interpolation="nearest")
-    # Annotate cells with values
     for i in range(n_active):
         for j in range(n_k):
             val = Z_active[i, j]
             if abs(val) > threshold:
                 ax.text(j, i, f"{val:.3f}", ha="center", va="center",
-                        fontsize=6, color="white" if abs(val) > 0.5 * vabs else "black")
+                        fontsize=FONT_SIZES_TWO_COL["small"] - 3,
+                        color="white" if abs(val) > 0.5 * vabs else "black")
 
     ax.set_xticks(range(n_k))
-    ax.set_xticklabels(k_labels, fontsize=8, rotation=30, ha="right")
+    ax.set_xticklabels(k_labels, fontsize=FONT_SIZES_TWO_COL["small"], rotation=30, ha="right")
     ax.set_yticks(range(n_active))
-    ax.set_yticklabels(active_names, fontsize=7)
+    ax.set_yticklabels(active_names, fontsize=FONT_SIZES_TWO_COL["small"] - 2)
     for i, c in enumerate(label_colors):
         ax.get_yticklabels()[i].set_color(c)
-    ax.set_xlabel("Uncertainty Source (Wind Generator)")
+    ax.set_xlabel("Uncertainty Source (Wind Generator)", fontsize=FONT_SIZES_TWO_COL["medium"])
     fig_a.colorbar(im, ax=ax, label="Z coefficient", shrink=0.8)
-    ax.set_title(f"Option A: Z Matrix Heatmap — DARUC Hour {hour:02d}\n"
-                 f"({n_active} gens with |Z| > {threshold})", fontsize=10)
     fig_a.tight_layout()
-    for fmt in ("png", "pdf"):
-        fig_a.savefig(out_dir / f"fig_z_A_heatmap_h{hour:02d}.{fmt}",
-                      dpi=200, bbox_inches="tight")
-    print(f"  Saved fig_z_A_heatmap_h{hour:02d}.png/pdf")
-    plt.close(fig_a)
+    _save_figure(fig_a, out_dir / f"fig_z_A_heatmap_h{hour:02d}")
 
     # --- Option B: Grouped horizontal bars (one color per wind source) ---
-    fig_b, ax = plt.subplots(figsize=(10, max(4, n_active * 0.4 + 1.5)))
+    fig_b, ax = plt.subplots(figsize=(IEEE_TWO_COL_WIDTH, max(4, n_active * 0.4 + 1.5)))
     bar_height = 0.8 / n_k
     colors_k = ["#4393c3", "#e08060", "#66c2a5", "#984ea3"]
     for j in range(n_k):
@@ -921,39 +906,30 @@ def plot_z_matrix(case_dir: Path, hour: int, out_dir: Path, threshold: float = 0
 
     ax.axvline(0, color="black", linewidth=0.5)
     ax.set_yticks(range(n_active))
-    ax.set_yticklabels(active_names, fontsize=7)
+    ax.set_yticklabels(active_names, fontsize=FONT_SIZES_TWO_COL["small"] - 2)
     for i, c in enumerate(label_colors):
         ax.get_yticklabels()[i].set_color(c)
-    ax.set_xlabel("Z coefficient value")
-    ax.legend(fontsize=8, loc="lower right", title="Wind Source")
-    ax.set_title(f"Option B: Z Coefficients by Wind Source — DARUC Hour {hour:02d}\n"
-                 f"({n_active} gens with |Z| > {threshold})", fontsize=10)
+    ax.set_xlabel("Z coefficient value", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax.legend(fontsize=FONT_SIZES_TWO_COL["small"], loc="lower right", title="Wind Source")
     ax.invert_yaxis()
     fig_b.tight_layout()
-    for fmt in ("png", "pdf"):
-        fig_b.savefig(out_dir / f"fig_z_B_bars_h{hour:02d}.{fmt}",
-                      dpi=200, bbox_inches="tight")
-    print(f"  Saved fig_z_B_bars_h{hour:02d}.png/pdf")
-    plt.close(fig_b)
+    _save_figure(fig_b, out_dir / f"fig_z_B_bars_h{hour:02d}")
 
     # --- Option C: Row-norm bar + stacked contribution ---
-    fig_c, (cx1, cx2) = plt.subplots(1, 2, figsize=(14, max(4, n_active * 0.35 + 1.5)),
+    fig_c, (cx1, cx2) = plt.subplots(1, 2, figsize=(IEEE_TWO_COL_WIDTH, max(4, n_active * 0.35 + 1.5)),
                                       gridspec_kw={"width_ratios": [1, 2]}, sharey=True)
 
-    # Left: total row norm
-    cx1.barh(range(n_active), row_norms[sort_order] if False else
-             np.linalg.norm(Z_active, axis=1),
+    cx1.barh(range(n_active), np.linalg.norm(Z_active, axis=1),
              color=["#2ca02c" if w else "#4393c3" for w in is_wind],
              edgecolor="white", linewidth=0.3)
-    cx1.set_xlabel("||Z row||")
+    cx1.set_xlabel(r"$\|Z_{\mathrm{row}}\|$", fontsize=FONT_SIZES_TWO_COL["medium"])
     cx1.set_yticks(range(n_active))
-    cx1.set_yticklabels(active_names, fontsize=7)
+    cx1.set_yticklabels(active_names, fontsize=FONT_SIZES_TWO_COL["small"] - 2)
     for i, c in enumerate(label_colors):
         cx1.get_yticklabels()[i].set_color(c)
-    cx1.set_title("Row Norm", fontsize=9)
+    cx1.set_title("Row Norm", fontsize=FONT_SIZES_TWO_COL["medium"])
     cx1.invert_yaxis()
 
-    # Right: stacked absolute contributions per wind source
     left = np.zeros(n_active)
     for j in range(n_k):
         abs_vals = np.abs(Z_active[:, j])
@@ -962,18 +938,13 @@ def plot_z_matrix(case_dir: Path, hour: int, out_dir: Path, threshold: float = 0
                  edgecolor="white", linewidth=0.3)
         left += abs_vals
 
-    cx2.set_xlabel("|Z| contribution")
-    cx2.legend(fontsize=7, loc="lower right", title="Wind Source", title_fontsize=7)
-    cx2.set_title("Stacked |Z| by Source", fontsize=9)
+    cx2.set_xlabel("|Z| contribution", fontsize=FONT_SIZES_TWO_COL["medium"])
+    cx2.legend(fontsize=FONT_SIZES_TWO_COL["small"] - 2, loc="lower right",
+               title="Wind Source", title_fontsize=FONT_SIZES_TWO_COL["small"] - 2)
+    cx2.set_title("Stacked |Z| by Source", fontsize=FONT_SIZES_TWO_COL["medium"])
 
-    fig_c.suptitle(f"Option C: Z Norm + Source Decomposition — DARUC Hour {hour:02d}\n"
-                   f"({n_active} gens with |Z| > {threshold})", fontsize=10)
     fig_c.tight_layout()
-    for fmt in ("png", "pdf"):
-        fig_c.savefig(out_dir / f"fig_z_C_norm_stack_h{hour:02d}.{fmt}",
-                      dpi=200, bbox_inches="tight")
-    print(f"  Saved fig_z_C_norm_stack_h{hour:02d}.png/pdf")
-    plt.close(fig_c)
+    _save_figure(fig_c, out_dir / f"fig_z_C_norm_stack_h{hour:02d}")
 
     # --- Option D: Stacked |Z| by source — thermal units only ---
     thermal_mask = is_wind == 0
@@ -988,7 +959,7 @@ def plot_z_matrix(case_dir: Path, hour: int, out_dir: Path, threshold: float = 0
         Z_thermal = Z_thermal[th_order]
         thermal_names = [thermal_names[i] for i in th_order]
 
-        fig_d, ax = plt.subplots(figsize=(10, max(3, n_th * 0.35 + 1.5)))
+        fig_d, ax = plt.subplots(figsize=(IEEE_TWO_COL_WIDTH, max(3, n_th * 0.35 + 1.5)))
 
         left = np.zeros(n_th)
         for j in range(n_k):
@@ -999,19 +970,13 @@ def plot_z_matrix(case_dir: Path, hour: int, out_dir: Path, threshold: float = 0
             left += abs_vals
 
         ax.set_yticks(range(n_th))
-        ax.set_yticklabels(thermal_names, fontsize=7)
-        ax.set_xlabel("|Z| contribution")
-        ax.legend(fontsize=8, loc="lower right", title="Wind Source", title_fontsize=8)
+        ax.set_yticklabels(thermal_names, fontsize=FONT_SIZES_TWO_COL["small"] - 2)
+        ax.set_xlabel("|Z| contribution", fontsize=FONT_SIZES_TWO_COL["medium"])
+        ax.legend(fontsize=FONT_SIZES_TWO_COL["small"], loc="lower right",
+                  title="Wind Source", title_fontsize=FONT_SIZES_TWO_COL["small"])
         ax.invert_yaxis()
-        ax.set_title(
-            f"Thermal Response to Wind Uncertainty — DARUC Hour {hour:02d}\n"
-            f"({n_th} thermal gens with |Z| > {threshold})", fontsize=10)
         fig_d.tight_layout()
-        for fmt in ("png", "pdf"):
-            fig_d.savefig(out_dir / f"fig_z_D_thermal_stack_h{hour:02d}.{fmt}",
-                          dpi=200, bbox_inches="tight")
-        print(f"  Saved fig_z_D_thermal_stack_h{hour:02d}.png/pdf")
-        plt.close(fig_d)
+        _save_figure(fig_d, out_dir / f"fig_z_D_thermal_stack_h{hour:02d}")
     else:
         print(f"  No active thermal generators at hour {hour}, skipping Option D")
 
@@ -1047,7 +1012,7 @@ def plot_network_commitment_map(
     """Network map showing line flows + additionally committed generators at a given hour.
 
     Uses deviation_summary.csv to identify which generators DARUC commits
-    beyond what DAM+Reserve committed, and highlights them on the map.
+    beyond what DAM w/ Res committed, and highlights them on the map.
     """
     from matplotlib.lines import Line2D
 
@@ -1085,7 +1050,7 @@ def plot_network_commitment_map(
     print(f"  {len(extra_gens)} extra-committed generators at hour {hour}: "
           f"{[g['gen_id'] for g in extra_gens]}")
 
-    fig, ax = plt.subplots(figsize=(12, 9))
+    fig, ax = plt.subplots(figsize=(IEEE_TWO_COL_WIDTH, 5.0))
 
     # Draw base network
     _draw_base_network(ax, bus, branch)
@@ -1148,26 +1113,22 @@ def plot_network_commitment_map(
             zorder=9,
         )
 
-    _style_map_ax(ax, f"DARUC Flows + Extra Commitments — Hour {hour:02d}:00")
+    _style_map_ax(ax, "")
 
     legend_elements = [
-        Line2D([0], [0], color="#4393c3", lw=4, label="Nominal flow"),
-        Line2D([0], [0], color="#e08060", lw=4, label="Robust margin"),
-        Line2D([0], [0], color="#b2182b", lw=5, alpha=0.25, label="Binding line"),
+        Line2D([0], [0], color="#4393c3", lw=3, label="Nominal flow"),
+        Line2D([0], [0], color="#e08060", lw=3, label="Robust margin"),
+        Line2D([0], [0], color="#b2182b", lw=4, alpha=0.25, label="Binding line"),
         Line2D([0], [0], marker="^", color="w", markerfacecolor="#2ca02c",
-               markeredgecolor="black", markersize=8, label="Wind gen"),
+               markeredgecolor="black", markersize=7, label="Wind gen"),
         Line2D([0], [0], marker="s", color="w", markerfacecolor="#d62728",
-               markeredgecolor="black", markersize=8, label="Extra-committed unit"),
+               markeredgecolor="black", markersize=7, label="Extra-committed unit"),
     ]
-    ax.legend(handles=legend_elements, loc="lower left", fontsize=8,
-              framealpha=0.9)
+    ax.legend(handles=legend_elements, loc="lower left",
+              fontsize=FONT_SIZES_TWO_COL["small"], framealpha=0.9)
 
     fig.tight_layout()
-    for fmt in ("png", "pdf"):
-        fig.savefig(out_dir / f"fig_map_commitment_h{hour:02d}.{fmt}",
-                    dpi=200, bbox_inches="tight")
-    print(f"  Saved fig_map_commitment_h{hour:02d}.png/pdf")
-    plt.close(fig)
+    _save_figure(fig, out_dir / f"fig_map_commitment_h{hour:02d}")
 
 
 # ---------------------------------------------------------------------------
@@ -1204,7 +1165,7 @@ def main():
     print("Filtering to day-1, binding lines only...")
     dam, daruc, binding_lines = filter_day1_binding(dam_raw, daruc_raw)
     print(f"  {len(binding_lines)} binding lines: {binding_lines}")
-    print(f"  {dam['period'].nunique()} periods (day 1)")
+    print(f"  {dam['period'].nunique()} periods ")
 
     print("\nChart 1: Loading heatmaps...")
     plot_loading_heatmaps(dam, daruc, binding_lines, out_dir)

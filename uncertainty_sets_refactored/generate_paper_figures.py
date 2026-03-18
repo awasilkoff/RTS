@@ -10,7 +10,7 @@ Usage:
 
 Outputs saved to: data/viz_artifacts/paper_final/
     figures/
-        fig1_kernel_distance.pdf    - Kernel distance: Learned (k=64, κ=1) vs Euclidean k-NN
+        fig1_kernel_distance.pdf    - Kernel distance: Learned (k=64, best κ from sweep) vs Euclidean k-NN
         fig2_ellipsoid_3d.pdf       - 3D side-by-side: Global vs Learned, k-NN vs Learned
         fig3_nll_vs_k.pdf           - NLL vs k sweep for k-NN
         fig4_nll_vs_kappa.pdf       - NLL vs kappa sweep for learned omega (16D)
@@ -54,6 +54,7 @@ import matplotlib.pyplot as plt
 
 from plot_config import (
     setup_plotting,
+    FONT_SIZES_TWO_COL,
     IEEE_COL_WIDTH,
     IEEE_TWO_COL_WIDTH,
     COLORS,
@@ -97,7 +98,7 @@ def configure_residuals_mode(use_residuals: bool) -> None:
     KNN_SWEEP_DIR = VIZ_ARTIFACTS / f"knn_k_sweep{suffix}"
 
 # Anonymized wind resource labels (Y columns are sorted: 122, 309, 317)
-WIND_LABELS = {0: "Wind 1", 1: "Wind 2", 2: "Wind 3"}
+WIND_LABELS = {0: "W1", 1: "W2", 2: "W3"}
 
 # Extreme eval-set indices (high SYS_STD, far from centroid in mean/std space)
 # Found via standardized Euclidean distance from centroid of eval set
@@ -130,6 +131,24 @@ def _load_omega(feature_set_dir: Path) -> np.ndarray:
     if not npy_path.exists():
         raise FileNotFoundError(f"Omega not found: {npy_path}")
     return np.load(npy_path)
+
+
+def _load_best_tau(feature_set_dir: Path) -> float:
+    """Load best tau (kappa) from sweep results in a feature set directory.
+
+    Prefers multi-seed stats if available, otherwise falls back to sweep_results.csv.
+    """
+    multi_seed_path = feature_set_dir / "multi_seed_stats.csv"
+    if multi_seed_path.exists():
+        tau_stats = pd.read_csv(multi_seed_path)
+        best_row = tau_stats.loc[tau_stats["val_nll_mean"].idxmin()]
+        return float(best_row["tau"])
+
+    df = _load_sweep_results(feature_set_dir)
+    # For focused_2d: softmax constraint; for high_dim_16d: unconstrained
+    # Just pick the row with the best val_nll_learned
+    best = df.sort_values("val_nll_learned").iloc[0]
+    return float(best["tau"])
 
 
 def _load_feature_config(feature_set_dir: Path) -> dict:
@@ -200,13 +219,13 @@ def fig1_kernel_distance_comparison(
     feature_set_dir: Path = None,  # resolved at call time via FOCUSED_2D_DIR
     output_path: Path = None,
     k: int = 64,
-    tau: float = 1.0,
+    tau: float = None,
 ) -> plt.Figure:
     """
     Generate kernel distance comparison figure.
 
     Shows side-by-side: Euclidean k-NN (uniform) vs Learned omega kernel weights.
-    Uses optimal hyperparameters: k=64, kappa=1.0.
+    Uses best tau from sweep results (loaded automatically if tau=None).
     """
     from viz_kernel_distance import (
         compute_kernel_weights,
@@ -219,6 +238,9 @@ def fig1_kernel_distance_comparison(
         feature_set_dir = FOCUSED_2D_DIR
     if output_path is None:
         output_path = OUTPUT_DIR / "figures" / "fig1_kernel_distance"
+    if tau is None:
+        tau = _load_best_tau(feature_set_dir)
+        print(f"  Using best tau from sweep: {tau}")
 
     # Load data
     actuals = pd.read_parquet(ACTUALS_PARQUET)
@@ -245,41 +267,17 @@ def fig1_kernel_distance_comparison(
     weights_knn = compute_knn_binary_weights(X_target, Xs, k=k)
     weights_learned = compute_kernel_weights(X_target, Xs, omega_learned, tau)
 
-    # Create figure (IEEE two-column width)
-    fig, axes = plt.subplots(1, 2, figsize=(IEEE_TWO_COL_WIDTH, 3.0))
+    # Create figure with GridSpec: [colorbar | learned kernel | k-NN]
+    # Colorbar gets its own narrow column so both plot axes are equal width.
+    from matplotlib.gridspec import GridSpec
+    fig = plt.figure(figsize=(IEEE_TWO_COL_WIDTH, 3.5))
+    gs = GridSpec(1, 3, figure=fig, width_ratios=[0.03, 1, 1], wspace=0.05)
+    cax = fig.add_subplot(gs[0, 0])
+    ax_left = fig.add_subplot(gs[0, 1])
+    ax_right = fig.add_subplot(gs[0, 2], sharey=ax_left)
 
-    # Left: k-NN binary weights
-    ax = axes[0]
-    knn_mask = weights_knn == 1.0
-    ax.scatter(Xs[~knn_mask, 0], Xs[~knn_mask, 1], c="lightgray", s=15, alpha=0.4)
-    ax.scatter(
-        Xs[knn_mask, 0],
-        Xs[knn_mask, 1],
-        c=COLORS["knn"],
-        s=25,
-        alpha=0.8,
-        label=f"k={k} neighbors",
-    )
-    ax.scatter(
-        X_target[0],
-        X_target[1],
-        c=COLORS["learned"],
-        s=150,
-        marker="*",
-        edgecolors="black",
-        linewidths=1,
-        zorder=10,
-        label="Target Hour",
-    )
-    ax.set_xlabel("System Mean")
-    ax.set_ylabel("System Standard Deviation")
-    # ax.set_title(f"Euclidean k-NN (k={k})")  # caption in paper
-    ax.legend(loc="upper right", fontsize=8)
-    ax.grid(True, alpha=0.3)
-
-    # Right: Learned kernel weights
-    ax = axes[1]
-    scatter = ax.scatter(
+    # Left: Learned kernel weights
+    scatter = ax_left.scatter(
         Xs[:, 0],
         Xs[:, 1],
         c=weights_learned,
@@ -290,7 +288,7 @@ def fig1_kernel_distance_comparison(
             vmin=max(weights_learned.min(), 1e-6), vmax=weights_learned.max()
         ),
     )
-    ax.scatter(
+    ax_left.scatter(
         X_target[0],
         X_target[1],
         c=COLORS["learned"],
@@ -301,18 +299,66 @@ def fig1_kernel_distance_comparison(
         zorder=10,
         label="Target Hour",
     )
-    ax.set_xlabel("System Mean")
-    ax.set_ylabel("System STD")
-    # Title omitted — caption in paper
-    ax.legend(loc="upper right", fontsize=8)
-    ax.grid(True, alpha=0.3)
+    print(f"Normalized features of target hour")
+    print(f"Normalized features: SYS_MEAN {X_target[0]:.2f} , SYS_STD {X_target[1]:.2f}")
 
-    # Colorbar
-    cbar = plt.colorbar(scatter, ax=ax)
-    cbar.set_label("Kernel Weight", fontsize=10)
+    # Weight distribution summary
+    n_total = len(weights_learned)
+    for thresh in [0.9,0.8,0.7,0.65,0.6,0.5, 0.1, 0.01, 0.001]:
+        n_above = int(np.sum(weights_learned > thresh))
+        print(f"{n_above} points, i.e.  {n_above / n_total:.1%} of points have weight > {thresh}")
+    for thresh in [0.0001,1e-5,1e-6,1e-7,1e-8]:
+        n_above = int(np.sum(weights_learned < thresh))
+        print(f"{n_above} points, i.e.  {n_above / n_total:.1%} of points have weight < {thresh}")
+    median_w = float(np.median(weights_learned))
+    print(f"  50% of points have weight < {median_w:.2e}")
+
+    ax_left.set_xlabel("System Mean")
+    # Move y-axis ticks to the right side of the left plot
+    ax_left.yaxis.tick_right()
+    ax_left.yaxis.set_label_position("right")
+    ax_left.set_ylabel("")
+    ax_left.legend(loc="upper right")
+    ax_left.grid(True, alpha=0.3)
+
+    # Colorbar in its own dedicated column on the far left
+    cbar = fig.colorbar(scatter, cax=cax)
+    cbar.set_label("Kernel Weight")
     cbar.ax.tick_params(labelsize=7)
+    cbar.ax.yaxis.set_ticks_position("left")
+    cbar.ax.yaxis.set_label_position("left")
 
-    plt.tight_layout()
+    # Right: k-NN binary weights
+    knn_mask = weights_knn == 1.0
+    ax_right.scatter(Xs[~knn_mask, 0], Xs[~knn_mask, 1], c="lightgray", s=15, alpha=0.4)
+    ax_right.scatter(
+        X_target[0],
+        X_target[1],
+        c=COLORS["learned"],
+        s=150,
+        marker="*",
+        edgecolors="black",
+        linewidths=1,
+        zorder=10,
+        label="Target Hour",
+    )
+    ax_right.scatter(
+        Xs[knn_mask, 0],
+        Xs[knn_mask, 1],
+        c=COLORS["knn"],
+        s=25,
+        alpha=0.8,
+        label=f"k={k} neighbors",
+    )
+
+    ax_right.set_xlabel("System Mean")
+    ax_right.yaxis.tick_right()
+    ax_right.yaxis.set_label_position("right")
+    ax_right.set_ylabel("System Standard Deviation")
+    ax_right.legend(loc="upper right")
+    ax_right.grid(True, alpha=0.3)
+
+    fig.tight_layout()
 
     # Save
     _save_figure(fig, output_path)
@@ -330,7 +376,10 @@ def fig2_3d_ellipsoid_comparison(
     knn_k: int = 16,
     tau: float = 0.07,
     rho: float = 1.0,
-    offset: float = 20.0,
+    offset: float = 0.0,
+    xlim: tuple = None,
+    ylim: tuple = None,
+    zlim: tuple = None,
 ) -> plt.Figure:
     """
     Side-by-side 3D ellipsoid comparison.
@@ -409,20 +458,33 @@ def fig2_3d_ellipsoid_comparison(
 
     # Use global mean as the common center for all ellipsoids
     Mu_common = Mu_global + offset
+    print(f"Global mean for plotting: {Mu_global}")
 
-    # Colors: high-contrast, distinct hues
-    color_global = "#4361EE"  # Blue
-    color_knn = "#2A9D8F"  # Teal
-    color_learned = "#F77F00"  # Orange
+    # Use shared color scheme from plot_config
+    color_global = COLORS["global"]
+    color_knn = COLORS["knn"]
+    color_learned = COLORS["learned"]
+
+    # Print covariance matrices
+    labels = [WIND_LABELS[i] for i in range(Sigma_global.shape[0])]
+    header = "          " + "  ".join(f"{l:>8s}" for l in labels)
+    for name, Sigma in [("Global", Sigma_global), ("Learned", Sigma_learned),
+                         (f"k-NN (k={knn_k})", knn_results[knn_k]["Sigma"][sample_idx])]:
+        print(f"\n  {name} covariance (MW²):")
+        print(header)
+        for i, row_label in enumerate(labels):
+            vals = "  ".join(f"{Sigma[i, j]:8.1f}" for j in range(Sigma.shape[1]))
+            print(f"    {row_label:>6s}  {vals}")
 
     # Create side-by-side 3D figure
     fig = plt.figure(figsize=(IEEE_TWO_COL_WIDTH, 3.5))
 
     def _labels(ax):
-        ax.set_xlabel(f"{WIND_LABELS[0]} (MW)", fontsize=7, labelpad=2)
-        ax.set_ylabel(f"{WIND_LABELS[1]} (MW)", fontsize=7, labelpad=2)
-        ax.set_zlabel(f"{WIND_LABELS[2]} (MW)", fontsize=7, labelpad=2)
-        ax.tick_params(labelsize=6)
+        ax.set_xlabel(f"{WIND_LABELS[0]} (MW)", labelpad=2)
+        ax.set_ylabel(f"{WIND_LABELS[1]} (MW)", labelpad=2)
+        ax.zaxis.set_rotate_label(False)
+        ax.set_zlabel(f"{WIND_LABELS[2]} (MW)", rotation=90, labelpad=2)
+        ax.tick_params(labelsize=8)
 
     n_pts = 25
 
@@ -488,33 +550,13 @@ def fig2_3d_ellipsoid_comparison(
         zorder=6,
     )
 
-    ax1.set_title("Global vs Learned ω", fontsize=9)
-    _labels(ax1)
+    ax1.set_title(r"Global vs. Learned $\boldsymbol{\omega}$", fontsize=9, pad=4)
+    # Left panel: x/y labels only, skip z-label (right panel covers it)
+    ax1.set_xlabel(f"{WIND_LABELS[0]} (MW)", labelpad=2)
+    ax1.set_ylabel(f"{WIND_LABELS[1]} (MW)", labelpad=2)
+    ax1.set_zlabel("")
+    ax1.tick_params(labelsize=9)
     ax1.view_init(elev=20, azim=45)
-    # Manual legend
-    from matplotlib.lines import Line2D
-
-    legend_elements = [
-        Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="w",
-            markerfacecolor=color_global,
-            markersize=8,
-            label="Global",
-        ),
-        Line2D(
-            [0],
-            [0],
-            marker="D",
-            color="w",
-            markerfacecolor=color_learned,
-            markersize=8,
-            label=f"Learned ω (κ={tau})",
-        ),
-    ]
-    ax1.legend(handles=legend_elements, loc="upper left", fontsize=7)
 
     # --- Right panel: k-NN vs Learned ---
     ax2 = fig.add_subplot(122, projection="3d")
@@ -561,32 +603,11 @@ def fig2_3d_ellipsoid_comparison(
         zorder=6,
     )
 
-    ax2.set_title(f"k-NN (k={knn_k}) vs Learned ω", fontsize=9)
+    ax2.set_title(r"k-NN vs. Learned $\boldsymbol{\omega}$", fontsize=9, pad=4)
     _labels(ax2)
     ax2.view_init(elev=20, azim=45)
-    legend_elements_r = [
-        Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="w",
-            markerfacecolor=color_knn,
-            markersize=8,
-            label=f"k-NN (k={knn_k})",
-        ),
-        Line2D(
-            [0],
-            [0],
-            marker="D",
-            color="w",
-            markerfacecolor=color_learned,
-            markersize=8,
-            label=f"Learned ω (κ={tau})",
-        ),
-    ]
-    ax2.legend(handles=legend_elements_r, loc="upper left", fontsize=7)
 
-    # Shared per-axis limits across both panels (each wind resource gets own range)
+    # Shared per-axis limits across both panels
     all_surfaces = [
         (X_g, Y_g, Z_g),
         (X_l, Y_l, Z_l),
@@ -600,18 +621,72 @@ def fig2_3d_ellipsoid_comparison(
         """Round limits outward to nearest step for clean tick marks."""
         return np.floor(lo / step) * step, np.ceil(hi / step) * step
 
-    xlim = _nice_lim(all_x.min(), all_x.max())
-    ylim = _nice_lim(all_y.min(), all_y.max())
-    zlim = _nice_lim(all_z.min(), all_z.max())
+    xlim_ = xlim if xlim is not None else _nice_lim(all_x.min(), all_x.max())
+    ylim_ = ylim if ylim is not None else _nice_lim(all_y.min(), all_y.max())
+    zlim_ = zlim if zlim is not None else _nice_lim(all_z.min(), all_z.max())
+    from matplotlib.ticker import MaxNLocator
     for ax in [ax1, ax2]:
-        ax.set_xlim(*xlim)
-        ax.set_ylim(*ylim)
-        ax.set_zlim(*zlim)
+        ax.set_xlim(*xlim_)
+        ax.set_ylim(*ylim_)
+        ax.set_zlim(*zlim_)
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True, nbins=5))
+        ax.yaxis.set_major_locator(MaxNLocator(integer=True, nbins=5))
+        ax.zaxis.set_major_locator(MaxNLocator(integer=True, nbins=5))
 
-    plt.tight_layout()
+    # Shared legend at bottom
+    from matplotlib.lines import Line2D
+    legend_handles = [
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=color_global,  markersize=8, label="Global"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=color_knn,     markersize=8, label=f"k-NN (k={knn_k})"),
+        Line2D([0], [0], marker="D", color="w", markerfacecolor=color_learned, markersize=8, label=r"Learned $\boldsymbol{\omega}$"),
+    ]
+    fig.legend(handles=legend_handles, loc="lower center", ncol=3, fontsize=10,
+               frameon=True, bbox_to_anchor=(0.5, 0.0))
+
+    plt.tight_layout(rect=[0.0, 0.06, 1.0, 1.0])
     _save_figure(fig, output_path)
 
     return fig
+
+
+def fig2_3d_ellipsoid_comparison_2x2(
+    feature_set_dir: Path = None,
+    output_path: Path = None,
+    normal_sample_idx: int = 0,
+    extreme_sample_idx: int = None,
+    knn_k: int = 16,
+    tau: float = 0.07,
+    rho: float = 3.0,
+    offset: float = 20.0,
+) -> plt.Figure:
+    """
+    Generates two 1x2 3D ellipsoid figures (normal and extreme hour)
+    with shared axis scales. Delegates to fig2_3d_ellipsoid_comparison
+    for each row.
+
+    Saves as fig2a_ellipsoid_3d_normal and fig2b_ellipsoid_3d_extreme.
+    Returns the extreme-hour figure.
+    """
+    if extreme_sample_idx is None:
+        extreme_sample_idx = EXTREME_SAMPLE_IDX
+    if output_path is None:
+        output_path = OUTPUT_DIR / "figures"
+
+    fig_normal = fig2_3d_ellipsoid_comparison(
+        feature_set_dir=feature_set_dir,
+        output_path=output_path / "fig2a_ellipsoid_3d_normal",
+        sample_idx=normal_sample_idx,
+        knn_k=knn_k, tau=tau, rho=rho, offset=offset,
+    )
+
+    fig_extreme = fig2_3d_ellipsoid_comparison(
+        feature_set_dir=feature_set_dir,
+        output_path=output_path / "fig2b_ellipsoid_3d_extreme",
+        sample_idx=extreme_sample_idx,
+        knn_k=knn_k, tau=tau, rho=rho, offset=offset,
+    )
+
+    return fig_extreme
 
 
 # ============================================================================
@@ -715,7 +790,7 @@ def fig3_nll_vs_k(
     ax.set_xlabel("k (Number of Neighbors)")
     ax.set_ylabel("Mean NLL")
     ax.set_xscale("log")
-    ax.legend(fontsize=7, loc="upper left")
+    ax.legend(loc="upper left")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -844,7 +919,7 @@ def fig4_nll_vs_tau(
     ax.set_xlabel("κ (Kernel Bandwidth)")
     ax.set_ylabel("Validation NLL")
     ax.set_xscale("log")
-    ax.legend(fontsize=7, loc="upper left")
+    ax.legend(loc="upper left")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -1073,6 +1148,144 @@ def fig3b_4b_hyperparameter_sweeps(
 
 
 # ============================================================================
+# FIGURE 3b/4b ALT: Two-panel version — k-NN sweep + combined kappa sweep
+# ============================================================================
+def fig3b_4b_hyperparameter_sweeps_combined(
+    feature_set_dir: Path = None,
+    output_path: Path = None,
+) -> plt.Figure:
+    """
+    Two-panel figure: (a) NLL vs k, (b) NLL vs κ with both softmax and
+    unconstrained lines overlaid on the same axes.
+    """
+    if feature_set_dir is None:
+        feature_set_dir = HIGH_DIM_16D_DIR
+    if output_path is None:
+        output_path = OUTPUT_DIR / "figures" / "fig3b_4b_hyperparameter_sweeps_combined"
+
+    fig, (ax_kappa, ax_k) = plt.subplots(
+        1,
+        2,
+        figsize=(IEEE_TWO_COL_WIDTH, IEEE_TWO_COL_WIDTH / 2),
+        sharey=True,
+    )
+
+    # ------------------------------------------------------------------
+    # Panel (b): NLL vs k
+    # ------------------------------------------------------------------
+    multi_stats_path = KNN_SWEEP_DIR / "multi_split_k_stats.csv"
+    if multi_stats_path.exists():
+        stats = pd.read_csv(multi_stats_path)
+        k_vals = stats["k"].values
+        nll_mean_k = stats["nll_mean"].values
+        nll_std_k = stats["nll_std"].values
+    else:
+        knn_df = _load_knn_sweep()
+        k_vals = knn_df["k"].values
+        nll_mean_k = knn_df["nll"].values
+        nll_std_k = np.zeros_like(nll_mean_k)
+
+    ax_k.plot(
+        k_vals, nll_mean_k, "o-",
+        linewidth=2, markersize=5, color=COLORS["knn"],
+    )
+    # ax_k.fill_between(
+    #     k_vals, nll_mean_k - nll_std_k, nll_mean_k + nll_std_k,
+    #     alpha=0.25, color=COLORS["knn"],
+    # )fig3b_4b_hyperparameter_sweeps_combined
+
+    # Mark best k
+    best_k_idx = np.argmin(nll_mean_k)
+    ax_k.scatter(
+        [k_vals[best_k_idx]], [nll_mean_k[best_k_idx]],
+        s=150, c=COLORS["knn"], marker="*", zorder=10,
+        edgecolors="black", linewidths=1,
+    )
+
+    # Load sweep data for baselines and kappa panel
+    df_sweep = _load_sweep_results(feature_set_dir)
+    nll_global = df_sweep.iloc[0]["val_nll_global"]
+
+    # Best learned omega (across all constraints) for panel (a) baseline
+    best_row_all = df_sweep.sort_values("val_nll_learned").iloc[0]
+    nll_learned_best = best_row_all["val_nll_learned"]
+
+    ax_k.axhline(nll_learned_best, linestyle="--", linewidth=1.5, color=COLORS["learned"])
+    ax_k.axhline(nll_global, linestyle=":", linewidth=1.5, color=COLORS["global"])
+
+    ax_k.set_xlabel("k (Number of Neighbors)")
+    ax_k.set_ylabel("Validation NLL")
+    ax_k.set_xscale("log")
+    ax_k.grid(True, alpha=0.3)
+    # ax_k.text(0.02, 0.98, "(a)", transform=ax_k.transAxes,
+    #           fontsize=10, fontweight="bold", va="top")
+
+    # Best k-NN NLL for baselines on kappa panel
+    nll_knn_best = nll_mean_k[best_k_idx]
+
+    # ------------------------------------------------------------------
+    # Panel (a): NLL vs κ — both constraints on same axes
+    # ------------------------------------------------------------------
+    for constraint_filter, label, color in [
+        ("softmax", r"Constrained $\boldsymbol{\omega}$", COLORS["unconstrained"]),
+        ("none", r"Unconstrained $\boldsymbol{\omega}$", COLORS["learned"]),
+    ]:
+        mask = df_sweep["omega_constraint"] == constraint_filter
+        df_filt = df_sweep[mask].copy()
+        if df_filt.empty:
+            continue
+
+        df_filt = (
+            df_filt.sort_values("val_nll_learned")
+            .groupby("tau", as_index=False)
+            .first()
+            .sort_values("tau")
+        )
+        tau_vals = df_filt["tau"].values
+        nll_vals = df_filt["val_nll_learned"].values
+        nll_std = np.zeros_like(nll_vals)
+
+        tau_vals, nll_vals, nll_std = _filter_diverged_taus(
+            tau_vals, nll_vals, nll_std, nll_std=nll_std
+        )
+
+        ax_kappa.plot(
+            tau_vals, nll_vals, "o-",
+            linewidth=2, markersize=5, color=color, label=label,
+        )
+
+        # Mark best kappa for this constraint
+        best_idx = np.argmin(nll_vals)
+        ax_kappa.scatter(
+            [tau_vals[best_idx]], [nll_vals[best_idx]],
+            s=150, c=color, marker="*", zorder=10,
+            edgecolors="black", linewidths=1,
+        )
+
+    # Baselines
+    ax_kappa.axhline(nll_knn_best, linestyle="--", linewidth=1.5, color=COLORS["knn"])
+    ax_kappa.axhline(nll_global, linestyle=":", linewidth=1.5, color=COLORS["global"])
+
+    ax_kappa.set_xlabel("κ (Kernel Bandwidth)")
+    ax_kappa.set_xscale("log")
+    ax_kappa.grid(True, alpha=0.3)
+
+    # Position legend top-left, just below the global baseline (grey line)
+    y_bot, y_top = ax_kappa.get_ylim()
+    y_below_global = (nll_global - y_bot) / (y_top - y_bot) - 0.05
+    ax_kappa.legend(loc="upper left", bbox_to_anchor=(0.02, y_below_global),
+                    )
+
+    # ax_kappa.text(0.02, 0.98, "(b)", transform=ax_kappa.transAxes,
+    #               fontsize=10, fontweight="bold", va="top")
+
+    plt.tight_layout()
+    _save_figure(fig, output_path)
+
+    return fig
+
+
+# ============================================================================
 # FIGURE 5: NLL Comparison Bar Chart (16D)
 # ============================================================================
 def fig5_nll_16d_comparison(
@@ -1114,7 +1327,6 @@ def fig5_nll_16d_comparison(
             f"{nll:.2f}",
             ha="center",
             va="bottom",
-            fontsize=8,
         )
 
     ax.set_ylabel("Validation NLL")
@@ -1376,7 +1588,7 @@ def fig6_calibration_curve(
     ax.set_xlim(0.75, 1.0)
     ax.set_ylim(0.75, 1.0)
     ax.set_aspect("equal", adjustable="box")
-    ax.legend(loc="lower right", fontsize=7)
+    ax.legend(loc="lower right")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -1485,7 +1697,7 @@ def fig6b_calibration_no_tolerance(
     ax.set_xlim(0.75, 1.0)
     ax.set_ylim(0.75, 1.0)
     ax.set_aspect("equal", adjustable="box")
-    ax.legend(loc="lower right", fontsize=7)
+    ax.legend(loc="lower right")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -1578,7 +1790,7 @@ def fig6c_calibration_points_only(
     ax.set_xlim(0.75, 1.0)
     ax.set_ylim(0.75, 1.0)
     ax.set_aspect("equal", adjustable="box")
-    ax.legend(loc="lower right", fontsize=7)
+    ax.legend(loc="lower right")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -1663,7 +1875,6 @@ def fig7_conformal_corrections(
             textcoords="offset points",
             xytext=(0, 8),
             ha="center",
-            fontsize=7,
         )
 
     ax.set_xlabel("Target Coverage (α)")
@@ -1773,7 +1984,6 @@ def fig7b_normalized_lower_bound(
             textcoords="offset points",
             xytext=(0, 8),
             ha="center",
-            fontsize=7,
         )
 
     ax.set_xlabel("Target Coverage (α)")
@@ -1902,14 +2112,184 @@ def fig7c_lower_bound_decomposition(
 
     # Total labels on top
     for i, tot in enumerate(totals):
-        ax.text(x[i], tot + 0.03, f"{tot:.2f}", ha="center", va="bottom", fontsize=7)
+        ax.text(x[i], tot + 0.03, f"{tot:.2f}", ha="center", va="bottom",
+                fontsize=FONT_SIZES_TWO_COL["small"])
 
     ax.set_xticks(x)
     ax.set_xticklabels([f"{a:.2f}" for a in alphas])
-    ax.set_xlabel("Target Coverage (α)")
-    ax.set_ylabel("Std. Deviations Below Mean")
-    ax.legend(fontsize=7, loc="upper left")
+    ax.set_xlabel("Target Coverage (α)", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax.set_ylabel("Std. Deviations Below Mean", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax.tick_params(labelsize=FONT_SIZES_TWO_COL["small"])
+    ax.legend(loc="upper left", fontsize=FONT_SIZES_TWO_COL["small"])
     ax.grid(axis="y", alpha=0.3)
+
+    plt.tight_layout()
+    _save_figure(fig, output_path)
+
+    return fig
+
+
+# ============================================================================
+# FIGURE 6c+7c Combined: Calibration + Lower Bound Decomposition
+# ============================================================================
+def fig6c7c_calibration_and_decomposition(
+    output_path: Path = None,
+    alpha_values: list[float] = None,
+) -> plt.Figure:
+    """
+    Two-panel figure combining calibration curve (left) and
+    lower-bound stacked-bar decomposition (right).
+
+    Shares a single data load and conformal training loop.
+    """
+    from conformal_prediction import train_wind_lower_model_conformal_binned
+    from data_processing import build_conformal_totals_df
+
+    if output_path is None:
+        output_path = OUTPUT_DIR / "figures" / "fig6c7c_calibration_decomposition"
+
+    if alpha_values is None:
+        alpha_values = [0.80, 0.85, 0.90, 0.95, 0.99]
+
+    # Load data (shared)
+    actuals = pd.read_parquet(ACTUALS_PARQUET)
+    forecasts = pd.read_parquet(
+        DATA_DIR / "forecasts_filtered_rts3_constellation_v1.parquet"
+    )
+    df_tot = build_conformal_totals_df(actuals, forecasts, value_col=ACTUAL_COL)
+
+    feature_cols = [
+        "ens_mean",
+        "ens_std",
+        "ens_min",
+        "ens_max",
+        "n_models",
+        "hour",
+        "dow",
+    ]
+
+    # Extract raw test-set ens_mean / ens_std (same split as conformal training)
+    df_sorted = df_tot.sort_values("TIME_HOURLY").reset_index(drop=True)
+    df_sorted = df_sorted[df_sorted["y"].notna()].reset_index(drop=True)
+    n_total = len(df_sorted)
+    n_test = int(0.25 * n_total)
+    test_start = n_total - n_test
+    ens_mean_test = df_sorted["ens_mean"].values[test_start:]
+    ens_std_test = df_sorted["ens_std"].values[test_start:]
+    valid = ens_std_test > 1e-6
+
+    # Train conformal models for each alpha (single loop for both panels)
+    calibration_results = []
+    decomposition_results = []
+    for alpha in alpha_values:
+        bundle, metrics, df_test = train_wind_lower_model_conformal_binned(
+            df_tot,
+            feature_cols=feature_cols,
+            target_col="y",
+            scale_col="ens_std",
+            alpha_target=float(alpha),
+            binning="y_pred",
+            n_bins=1,
+            cal_frac=0.35,
+        )
+
+        # Calibration data (fig6c)
+        calibration_results.append(
+            {
+                "alpha_target": float(alpha),
+                "coverage": float(metrics["coverage"]),
+            }
+        )
+
+        # Decomposition data (fig7c)
+        q_hat = bundle.q_hat_global_r
+        y_pred_base = df_test["y_pred_base"].values
+        base_component = float(
+            np.mean((ens_mean_test[valid] - y_pred_base[valid]) / ens_std_test[valid])
+        )
+        decomposition_results.append(
+            {
+                "alpha": alpha,
+                "base": base_component,
+                "conformal": q_hat,
+                "total": base_component + q_hat,
+            }
+        )
+        print(
+            f"    α={alpha:.2f}: coverage={metrics['coverage']:.3f}, "
+            f"base={base_component:.3f}, conformal={q_hat:.3f}, total={base_component + q_hat:.3f}"
+        )
+
+    # --- Two-panel figure ---
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(IEEE_TWO_COL_WIDTH, 2.8))
+
+    # --- Left panel: Calibration curve (fig6c) ---
+    alpha_targets = np.array([r["alpha_target"] for r in calibration_results])
+    coverages = np.array([r["coverage"] for r in calibration_results])
+
+    diag = np.linspace(0.75, 1.0, 100)
+    ax1.plot(diag, diag, "k--", linewidth=1.5, label="Perfect Calibration")
+    ax1.scatter(
+        alpha_targets,
+        coverages,
+        s=60,
+        c=COLORS["learned"],
+        marker="o",
+        edgecolors="black",
+        linewidths=1,
+        zorder=5,
+    )
+
+    ax1.set_xlabel("Target Coverage (α)", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax1.set_ylabel("Empirical Coverage", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax1.set_xlim(0.75, 1.0)
+    ax1.set_ylim(0.75, 1.0)
+    ax1.set_aspect("equal", adjustable="box")
+    ax1.legend(loc="lower right", fontsize=FONT_SIZES_TWO_COL["small"])
+    ax1.tick_params(labelsize=FONT_SIZES_TWO_COL["small"])
+    ax1.grid(True, alpha=0.3)
+
+    # --- Right panel: Stacked bar decomposition (fig7c) ---
+    alphas = [r["alpha"] for r in decomposition_results]
+    bases = [r["base"] for r in decomposition_results]
+    conforals = [r["conformal"] for r in decomposition_results]
+    totals = [r["total"] for r in decomposition_results]
+
+    x = np.arange(len(alphas))
+    width = 0.5
+
+    ax2.bar(
+        x,
+        bases,
+        width,
+        label="Base Quantile",
+        color=COLORS["knn"],
+        edgecolor="black",
+        linewidth=0.5,
+    )
+    ax2.bar(
+        x,
+        conforals,
+        width,
+        bottom=bases,
+        label="Conformal Correction",
+        color=COLORS["learned"],
+        edgecolor="black",
+        linewidth=0.5,
+    )
+
+    # Total labels on top
+    for i, tot in enumerate(totals):
+        ax2.text(x[i], tot + 0.03, f"{tot:.2f}", ha="center", va="bottom",
+                 fontsize=FONT_SIZES_TWO_COL["small"])
+
+    ax2.set_xticks(x)
+    ax2.set_xticklabels([f"{a:.2f}" for a in alphas])
+    ax2.set_xlabel("Target Coverage (α)", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax2.set_ylabel("Std. Deviations Below Mean", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax2.tick_params(labelsize=FONT_SIZES_TWO_COL["small"])
+    ax2.legend(loc="upper left", fontsize=FONT_SIZES_TWO_COL["small"])
+    ax2.grid(axis="y", alpha=0.3)
 
     plt.tight_layout()
     _save_figure(fig, output_path)
@@ -2014,9 +2394,9 @@ def fig8_ellipse_grid(
             ax.fill(ex, ey, alpha=0.2, color=colors[col])
             ax.scatter([mu2[0]], [mu2[1]], s=50, c="black", marker="o", zorder=5)
 
-            ax.set_xlabel(WIND_LABELS[dims[0]] + " (MW)", fontsize=7)
-            ax.set_ylabel(WIND_LABELS[dims[1]] + " (MW)", fontsize=7)
-            ax.set_title(k_labels[col], fontsize=8)
+            ax.set_xlabel(WIND_LABELS[dims[0]] + " (MW)")
+            ax.set_ylabel(WIND_LABELS[dims[1]] + " (MW)")
+            ax.set_title(k_labels[col])
             ax.tick_params(labelsize=6)
             ax.grid(True, alpha=0.3)
             ax.set_xlim(xlim_lo, xlim_hi)
@@ -2133,7 +2513,7 @@ def fig10_ellipse_overlay(
     ax.set_xlabel(WIND_LABELS[dims[0]])
     ax.set_ylabel(WIND_LABELS[dims[1]])
     # ax.set_title(...)  # caption in paper
-    ax.legend(fontsize=7, loc="upper right")
+    ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
     ax.set_aspect("equal", adjustable="datalim")
 
@@ -2249,7 +2629,8 @@ def fig10b_ellipse_overlay_two_hours(
     # Figure layout: square panels, width scales with panel count
     panel_size = 2.0  # inches per panel
     fig_w = panel_size * n_panels
-    fig, axes = plt.subplots(1, n_panels, figsize=(fig_w, panel_size))
+    fig, axes = plt.subplots(1, n_panels, figsize=(fig_w, panel_size),
+                             sharex=True, sharey=True)
 
     hour_specs = [
         (normal_sample_idx,  color_normal,  "Normal hour"),
@@ -2267,17 +2648,27 @@ def fig10b_ellipse_overlay_two_hours(
         # Single center dot at fixed artificial center
         ax.scatter([mu_common[0]], [mu_common[1]], s=30, c="black", marker="o", zorder=5)
 
-        ax.set_xlabel(WIND_LABELS[dims[0]] + " (MW)", fontsize=7)
         if col == 0:
-            ax.set_ylabel(WIND_LABELS[dims[1]] + " (MW)", fontsize=7)
-        ax.set_title(label, fontsize=8)
+            ax.set_ylabel(WIND_LABELS[dims[1]] + " (MW)")
+        ax.set_title(label)
         ax.tick_params(labelsize=6)
         ax.grid(True, alpha=0.3)
         ax.set_xlim(*xlim)
         ax.set_ylim(*ylim)
         ax.set_aspect("equal")
 
-    plt.tight_layout(pad=0.5, w_pad=0.8)
+    fig.supxlabel(WIND_LABELS[dims[0]] + " (MW)",
+                  fontsize=plt.rcParams.get("axes.labelsize", 10))
+
+    from matplotlib.lines import Line2D
+    hour_legend = [
+        Line2D([0], [0], color=color_normal, linewidth=1.5, label="Normal hour"),
+        Line2D([0], [0], color=color_extreme, linewidth=1.5, label="Extreme hour"),
+    ]
+    fig.legend(handles=hour_legend, loc="lower center", ncol=2, fontsize=7,
+               frameon=True, bbox_to_anchor=(0.5, -0.02))
+
+    plt.tight_layout(rect=[0.0, 0.08, 1.0, 1.0], pad=0.5, w_pad=0.8)
     _save_figure(fig, output_path)
 
     return fig
@@ -2381,7 +2772,7 @@ def fig11_tau_sweep_unconstrained(
     ax.set_xlabel("κ (Kernel Bandwidth)")
     ax.set_ylabel("Validation NLL")
     ax.set_xscale("log")
-    ax.legend(fontsize=7, loc="upper right")
+    ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -2798,7 +3189,7 @@ def fig_nll_heatmap(
             rasterized=True,
         )
         ax.set_xlabel(xlabel)
-        ax.set_title(title, fontsize=9)
+        ax.set_title(title)
         ax.grid(True, alpha=0.3)
 
     ax_left.set_ylabel(ylabel)
@@ -2806,7 +3197,7 @@ def fig_nll_heatmap(
 
     # Colorbar in its own axis — no overlap
     cbar = fig.colorbar(sc, cax=cax)
-    cbar.set_label("NLL (per point)", fontsize=8)
+    cbar.set_label("NLL (per point)")
     cbar.ax.tick_params(labelsize=7)
 
     _save_figure(fig, output_path)
@@ -3017,15 +3408,12 @@ def fig_nll_delta_surface(
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    ax.set_title(
-        f"ΔNLL (k-NN k={knn_k} − Learned ω)",
-        fontsize=9,
-    )
+    ax.set_title(f"ΔNLL (k-NN k={knn_k} − Learned ω)")
     ax.grid(True, alpha=0.2)
 
     # Colorbar
     cbar = fig.colorbar(cf, cax=cax)
-    cbar.set_label("ΔNLL  (blue = learned wins)", fontsize=8)
+    cbar.set_label("ΔNLL  (blue = learned wins)")
     cbar.ax.tick_params(labelsize=7)
 
     _save_figure(fig, output_path)
@@ -3102,7 +3490,7 @@ def generate_all_figures(use_residuals: bool = False):
     # Figure 1: Kernel distance comparison
     print("\n[1/15] Kernel distance comparison (Learned vs k-NN)...")
     try:
-        fig1_kernel_distance_comparison(k=64, tau=1.0)
+        fig1_kernel_distance_comparison(k=64)
         figures_generated.append("fig1_kernel_distance")
     except Exception as e:
         print(f"  Error: {e}")
@@ -3110,7 +3498,9 @@ def generate_all_figures(use_residuals: bool = False):
     # Figure 2: 3D ellipsoid (Learned, k-NN k=16, Global)
     print("\n[2/15] 3D ellipsoid comparison (Learned, k-NN, Global)...")
     try:
-        fig2_3d_ellipsoid_comparison(knn_k=16, tau=0.07)
+        fig2_3d_ellipsoid_comparison(knn_k=16, tau=0.07,
+                                     xlim=(0,15),ylim=(0,50),zlim=(0,100)
+                                     )
         figures_generated.append("fig2_ellipsoid_3d")
     except Exception as e:
         print(f"  Error: {e}")
@@ -3121,6 +3511,7 @@ def generate_all_figures(use_residuals: bool = False):
         fig2_3d_ellipsoid_comparison(
             knn_k=16,
             tau=0.07,
+            xlim=(0, 15), ylim=(0, 50), zlim=(0, 100),
             sample_idx=EXTREME_SAMPLE_IDX,
             output_path=OUTPUT_DIR / "figures" / "fig2_ellipsoid_3d_extreme",
         )
@@ -3128,27 +3519,41 @@ def generate_all_figures(use_residuals: bool = False):
     except Exception as e:
         print(f"  Error: {e}")
 
+    # Figure 2 2x2: normal + extreme rows with shared axis scales
+    # print("\n[2b/15] 3D ellipsoid comparison 2x2 (normal + extreme, shared axes)...")
+    # try:
+    #     fig2_3d_ellipsoid_comparison_2x2(knn_k=16, tau=0.07)
+    #     figures_generated.append("fig2_ellipsoid_3d_2x2")
+    # except Exception as e:
+    #     print(f"  Error: {e}")
+
     # Figure 3: NLL vs k
-    print("\n[3/15] NLL vs k sweep...")
-    try:
-        fig3_nll_vs_k()
-        figures_generated.append("fig3_nll_vs_k")
-    except Exception as e:
-        print(f"  Error: {e}")
+    # print("\n[3/15] NLL vs k sweep...")
+    # try:
+    #     fig3_nll_vs_k()
+    #     figures_generated.append("fig3_nll_vs_k")
+    # except Exception as e:
+    #     print(f"  Error: {e}")
 
     # Figure 4: NLL vs kappa
-    print("\n[4/15] NLL vs kappa sweep...")
-    try:
-        fig4_nll_vs_tau()
-        figures_generated.append("fig4_nll_vs_kappa")
-    except Exception as e:
-        print(f"  Error: {e}")
+    # print("\n[4/15] NLL vs kappa sweep...")
+    # try:
+    #     fig4_nll_vs_tau()
+    #     figures_generated.append("fig4_nll_vs_kappa")
+    # except Exception as e:
+    #     print(f"  Error: {e}")
 
     # Figure 3b+4b: Combined hyperparameter sweeps with baselines and shared y-axis
     print("\n[3b+4b] Hyperparameter sweeps with baselines (2-panel)...")
     try:
         fig3b_4b_hyperparameter_sweeps()
         figures_generated.append("fig3b_4b_hyperparameter_sweeps")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+    try:
+        fig3b_4b_hyperparameter_sweeps_combined()
+        figures_generated.append("fig3b_4b_hyperparameter_sweeps_combined")
     except Exception as e:
         print(f"  Error: {e}")
 
@@ -3199,6 +3604,14 @@ def generate_all_figures(use_residuals: bool = False):
     try:
         fig7c_lower_bound_decomposition()
         figures_generated.append("fig7c_lb_decomposition")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+    # Figure 6c+7c combined: Calibration + Decomposition (two-panel)
+    print("\n[7c+/15] Calibration + decomposition (two-panel)...")
+    try:
+        fig6c7c_calibration_and_decomposition()
+        figures_generated.append("fig6c7c_calibration_decomposition")
     except Exception as e:
         print(f"  Error: {e}")
 

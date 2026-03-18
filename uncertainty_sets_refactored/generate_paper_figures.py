@@ -98,7 +98,7 @@ def configure_residuals_mode(use_residuals: bool) -> None:
     KNN_SWEEP_DIR = VIZ_ARTIFACTS / f"knn_k_sweep{suffix}"
 
 # Anonymized wind resource labels (Y columns are sorted: 122, 309, 317)
-WIND_LABELS = {0: "Wind 1", 1: "Wind 2", 2: "Wind 3"}
+WIND_LABELS = {0: "W1", 1: "W2", 2: "W3"}
 
 # Extreme eval-set indices (high SYS_STD, far from centroid in mean/std space)
 # Found via standardized Euclidean distance from centroid of eval set
@@ -458,6 +458,7 @@ def fig2_3d_ellipsoid_comparison(
 
     # Use global mean as the common center for all ellipsoids
     Mu_common = Mu_global + offset
+    print(f"Global mean for plotting: {Mu_global}")
 
     # Use shared color scheme from plot_config
     color_global = COLORS["global"]

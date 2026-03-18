@@ -125,6 +125,99 @@ def save_line_flow_analysis(data, dispatch_arr, margin_df, label, out_dir):
 
 
 # ---------------------------------------------------------------------------
+# Reserve equivalent from LDR under worst-case total wind shortfall
+# ---------------------------------------------------------------------------
+
+def compute_reserve_equivalent(results, data, Sigma, rho):
+    """Compute per-generator reserve equivalent under worst-case total wind shortfall.
+
+    The worst-case direction that maximizes total wind shortfall over the
+    ellipsoid {r : r^T Sigma^{-1} r <= rho^2} is:
+
+        r_wc[t] = rho[t] * Sigma[t] @ e / sqrt(e^T Sigma[t] e)
+
+    The reserve equivalent for generator i at period t is then:
+
+        reserve_eq[i,t] = Z[i,t,:] @ r_wc[t,:]
+
+    Parameters
+    ----------
+    results : dict — must contain "Z" (DataFrame with MultiIndex columns (time, k))
+    data : DAMData
+    Sigma : (K, K) or (T, K, K) array — covariance matrices
+    rho : scalar or (T,) array — ellipsoid radii
+
+    Returns
+    -------
+    reserve_df : DataFrame (gen_ids x time) — per-generator reserve equivalent (MW)
+    stats : dict — summary statistics for inclusion in summary.json
+    """
+    Z_df = results["Z"]
+    gen_ids = data.gen_ids
+    time_labels = data.time
+    I = len(gen_ids)
+    T = len(time_labels)
+
+    # Normalize Sigma to (T, K, K)
+    if Sigma.ndim == 2:
+        Sigma_3d = np.broadcast_to(Sigma[None, :, :], (T, Sigma.shape[0], Sigma.shape[1]))
+    else:
+        Sigma_3d = Sigma
+
+    K = Sigma_3d.shape[1]
+
+    # Normalize rho to (T,)
+    rho_arr = np.atleast_1d(rho).astype(float)
+    if rho_arr.shape[0] == 1:
+        rho_arr = np.full(T, rho_arr[0])
+
+    # Compute worst-case deviation vector per period
+    ones = np.ones(K)
+    r_wc = np.zeros((T, K))
+    for t in range(T):
+        Se = Sigma_3d[t] @ ones
+        denom = np.sqrt(ones @ Se)
+        if denom > 1e-12:
+            r_wc[t] = rho_arr[t] * Se / denom
+
+    # Extract Z as (I, T, K) array from MultiIndex DataFrame
+    Z_arr = np.zeros((I, T, K))
+    for i in range(I):
+        for t in range(T):
+            t_label = time_labels[t]
+            for k in range(K):
+                col = (t_label, k)
+                if col in Z_df.columns:
+                    Z_arr[i, t, k] = Z_df.iloc[i][col]
+
+    # Reserve equivalent: Z[i,t,:] @ r_wc[t,:]
+    reserve_eq = np.einsum("itk,tk->it", Z_arr, r_wc)
+
+    reserve_df = pd.DataFrame(reserve_eq, index=gen_ids, columns=time_labels)
+
+    # Summary statistics
+    system_total = reserve_eq.sum(axis=0)  # (T,) — should sum to ~0 by power balance
+    thermal_mask = [gt == "THERMAL" for gt in data.gen_type]
+    thermal_total = reserve_eq[thermal_mask].sum(axis=0)  # (T,)
+    wind_mask = [gt.upper() == "WIND" for gt in data.gen_type]
+    wind_total = reserve_eq[wind_mask].sum(axis=0)
+
+    stats = {
+        "reserve_equivalent": {
+            "thermal_total_min_mw": round(float(thermal_total.min()), 2),
+            "thermal_total_max_mw": round(float(thermal_total.max()), 2),
+            "thermal_total_mean_mw": round(float(thermal_total.mean()), 2),
+            "wind_total_min_mw": round(float(wind_total.min()), 2),
+            "wind_total_max_mw": round(float(wind_total.max()), 2),
+            "wind_total_mean_mw": round(float(wind_total.mean()), 2),
+            "system_balance_max_abs_mw": round(float(np.abs(system_total).max()), 4),
+        },
+    }
+
+    return reserve_df, stats
+
+
+# ---------------------------------------------------------------------------
 # Output saving helpers
 # ---------------------------------------------------------------------------
 
@@ -204,8 +297,8 @@ def save_robust_outputs(results, data, out_dir, Sigma, rho,
     """Save standard robust model (ARUC/DARUC) outputs to a directory.
 
     Saves: commitment_u.csv, dispatch_p0.csv, Z_coefficients.csv,
-           Sigma.npy, rho.npy, summary.json, and optionally
-           deviation_summary.csv, line_margin.csv, Z_analysis.
+           reserve_equivalent.csv, Sigma.npy, rho.npy, summary.json,
+           and optionally deviation_summary.csv, line_margin.csv, Z_analysis.
 
     Parameters
     ----------
@@ -230,6 +323,13 @@ def save_robust_outputs(results, data, out_dir, Sigma, rho,
         analyze_z_fn(results["Z"], data, out_dir, rho=rho)
     if margin_df is not None:
         margin_df.to_csv(out_dir / "line_margin.csv")
+
+    # Reserve equivalent under worst-case total wind shortfall
+    reserve_df, reserve_stats = compute_reserve_equivalent(results, data, Sigma, rho)
+    reserve_df.to_csv(out_dir / "reserve_equivalent.csv")
+    if summary_dict is not None:
+        summary_dict.update(reserve_stats)
+
     if summary_dict is not None:
         with open(out_dir / "summary.json", "w") as f:
             json.dump(summary_dict, f, indent=2)

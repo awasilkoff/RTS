@@ -101,6 +101,16 @@ def extract_solution(
         "p": p_df,
         "obj": float(model.ObjVal),
     }
+
+    # Extract reserve variables if present (from DAM+Reserve model)
+    if "r" in vars_dict:
+        r = vars_dict["r"]
+        r_array = np.zeros((I, T), dtype=float)
+        for (i, t), var in r.items():
+            r_array[i, t] = var.X
+        r_df = pd.DataFrame(r_array, index=gen_ids, columns=time_labels)
+        results["r"] = r_df
+
     return results
 
 

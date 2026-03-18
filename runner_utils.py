@@ -240,11 +240,11 @@ def save_dam_outputs(results, out_dir, summary_dict=None,
     """Save DAM or DAM+Reserve outputs to a directory.
 
     Saves: commitment_u.csv, dispatch_p0.csv, summary.json,
-           and optionally reserve_requirement.npy.
+           and optionally reserve_requirement.npy and reserve_distribution.csv.
 
     Parameters
     ----------
-    results : dict with keys "u", dispatch_key, "obj"
+    results : dict with keys "u", dispatch_key, "obj", and optionally "r"
     out_dir : Path — directory to save to (must exist)
     summary_dict : dict, optional — metadata for summary.json
     reserve_R : array, optional — reserve requirement R[t]
@@ -254,6 +254,8 @@ def save_dam_outputs(results, out_dir, summary_dict=None,
     results[dispatch_key].to_csv(out_dir / "dispatch_p0.csv")
     if reserve_R is not None:
         np.save(out_dir / "reserve_requirement.npy", reserve_R)
+    if "r" in results:
+        results["r"].to_csv(out_dir / "reserve_distribution.csv")
     if summary_dict is not None:
         with open(out_dir / "summary.json", "w") as f:
             json.dump(summary_dict, f, indent=2)

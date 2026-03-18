@@ -466,7 +466,7 @@ def main():
     parser.add_argument("--provider-start", type=int, default=2448)
     parser.add_argument("--rho-lines-frac", type=float, default=None)
     parser.add_argument("--mip-gap", type=float, default=0.005)
-    parser.add_argument("--dispatch-cost-scale", type=float, default=0.1)
+    parser.add_argument("--dispatch-cost-scale", type=float, default=0.01)
     parser.add_argument("--day2-interval", type=int, default=2)
     parser.add_argument("--day1-only-robust", action="store_true", default=True)
     parser.add_argument("--no-day1-only-robust", dest="day1_only_robust", action="store_false")
@@ -483,7 +483,7 @@ def main():
     parser.add_argument("--reserve-ramp-multiplier", type=float, default=1.0,
                         help="Multiplier on reserve ramp-rate cap (RU*dt*mult). 0 to disable. Default: 1.0")
     parser.add_argument("--line-monitor-threshold", type=float, default=0.9)
-    parser.add_argument("--time-limit", type=float, default=6000)
+    parser.add_argument("--time-limit", type=float, default=60000)
     parser.add_argument("--threads", type=int, default=None)
     parser.add_argument("--bar-qcp-conv-tol", type=float, default=1e-4)
     parser.add_argument("--out-dir", type=str, default=None)
@@ -496,7 +496,7 @@ def main():
     if args.out_dir:
         out_dir = Path(args.out_dir)
     else:
-        tag = f"rho{args.rho}_{args.hours}h_m{args.start_month:02d}d{args.start_day:02d}"
+        tag = f"rho{args.rho}_{args.hours}h_m{args.start_month:02d}d{args.start_day:02d}_costscaled{args.dispatch_cost_scale}"
         out_dir = Path("reserve_then_daruc_outputs") / tag
 
     run_reserve_then_daruc(

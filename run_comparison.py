@@ -85,6 +85,7 @@ def main():
         "--enforce-lines",
         action="store_true",
         help="Enforce line flow limits (default: copperplate)",
+        default=True,
     )
     parser.add_argument(
         "--uncertainty-npz",
@@ -192,6 +193,7 @@ def main():
         "--with-reserve",
         action="store_true",
         help="Re-solve DAM with spinning reserve derived from uncertainty set (works with --uncertainty-npz or scalar --rho)",
+        default=True,
     )
     parser.add_argument(
         "--reserve-ramp-multiplier",
@@ -249,7 +251,7 @@ def main():
         if args.bar_qcp_conv_tol is None:
             args.bar_qcp_conv_tol = 1e-4
         if args.time_limit is None:
-            args.time_limit = 6000.0
+            args.time_limit = 60000.0
         if args.line_monitor_threshold is None and args.enforce_lines:
             args.line_monitor_threshold = 0.5
 

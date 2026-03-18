@@ -1294,12 +1294,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--multi-split",
         action="store_true",
+        default=True,
         help="Run multi-split sweep (multiple random seeds for train/val split)",
     )
     parser.add_argument(
         "--n-splits",
         type=int,
-        default=5,
+        default=30,
         help="Number of random train/val splits (for --multi-split)",
     )
     parser.add_argument(
@@ -1331,7 +1332,7 @@ if __name__ == "__main__":
 
     if args.multi_split:
         run_multi_split_k_sweep(
-            k_values=[8, 16, 32, 64, 128, 256, 512, 1024, 2048],
+            k_values=[12, 16, 32, 64, 128, 256, 512, 1024, 2048],
             n_splits=args.n_splits,
             feature_set=args.feature_set,
             use_residuals=args.use_residuals,
@@ -1341,7 +1342,7 @@ if __name__ == "__main__":
         )
     else:
         results, df_summary = run_knn_k_sweep(
-            k_values=[8, 16, 32, 64, 128, 256, 512, 1024, 2048],
+            k_values=[ 16, 32, 64, 128, 256, 512, 1024, 2048],
             output_subdir=output_subdir,
             dims=(0, 1),
             rho=2.0,

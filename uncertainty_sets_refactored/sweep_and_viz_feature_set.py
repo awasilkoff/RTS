@@ -897,7 +897,8 @@ def main():
     parser.add_argument(
         "--feature-set",
         type=str,
-        required=True,
+        # required=True,
+        default='focused_2d',
         choices=list(FEATURE_BUILDERS.keys()),
         help="Feature set to use",
     )
@@ -922,7 +923,7 @@ def main():
         nargs="+",
         type=float,
         default=[
-            0.01,
+            # 0.01,
             0.05,
             0.1,
             0.25,
@@ -932,7 +933,7 @@ def main():
             5.0,
             7.5,
             10.0,
-            20.0,
+            # 20.0,
         ],
         help="Tau values to sweep (finer at low tau where performance is better)",
     )
@@ -940,14 +941,14 @@ def main():
         "--omega-l2-regs",
         nargs="+",
         type=float,
-        default=[0.0, 0.01, 0.1, 1.0],
+        default=[0.0,],
         help="Omega L2 regularization values (only used when omega-constraint=none)",
     )
     parser.add_argument(
         "--omega-constraints",
         nargs="+",
         type=str,
-        default=["softmax"],
+        default=["none","softmax"],
         choices=["none", "softmax", "simplex", "normalize"],
         help="Omega constraint types to sweep: none (L2 reg), softmax (sum=1 via softmax), "
         "simplex (projected sum=1), normalize (post-hoc normalize)",

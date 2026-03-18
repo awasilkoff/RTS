@@ -132,15 +132,15 @@ Every North American RTO operates a reliability unit commitment
 process following the day-ahead market clearing.
 The Southwest Power Pool (SPP) runs a DARUC with a 48-hour
 look-ahead that may commit additional resources beyond the
-day-ahead market solution~[cite SPP market protocols].
+day-ahead market solution~\cite{spp2024protocols}.
 The Midcontinent ISO (MISO) executes a similar reliability
 assessment commitment (RAC) process to ensure resource adequacy
-over the next operating day~[cite MISO BPM-002].
+over the next operating day~\cite{miso2024bpm002}.
 CAISO's residual unit commitment (RUC) procures capacity to
 close any gap between day-ahead scheduled supply and the
-operator's demand forecast~[cite CAISO BPM].
+operator's demand forecast~\cite{caiso2024ruc}.
 PJM, NYISO, and ERCOT employ analogous processes under varying
-nomenclature~[cite PJM manual 11; NYISO OATT; ERCOT protocols].
+nomenclature~\cite{pjm2024manual11, nyiso2024oatt, ercot2024protocols}.
 
 Despite the ubiquity of these processes, their mathematical
 formulations are largely proprietary and vary considerably across
@@ -148,7 +148,7 @@ operators.
 FERC Order~2222 and subsequent technical conferences have drawn
 attention to the market impact of reliability commitments, noting
 that out-of-market actions can suppress energy prices and
-create uplift charges~[cite FERC].
+create uplift charges~\cite{ferc2020order2222}.
 The academic literature has given comparatively little attention
 to the formulation of the reliability commitment problem itself,
 typically treating it as a standard unit commitment solved
@@ -160,32 +160,32 @@ at each stage --- has received almost no formal treatment.
 \subsection{Robust and Stochastic Unit Commitment}
 
 The robust optimization approach to unit commitment was
-pioneered by Bertsimas et~al.~[cite Bertsimas 2012], who
+pioneered by Bertsimas et~al.~\cite{bertsimas2013adaptive}, who
 introduced a polyhedral uncertainty set for net load and solved
 the two-stage problem via Benders decomposition.
-Subsequent work by Jiang et~al.~[cite Jiang 2012] developed
+Subsequent work by Jiang et~al.~\cite{jiang2012robust} developed
 column-and-constraint generation methods that avoid the need for
 dual-based decomposition and demonstrated improved computational
 performance.
-Zhao and Guan~[cite Zhao Guan 2013] extended the framework to
+Zhao and Guan~\cite{zhao2013unified} extended the framework to
 multi-stage settings and established finite convergence results
 for the CCG procedure.
 
 Stochastic unit commitment provides an alternative treatment of
 uncertainty through scenario-based formulations.
-Papavasiliou et~al.~[cite Papavasiliou 2011] demonstrated the
+Papavasiliou et~al.~\cite{papavasiliou2013multiarea} demonstrated the
 value of stochastic optimization for wind integration, and
-Zheng et~al.~[cite Zheng 2015] developed decomposition methods
+Zheng et~al.~\cite{zheng2013decomposition} developed decomposition methods
 for large-scale stochastic UC problems.
 Distributionally robust approaches, which optimize over
 ambiguity sets of probability distributions, have been explored
-by Xiong et~al.~[cite Xiong 2017] and others.
+by Xiong et~al.~\cite{xiong2017distributionally} and others.
 
 Linear decision rules (LDR) provide a tractable approximation of
 the recourse policy in robust and adaptive optimization.
-Ben-Tal et~al.~[cite Ben-Tal 2004] established the affine
+Ben-Tal et~al.~\cite{bental2004adjustable} established the affine
 adjustable robust counterpart framework, and Lorca and
-Sun~[cite Lorca Sun 2016] applied LDR to unit commitment with
+Sun~\cite{lorca2016multistage, lorca2017robust} applied LDR to unit commitment with
 ellipsoidal uncertainty sets, obtaining second-order cone
 reformulations.
 The present work builds on the LDR-based robust UC framework
@@ -210,9 +210,8 @@ market efficiency.
 Reliability commitments that deviate from the market solution
 create make-whole payments (uplift) to committed generators,
 representing costs that are not reflected in locational marginal
-prices~[cite Hogan 2003; O'Neill 2005].
-The convex hull pricing literature~[cite Gribik 2007;
-Schiro 2016] has established that pricing in the presence of
+prices~\cite{hogan2003minimum, oneill2005efficient}.
+The convex hull pricing literature~\cite{gribik2007market, schiro2016convex} has established that pricing in the presence of
 non-convexities (including commitment decisions) cannot
 simultaneously achieve revenue adequacy and cost recovery without
 some form of side payment.
@@ -220,11 +219,11 @@ some form of side payment.
 Reducing the number of out-of-market commitments directly
 reduces the magnitude of uplift and improves the extent to which
 energy prices reflect the true marginal cost of supply.
-Andrianesis et~al.~[cite Andrianesis 2020] quantify the
+Andrianesis et~al.~\cite{andrianesis2022computation} quantify the
 relationship between commitment interventions and uplift in
 ISO-NE, finding that reliability commitments account for a
 substantial fraction of total uplift payments.
-Ela et~al.~[cite Ela 2011] analyze the operational and market
+Ela et~al.~\cite{ela2011operating} analyze the operational and market
 impacts of wind integration on commitment processes, noting that
 conservative commitment practices designed to hedge against
 renewable forecast errors contribute to over-commitment and
@@ -1010,7 +1009,7 @@ $s_t$ & Power balance slack \\
 \section*{Acknowledgment}
 The authors would like to thank\ldots
 
-%\bibliographystyle{IEEEtran}
-%\bibliography{IEEEabrv,../bib/paper}
+\bibliographystyle{IEEEtran}
+\bibliography{references}
 
 \end{document}

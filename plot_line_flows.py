@@ -1378,6 +1378,129 @@ def plot_reserve_per_unit(
     _save_figure(fig, out_dir / "fig_reserve_per_unit")
 
 
+def plot_reserve_network_map(
+    case_dir: Path,
+    out_dir: Path,
+    snapshot_hour: int = 16,
+):
+    """Two-panel network map showing per-bus reserve allocation at a snapshot hour.
+
+    Left panel: DAM+Reserve explicit reserves r[i,t].
+    Right panel: DARUC reserve equivalent from Z coefficients.
+
+    Circle size ∝ total reserve at each bus.  Wind buses shown as triangles
+    (negative reserve = curtailment) and thermals as circles (upward reserve).
+    """
+    from matplotlib.lines import Line2D
+
+    dam_r, daruc_eq, R_req, time_labels = load_reserve_data(case_dir)
+    bus, branch = load_network_topology()
+
+    # Find snapshot column
+    snap_cols = [c for c in time_labels if c.hour == snapshot_hour]
+    if not snap_cols:
+        hours = np.array([c.hour for c in time_labels])
+        closest_idx = int(np.argmin(np.abs(hours - snapshot_hour)))
+        snap_cols = [time_labels[closest_idx]]
+        print(f"  Hour {snapshot_hour}:00 not found, using {snap_cols[0]}")
+    snap_col = snap_cols[0]
+
+    # Aggregate per-bus reserves at snapshot
+    def _aggregate_bus(reserve_series):
+        """Group generator reserves by bus, return dict {bus_id: total_mw}."""
+        bus_reserve = {}
+        for gen_id, val in reserve_series.items():
+            bid = _gen_id_to_bus(gen_id)
+            bus_reserve[bid] = bus_reserve.get(bid, 0.0) + val
+        return bus_reserve
+
+    dam_bus = _aggregate_bus(dam_r[snap_col])
+    daruc_bus = _aggregate_bus(daruc_eq[snap_col])
+
+    # Shared scale: max across both panels for consistent sizing
+    all_vals = list(dam_bus.values()) + list(daruc_bus.values())
+    max_reserve = max(abs(v) for v in all_vals) if all_vals else 1.0
+
+    # Circle size scaling
+    S_MIN, S_MAX = 20, 600  # marker area range
+
+    def _reserve_size(mw):
+        frac = min(abs(mw) / max_reserve, 1.0) if max_reserve > 0 else 0
+        return S_MIN + (S_MAX - S_MIN) * frac
+
+    # Colors
+    C_THERMAL_UP = "#4682B4"   # blue — upward thermal reserve
+    C_WIND_DOWN = "#E07B39"    # orange — wind curtailment (downward)
+
+    fs = FONT_SIZES_TWO_COL
+
+    def _draw_reserve_panel(ax, bus_df, branch_df, bus_reserves, title):
+        """Draw one reserve map panel."""
+        _draw_base_network(ax, bus_df, branch_df)
+
+        for bid, mw in bus_reserves.items():
+            if bid not in bus_df.index:
+                continue
+            if abs(mw) < 0.5:
+                continue
+            bx = bus_df.loc[bid, "lng"]
+            by = bus_df.loc[bid, "lat"]
+            is_wind = bid in _WIND_BUSES
+            color = C_WIND_DOWN if is_wind else C_THERMAL_UP
+            marker = "v" if is_wind else "o"
+            sz = _reserve_size(mw)
+            ax.scatter(bx, by, s=sz, c=color, marker=marker, zorder=7,
+                       edgecolors="black", linewidths=0.5, alpha=0.85)
+
+            # Label buses with significant reserve (top ~5 thermal + all wind)
+            if abs(mw) > max_reserve * 0.15 or is_wind:
+                ax.annotate(
+                    f"{mw:.0f}", (bx, by),
+                    fontsize=fs["small"] - 2, fontweight="bold",
+                    color=color, ha="center", va="bottom",
+                    xytext=(0, 6), textcoords="offset points",
+                    bbox=dict(boxstyle="round,pad=0.1", fc="white",
+                              ec=color, alpha=0.8, lw=0.4),
+                    zorder=9,
+                )
+
+        _style_map_ax(ax, title)
+
+    fig, (ax1, ax2) = plt.subplots(
+        1, 2, figsize=(IEEE_TWO_COL_WIDTH, 4.0))
+
+    _draw_reserve_panel(ax1, bus, branch, dam_bus,
+                        f"DAM+Reserve (h{snapshot_hour:02d})")
+    _draw_reserve_panel(ax2, bus, branch, daruc_bus,
+                        f"DARUC equivalent (h{snapshot_hour:02d})")
+
+    # Shared legend
+    legend_elements = [
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=C_THERMAL_UP,
+               markeredgecolor="black", markersize=10,
+               label="Thermal upward reserve"),
+        Line2D([0], [0], marker="v", color="w", markerfacecolor=C_WIND_DOWN,
+               markeredgecolor="black", markersize=10,
+               label="Wind curtailment"),
+        Line2D([0], [0], marker="^", color="w", markerfacecolor="#2ca02c",
+               markeredgecolor="black", markersize=8, label="Wind bus"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="#999999",
+               markeredgecolor="none", markersize=5, label="Load bus"),
+    ]
+    fig.legend(handles=legend_elements, loc="lower center", ncol=4,
+               fontsize=fs["small"], bbox_to_anchor=(0.5, -0.02))
+
+    # Size reference annotation
+    ref_mw = round(max_reserve, -1)  # round to nearest 10
+    if ref_mw > 0:
+        fig.text(0.98, 0.01, f"(max circle = {ref_mw:.0f} MW)",
+                 fontsize=fs["small"] - 1, ha="right", va="bottom",
+                 style="italic", color="#666666")
+
+    fig.tight_layout(rect=[0, 0.05, 1, 1.0])
+    _save_figure(fig, out_dir / f"fig_reserve_map_h{snapshot_hour:02d}")
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -1461,6 +1584,12 @@ def main():
         plot_reserve_per_unit(case_dir, out_dir, snapshot_hour=args.reserve_hour)
     except FileNotFoundError as e:
         print(f"  Skipping per-unit reserve: {e}")
+
+    print(f"\nChart 9: Reserve network map (hour {args.reserve_hour})...")
+    try:
+        plot_reserve_network_map(case_dir, out_dir, snapshot_hour=args.reserve_hour)
+    except FileNotFoundError as e:
+        print(f"  Skipping reserve network map: {e}")
 
     print(f"\nDone. Figures saved to {out_dir}/")
 

@@ -190,8 +190,12 @@ def compute_reserve_equivalent(results, data, Sigma, rho):
                 if col in Z_df.columns:
                     Z_arr[i, t, k] = Z_df.iloc[i][col]
 
-    # Reserve equivalent: Z[i,t,:] @ r_wc[t,:]
-    reserve_eq = np.einsum("itk,tk->it", Z_arr, r_wc)
+    # Reserve equivalent: -Z[i,t,:] @ r_wc[t,:]
+    # Negated because the LDR is p(r) = p0 + Z @ r where r is wind shortfall
+    # (positive).  Thermal Z values are negative (they ramp UP to compensate),
+    # so -Z @ r_wc gives the positive upward reserve contribution for thermals
+    # and negative for wind (which loses output under shortfall).
+    reserve_eq = -np.einsum("itk,tk->it", Z_arr, r_wc)
 
     reserve_df = pd.DataFrame(reserve_eq, index=gen_ids, columns=time_labels)
 

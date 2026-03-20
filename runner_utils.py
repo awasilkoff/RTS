@@ -304,11 +304,11 @@ def compute_worst_case_total_shortfall_flows(
         # (Z ~identity -> -Z ~negative).
         #
         # The ARUC model's SOC constraints ensure p_wc ∈ [Pmin, Pmax]
-        # for the solved Z, but clamp for numerical safety.
+        # for the solved Z.  Do NOT clip here -- even tiny adjustments
+        # break sum_i Z[i,t,k] = 0 (power balance response) and create
+        # spurious line-flow violations.
         for t in range(T):
             p_wc[:, t] = p0_arr[:, t] - Z_arr[:, t, :] @ r_wc[t, :]
-        # Clamp to [0, Pmax]
-        np.clip(p_wc, 0.0, Pmax_2d, out=p_wc)
 
     elif r_arr is not None:
         # DAM+Reserve: no adaptive policy.

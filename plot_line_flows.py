@@ -1364,14 +1364,14 @@ def plot_reserve_per_unit(
     fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, fig_h))
 
     ax.barh(y_pos + bar_h / 2, dam_top.values, height=bar_h,
-            color=C_DAM, label="DAM+Res", edgecolor="white", linewidth=0.3)
+            color=C_DAM, label="DAM w/Res", edgecolor="white", linewidth=0.3)
     ax.barh(y_pos - bar_h / 2, daruc_top.values, height=bar_h,
             color=C_DARUC, label="DARUC", edgecolor="white", linewidth=0.3)
     ax.set_yticks(y_pos)
     ax.set_yticklabels(labels, fontsize=fs["small"] - 1)
     ax.set_xlabel("Reserve (MW)", fontsize=fs["medium"])
-    ax.set_title(f"Per-unit reserve at {snapshot_hour:02d}:00", fontsize=fs["large"])
-    ax.legend(fontsize=fs["small"], loc="lower right")
+    # ax.set_title(f"Per-unit reserve at {snapshot_hour:02d}:00", fontsize=fs["large"])
+    ax.legend(fontsize=fs["small"], loc="upper right")
     ax.tick_params(labelsize=fs["small"])
 
     fig.tight_layout()

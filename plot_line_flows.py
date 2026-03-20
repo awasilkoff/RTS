@@ -1132,6 +1132,182 @@ def plot_network_commitment_map(
 
 
 # ---------------------------------------------------------------------------
+# Chart 7: Reserve distribution comparison (DAM+Reserve vs DARUC)
+# ---------------------------------------------------------------------------
+
+def load_reserve_data(case_dir: Path):
+    """Load reserve distribution (DAM) and reserve equivalent (DARUC) CSVs.
+
+    Returns
+    -------
+    dam_r : DataFrame (gen_ids x day-1 times) — DAM+Reserve r[i,t]
+    daruc_eq : DataFrame (gen_ids x day-1 times) — DARUC reserve equivalent
+    R_req : (T_day1,) array — system reserve requirement per period
+    time_labels : list — day-1 column labels
+    """
+    dam_path = case_dir / "dam_reserve" / "reserve_distribution.csv"
+    daruc_path = case_dir / "daruc" / "reserve_equivalent.csv"
+    req_path = case_dir / "dam_reserve" / "reserve_requirement.npy"
+
+    for p in [dam_path, daruc_path, req_path]:
+        if not p.exists():
+            raise FileNotFoundError(f"Missing: {p}")
+
+    dam_r = pd.read_csv(dam_path, index_col=0, parse_dates=True)
+    daruc_eq = pd.read_csv(daruc_path, index_col=0, parse_dates=True)
+    R_req = np.load(req_path)
+
+    # Convert column labels to Timestamps for consistent matching
+    dam_r.columns = pd.to_datetime(dam_r.columns)
+    daruc_eq.columns = pd.to_datetime(daruc_eq.columns)
+
+    # Align to common generators and time columns
+    common_gens = dam_r.index.intersection(daruc_eq.index)
+    common_times = dam_r.columns.intersection(daruc_eq.columns)
+    dam_r = dam_r.loc[common_gens, common_times]
+    daruc_eq = daruc_eq.loc[common_gens, common_times]
+
+    # Restrict to day 1 (first 24 hourly periods)
+    t0 = common_times.min()
+    day1_cutoff = t0 + pd.Timedelta(hours=24)
+    day1_cols = [c for c in common_times if c < day1_cutoff]
+    dam_r = dam_r[day1_cols]
+    daruc_eq = daruc_eq[day1_cols]
+    R_req = R_req[:len(day1_cols)]
+
+    return dam_r, daruc_eq, R_req, day1_cols
+
+
+def plot_reserve_comparison(
+    case_dir: Path,
+    out_dir: Path,
+    snapshot_hour: int = 16,
+    top_n: int = 15,
+):
+    """Three-panel reserve distribution comparison: DAM+Reserve vs DARUC.
+
+    (a) System total reserve by period (day 1)
+    (b) Per-unit allocation at snapshot hour (top generators)
+    (c) Largest DARUC−DAM differences at snapshot hour
+    """
+    dam_r, daruc_eq, R_req, time_labels = load_reserve_data(case_dir)
+
+    # Colors
+    C_DAM = "#4682B4"
+    C_DARUC = "#E07B39"
+    C_REQ = "#808080"
+
+    # --- Find snapshot column ---
+    snap_cols = [c for c in time_labels if c.hour == snapshot_hour]
+    if not snap_cols:
+        # Fallback: closest hour
+        hours = np.array([c.hour for c in time_labels])
+        closest_idx = np.argmin(np.abs(hours - snapshot_hour))
+        snap_cols = [time_labels[closest_idx]]
+        print(f"  Hour {snapshot_hour}:00 not found, using {snap_cols[0]}")
+    snap_col = snap_cols[0]
+
+    # --- Hour labels for x-axis ---
+    x_hours = np.array([c.hour + c.minute / 60 for c in time_labels])
+
+    # --- Panel data ---
+    dam_thermal = dam_r.loc[(dam_r != 0).any(axis=1)]  # thermal rows only
+    # For DARUC, use only generators present in dam_thermal (thermals)
+    thermal_gens = dam_thermal.index
+    daruc_thermal = daruc_eq.loc[daruc_eq.index.isin(thermal_gens)]
+    # Align indices
+    common_thermal = thermal_gens.intersection(daruc_thermal.index)
+    dam_thermal = dam_thermal.loc[common_thermal]
+    daruc_thermal = daruc_thermal.loc[common_thermal]
+
+    dam_total = dam_thermal.sum(axis=0).values
+    daruc_total = daruc_thermal.sum(axis=0).values
+
+    # ===================================================================
+    # Build figure
+    # ===================================================================
+    fig, axes = plt.subplots(
+        1, 3,
+        figsize=(IEEE_TWO_COL_WIDTH * 1.4, 4.0),
+        gridspec_kw={"width_ratios": [3, 3, 3]},
+    )
+    fs = FONT_SIZES_TWO_COL
+
+    # --- (a) System total reserve by period ---
+    ax = axes[0]
+    ax.plot(x_hours, R_req, "--", color=C_REQ, linewidth=1.5, label="Requirement")
+    ax.plot(x_hours, dam_total, "-", color=C_DAM, linewidth=1.5, label="DAM+Res")
+    ax.plot(x_hours, daruc_total, "-", color=C_DARUC, linewidth=1.5, label="DARUC")
+    ax.axvline(snapshot_hour, color="k", linewidth=0.6, linestyle=":", alpha=0.5)
+    ax.set_xlabel("Hour", fontsize=fs["medium"])
+    ax.set_ylabel("Reserve (MW)", fontsize=fs["medium"])
+    ax.set_title("(a) System reserve by period", fontsize=fs["large"])
+    ax.legend(fontsize=fs["small"], loc="best")
+    ax.tick_params(labelsize=fs["small"])
+
+    # --- (b) Per-unit allocation at snapshot hour ---
+    ax = axes[1]
+    dam_snap = dam_thermal[snap_col].sort_values(ascending=True)
+    daruc_snap = daruc_thermal[snap_col].reindex(dam_snap.index)
+
+    # Top generators by max(dam, daruc)
+    combined_max = pd.concat([dam_snap.abs(), daruc_snap.abs()], axis=1).max(axis=1)
+    top_gens = combined_max.nlargest(top_n).index
+    dam_top = dam_snap.loc[top_gens].sort_values(ascending=True)
+    daruc_top = daruc_snap.loc[dam_top.index]
+
+    # Shorten labels
+    labels = [g[:14] for g in dam_top.index]
+    y_pos = np.arange(len(labels))
+    bar_h = 0.35
+
+    ax.barh(y_pos + bar_h / 2, dam_top.values, height=bar_h,
+            color=C_DAM, label="DAM+Res", edgecolor="white", linewidth=0.3)
+    ax.barh(y_pos - bar_h / 2, daruc_top.values, height=bar_h,
+            color=C_DARUC, label="DARUC", edgecolor="white", linewidth=0.3)
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(labels, fontsize=fs["small"] - 1)
+    ax.set_xlabel("Reserve (MW)", fontsize=fs["medium"])
+    ax.set_title(f"(b) Top units at {snapshot_hour:02d}:00", fontsize=fs["large"])
+    ax.legend(fontsize=fs["small"], loc="lower right")
+    ax.tick_params(labelsize=fs["small"])
+
+    # --- (c) Largest differences ---
+    ax = axes[2]
+    delta = daruc_thermal[snap_col] - dam_thermal[snap_col]
+    # Filter to meaningful differences
+    delta = delta[delta.abs() > 1.0].sort_values()
+
+    if len(delta) == 0:
+        ax.text(0.5, 0.5, "No significant\ndifferences",
+                transform=ax.transAxes, ha="center", va="center",
+                fontsize=fs["medium"])
+        ax.set_title(f"(c) DARUC\u2212DAM at {snapshot_hour:02d}:00", fontsize=fs["large"])
+    else:
+        # Show top differences (limit to reasonable number)
+        if len(delta) > 20:
+            # Keep top 10 positive and top 10 negative
+            top_pos = delta.nlargest(10)
+            top_neg = delta.nsmallest(10)
+            delta = pd.concat([top_neg, top_pos]).sort_values()
+
+        labels_c = [g[:14] for g in delta.index]
+        y_pos_c = np.arange(len(labels_c))
+        colors = [C_DARUC if v > 0 else C_DAM for v in delta.values]
+
+        ax.barh(y_pos_c, delta.values, color=colors, edgecolor="white", linewidth=0.3)
+        ax.axvline(0, color="k", linewidth=0.8)
+        ax.set_yticks(y_pos_c)
+        ax.set_yticklabels(labels_c, fontsize=fs["small"] - 1)
+        ax.set_xlabel("\u0394 Reserve (MW)", fontsize=fs["medium"])
+        ax.set_title(f"(c) DARUC\u2212DAM at {snapshot_hour:02d}:00", fontsize=fs["large"])
+        ax.tick_params(labelsize=fs["small"])
+
+    fig.tight_layout()
+    _save_figure(fig, out_dir / "fig_reserve_comparison")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -1152,6 +1328,10 @@ def main():
     parser.add_argument(
         "--z-threshold", type=float, default=0.001,
         help="Min |Z| to include a generator in Z matrix plots (default: 0.001)",
+    )
+    parser.add_argument(
+        "--reserve-hour", type=int, default=16,
+        help="Hour (0-23) for reserve comparison snapshot (default: 16)",
     )
     args = parser.parse_args()
 
@@ -1198,6 +1378,12 @@ def main():
         plot_z_matrix(case_dir, args.map_hour, out_dir, threshold=args.z_threshold)
     except FileNotFoundError as e:
         print(f"  Skipping Z matrix: {e}")
+
+    print(f"\nChart 7: Reserve comparison (hour {args.reserve_hour})...")
+    try:
+        plot_reserve_comparison(case_dir, out_dir, snapshot_hour=args.reserve_hour)
+    except FileNotFoundError as e:
+        print(f"  Skipping reserve comparison: {e}")
 
     print(f"\nDone. Figures saved to {out_dir}/")
 

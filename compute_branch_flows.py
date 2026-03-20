@@ -214,6 +214,105 @@ def find_line_violations(
     return violations
 
 
+def find_worst_case_line_violations(
+    data_full: DAMData,
+    p0_arr: np.ndarray,
+    Z_arr: np.ndarray,
+    robust_mask: np.ndarray,
+    sqrt_Sigma,
+    rho,
+    rho_lines_frac: float | None,
+    time_varying: bool,
+    viol_tol: float = 1.0,
+) -> list[tuple[int, int, float, float]]:
+    """Check all lines for worst-case flow violations under uncertainty.
+
+    For robust periods, the worst-case flow on line l at time t is:
+        |f_nom[l,t]| + rho_t * ||L_t^T @ a_t||
+    where a_t[k] = sum_n PTDF[l,n] * sum_{i at bus n} Z[i,t,k].
+
+    For non-robust periods, falls back to nominal flow check.
+
+    Parameters
+    ----------
+    data_full : DAMData
+        Full system data with all lines (unfiltered PTDF/Fmax).
+    p0_arr : np.ndarray
+        Nominal dispatch array (I, T) in MW.
+    Z_arr : np.ndarray
+        LDR coefficient array (I, T, K) in MW.
+    robust_mask : np.ndarray of bool, shape (T,)
+        Which periods have robust constraints.
+    sqrt_Sigma : np.ndarray
+        Cholesky factor(s). Shape (T,K,K) if time-varying, else (K,K).
+    rho : float or np.ndarray
+        Uncertainty radius. Scalar or (T,) if time-varying.
+    rho_lines_frac : float or None
+        If set, rho_lines = rho_lines_frac * rho.
+    time_varying : bool
+    viol_tol : float
+        Excess MW above Fmax to count as a violation.
+
+    Returns
+    -------
+    list of (line_idx, period, excess_MW, signed_flow_MW) tuples.
+        signed_flow_MW is the nominal flow direction (for binding-direction
+        constraint addition). excess_MW is the worst-case excess.
+    """
+    PTDF = data_full.PTDF  # (L, N)
+    Fmax = data_full.Fmax  # (L,)
+    gen_to_bus = data_full.gen_to_bus.astype(int)
+    N = data_full.n_buses
+    I, T = p0_arr.shape
+    L = PTDF.shape[0]
+
+    if rho_lines_frac is not None:
+        rho_lines = rho_lines_frac * rho
+    else:
+        rho_lines = rho
+
+    # Nominal flows: PTDF @ (gen_injection - load)
+    inj = np.zeros((N, T))
+    for i in range(I):
+        inj[gen_to_bus[i], :] += p0_arr[i, :]
+    inj -= data_full.d
+    flow_nom = PTDF @ inj  # (L, T)
+
+    # Z aggregated by bus: Z_bus[n, t, k] = sum_{i at bus n} Z[i, t, k]
+    K = Z_arr.shape[2]
+    Z_bus = np.zeros((N, T, K))
+    for i in range(I):
+        Z_bus[gen_to_bus[i], :, :] += Z_arr[i, :, :]
+
+    # Line sensitivity: a[l, t, k] = sum_n PTDF[l,n] * Z_bus[n,t,k]
+    # = PTDF @ Z_bus  reshaped appropriately
+    # PTDF is (L, N), Z_bus is (N, T, K) -> a is (L, T, K)
+    a = np.einsum("ln,ntk->ltk", PTDF, Z_bus)
+
+    violations = []
+    for l in range(L):
+        fmax_l = Fmax[l]
+        for t in range(T):
+            f_nom = flow_nom[l, t]
+            if robust_mask[t]:
+                # Worst-case margin: rho_t * ||L_t^T @ a[l,t,:]||
+                L_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma  # (K, K)
+                rho_t = float(rho_lines[t]) if time_varying else float(rho_lines)
+                # y = L^T @ a  -> ||y||
+                y = L_t.T @ a[l, t, :]  # (K,)
+                norm_y = np.linalg.norm(y)
+                # Worst case in positive direction: f_nom + rho_t * norm_y
+                # Worst case in negative direction: -f_nom + rho_t * norm_y
+                wc_pos = f_nom + rho_t * norm_y
+                wc_neg = -f_nom + rho_t * norm_y
+                excess = max(wc_pos - fmax_l, wc_neg - fmax_l)
+            else:
+                excess = abs(f_nom) - fmax_l
+            if excess > viol_tol:
+                violations.append((l, t, excess, f_nom))
+    return violations
+
+
 def iterative_line_resolve(
     model,
     vars_dict: dict,
@@ -285,15 +384,26 @@ def iterative_line_resolve(
 
     added_pairs: set[tuple[int, int]] = set()
 
-    for iteration in range(1, max_iter + 1):
-        # Extract p0 dispatch
+    def _extract_solution():
+        """Extract p0 and Z arrays from solved Gurobi variables."""
         p0_arr = np.zeros((I, T))
         for (i, t), var in p0.items():
             p0_arr[i, t] = var.X
+        Z_arr = np.zeros((I, T, K))
+        for (i, t, k), var in Z.items():
+            Z_arr[i, t, k] = var.X
+        return p0_arr, Z_arr
 
-        violations = find_line_violations(data_full, p0_arr, viol_tol)
+    for iteration in range(1, max_iter + 1):
+        p0_arr, Z_arr = _extract_solution()
+
+        # Check worst-case flows (nominal + uncertainty margin)
+        violations = find_worst_case_line_violations(
+            data_full, p0_arr, Z_arr, robust_mask,
+            sqrt_Sigma, rho, rho_lines_frac, time_varying, viol_tol,
+        )
         if not violations:
-            print(f"  [Line iter] No violations (tol={viol_tol} MW) — converged.")
+            print(f"  [Line iter] No worst-case violations (tol={viol_tol} MW) — converged.")
             return iteration - 1
 
         # Filter already-added pairs
@@ -303,9 +413,9 @@ def iterative_line_resolve(
                   f"already constrained — cannot resolve further.")
             return iteration
 
-        print(f"  [Line iter {iteration}] {len(new_viols)} new violated (line,period) pairs:")
+        print(f"  [Line iter {iteration}] {len(new_viols)} new worst-case violated (line,period) pairs:")
         for l, t, ex, fv in sorted(new_viols, key=lambda x: -x[2])[:10]:
-            print(f"    {data_full.line_ids[l]:<15} t={t:2d}  excess={ex:.1f} MW  flow={fv:+.1f}")
+            print(f"    {data_full.line_ids[l]:<15} t={t:2d}  wc_excess={ex:.1f} MW  nom_flow={fv:+.1f}")
         if len(new_viols) > 10:
             print(f"    ... and {len(new_viols) - 10} more")
 
@@ -316,10 +426,6 @@ def iterative_line_resolve(
         for l_full, t, _ex, flow_val in new_viols:
             added_pairs.add((l_full, t))
             tag = f"l{l_full}_t{t}"
-
-            # Binding direction: violations always have |flow| > Fmax,
-            # so we trust the sign to determine which side binds.
-            positive_binding = (flow_val >= 0)
 
             # Build flow_nom expression for this (l_full, t) using full PTDF
             flow_nom = gp.LinExpr()
@@ -371,15 +477,36 @@ def iterative_line_resolve(
                     name=f"soc_line_add_{tag}",
                 )
 
-                # Robust flow limit — binding direction only
-                if positive_binding:
+                # Determine which directions violate under worst case.
+                # wc_pos = f_nom + rho*||y|| can exceed +Fmax
+                # wc_neg = -f_nom + rho*||y|| can exceed +Fmax (i.e. f_nom - rho*||y|| < -Fmax)
+                # With uncertainty, both directions can bind even if nominal
+                # flow is small, so we check both and add both if needed.
+                Z_arr_lt = Z_arr[:, t, :]  # (I, K)
+                Z_bus_lt = np.zeros((N, K))
+                for ii in range(I):
+                    Z_bus_lt[gen_to_bus[ii], :] += Z_arr_lt[ii, :]
+                a_num = PTDF_full[l_full, :] @ Z_bus_lt  # (K,)
+                y_num = sqrt_Sigma_t.T @ a_num
+                norm_y = np.linalg.norm(y_num)
+                margin = rho_lines_t * norm_y
+
+                add_pos = (flow_val + margin > fmax_l + viol_tol)
+                add_neg = (-flow_val + margin > fmax_l + viol_tol)
+                if not add_pos and not add_neg:
+                    # Shouldn't happen (we detected a violation), add based on nominal
+                    add_pos = (flow_val >= 0)
+                    add_neg = not add_pos
+
+                if add_pos:
                     model.addConstr(flow_nom + rho_lines_t * z_var <= fmax_l,
                                     name=f"line_max_add_{tag}")
-                else:
+                if add_neg:
                     model.addConstr(-flow_nom + rho_lines_t * z_var <= fmax_l,
                                     name=f"line_min_add_{tag}")
             else:
-                # Nominal flow limit — binding direction only
+                # Nominal flow limit — add both directions since we're here
+                positive_binding = (flow_val >= 0)
                 if positive_binding:
                     model.addConstr(flow_nom <= fmax_l, name=f"line_max_add_{tag}")
                 else:
@@ -405,12 +532,13 @@ def iterative_line_resolve(
                 return iteration
 
     # Exhausted max_iter — final check
-    p0_arr = np.zeros((I, T))
-    for (i, t), var in p0.items():
-        p0_arr[i, t] = var.X
-    remaining = find_line_violations(data_full, p0_arr, viol_tol)
+    p0_arr, Z_arr = _extract_solution()
+    remaining = find_worst_case_line_violations(
+        data_full, p0_arr, Z_arr, robust_mask,
+        sqrt_Sigma, rho, rho_lines_frac, time_varying, viol_tol,
+    )
     if remaining:
-        print(f"  [Line iter] WARNING: {len(remaining)} violations remain after {max_iter} iterations")
+        print(f"  [Line iter] WARNING: {len(remaining)} worst-case violations remain after {max_iter} iterations")
     else:
         print(f"  [Line iter] Converged after {max_iter} iterations.")
     return max_iter

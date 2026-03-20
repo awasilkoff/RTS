@@ -222,6 +222,207 @@ def compute_reserve_equivalent(results, data, Sigma, rho):
 
 
 # ---------------------------------------------------------------------------
+# Worst-case total-shortfall line flows
+# ---------------------------------------------------------------------------
+
+def compute_worst_case_total_shortfall_flows(
+    data, p0_arr, Sigma, rho, Z_arr=None, r_arr=None,
+):
+    """Compute line flows under the worst-case total wind shortfall scenario.
+
+    Given the worst-case deviation vector:
+        r_wc[t] = rho[t] * Sigma[t] @ e / sqrt(e^T Sigma[t] e)
+
+    For DARUC/ARUC (Z_arr provided):
+        p_wc[i,t] = p0[i,t] + Z[i,t,:] @ r_wc[t,:]
+        (LDR adjusts all generators — thermals ramp up, wind curtails)
+
+    For DAM+Reserve (r_arr provided, no Z):
+        Wind loses: p_wc[wind_k,t] = p0[wind_k,t] - r_wc[t,k]
+        Thermals deploy: p_wc[i,t] = p0[i,t] + r[i,t] * R[t] / sum_j(r[j,t])
+        (Reserves deployed proportionally; may exceed sum -> capped to r[i,t])
+
+    Parameters
+    ----------
+    data : DAMData — must have PTDF, gen_to_bus, d, gen_type, Fmax
+    p0_arr : (I, T) array — nominal dispatch
+    Sigma : (K, K) or (T, K, K) — covariance
+    rho : scalar or (T,) — ellipsoid radii
+    Z_arr : (I, T, K) array or None — LDR coefficients (DARUC/ARUC)
+    r_arr : (I, T) array or None — explicit reserves (DAM+Reserve, thermal-only)
+
+    Returns
+    -------
+    dict with keys:
+        flow_nominal : (L, T) array — PTDF @ (p0 - load)
+        flow_wc : (L, T) array — PTDF @ (p_wc - load)
+        p_wc : (I, T) array — worst-case dispatch per generator
+        r_wc : (T, K) array — worst-case deviation vector
+        violations : list of (line_idx, period, excess_mw, flow_mw)
+    """
+    I, T = p0_arr.shape
+    is_wind = np.array([gt.upper() == "WIND" for gt in data.gen_type])
+    wind_idx = np.where(is_wind)[0]
+    K = len(wind_idx)
+
+    # Normalize Sigma/rho
+    if Sigma.ndim == 2:
+        Sigma_3d = np.broadcast_to(Sigma[None, :, :], (T, K, K))
+    else:
+        Sigma_3d = Sigma
+    rho_arr = np.atleast_1d(rho).astype(float)
+    if rho_arr.shape[0] == 1:
+        rho_arr = np.full(T, rho_arr[0])
+
+    # Compute worst-case deviation: r_wc[t] = rho[t] * Sigma[t] @ e / sqrt(e^T Sigma[t] e)
+    ones = np.ones(K)
+    r_wc = np.zeros((T, K))
+    R_total = np.zeros(T)
+    for t in range(T):
+        Se = Sigma_3d[t] @ ones
+        denom = np.sqrt(ones @ Se)
+        if denom > 1e-12:
+            r_wc[t] = rho_arr[t] * Se / denom
+            R_total[t] = rho_arr[t] * denom
+
+    # Compute worst-case dispatch
+    p_wc = p0_arr.copy()
+
+    # Pmax for clamping (handle both (I,) and (I,T) shapes)
+    Pmax = np.array(data.Pmax, dtype=float)
+    if Pmax.ndim == 1:
+        Pmax_2d = np.broadcast_to(Pmax[:, None], (I, T))
+    else:
+        Pmax_2d = Pmax
+
+    if Z_arr is not None:
+        # DARUC/ARUC: p_wc = p0 - Z @ r_wc
+        # The LDR is p(r) = p0 + Z @ r.  The worst-case total shortfall
+        # direction is r = -r_wc (wind produces less), so:
+        #   p_adjusted = p0 + Z @ (-r_wc) = p0 - Z @ r_wc
+        # Thermals go UP (Z negative -> -Z positive), wind goes DOWN
+        # (Z ~identity -> -Z ~negative).
+        #
+        # The ARUC model's SOC constraints ensure p_wc ∈ [Pmin, Pmax]
+        # for the solved Z.  Do NOT clip here -- even tiny adjustments
+        # break sum_i Z[i,t,k] = 0 (power balance response) and create
+        # spurious line-flow violations.
+        for t in range(T):
+            p_wc[:, t] = p0_arr[:, t] - Z_arr[:, t, :] @ r_wc[t, :]
+
+    elif r_arr is not None:
+        # DAM+Reserve: no adaptive policy.
+        #
+        # Wind curtailment matters: if wind is already dispatched below
+        # forecast (p0 < Pmax), the effective shortfall from dispatched
+        # level is less than r_wc.  Actual wind under worst case:
+        #   p_wc[wind_k] = max(0, Pmax[wind_k] - r_wc[k])
+        # but can't exceed what was dispatched (curtailed):
+        #   p_wc[wind_k] = min(p0[wind_k], max(0, Pmax[wind_k] - r_wc[k]))
+        # Effective reduction from dispatch:
+        #   delta_wind[k] = p0[wind_k] - p_wc[wind_k]
+        actual_net_shortfall = np.zeros(T)
+        for k, i in enumerate(wind_idx):
+            for t in range(T):
+                available_wc = max(0.0, Pmax_2d[i, t] - r_wc[t, k])
+                p_wc[i, t] = min(p0_arr[i, t], available_wc)
+                actual_net_shortfall[t] += p0_arr[i, t] - p_wc[i, t]
+
+        # Thermals deploy reserves proportionally to cover the actual
+        # net shortfall (which may be < R_total due to wind curtailment)
+        is_thermal = np.array([gt == "THERMAL" for gt in data.gen_type])
+        for t in range(T):
+            if actual_net_shortfall[t] < 1e-6:
+                continue
+            thermal_reserve_total = r_arr[is_thermal, t].sum()
+            if thermal_reserve_total < 1e-6:
+                continue
+            # Deploy just enough to cover actual shortfall
+            scale = min(actual_net_shortfall[t] / thermal_reserve_total, 1.0)
+            for i in np.where(is_thermal)[0]:
+                deployed = r_arr[i, t] * scale
+                p_wc[i, t] = min(p0_arr[i, t] + deployed, Pmax_2d[i, t])
+    else:
+        raise ValueError("Must provide either Z_arr (DARUC) or r_arr (DAM+Reserve)")
+
+    # Compute flows via PTDF
+    from compute_branch_flows import compute_branch_flows
+    flow_nom_df = compute_branch_flows(data, p0_arr)
+    flow_wc_df = compute_branch_flows(data, p_wc)
+
+    flow_nom = flow_nom_df.values
+    flow_wc = flow_wc_df.values
+    Fmax = data.Fmax
+
+    # Detect violations
+    violations = []
+    for l in range(len(Fmax)):
+        for t in range(T):
+            excess = abs(flow_wc[l, t]) - Fmax[l]
+            if excess > 1.0:
+                violations.append((l, t, excess, flow_wc[l, t]))
+
+    return {
+        "flow_nominal": flow_nom,
+        "flow_wc": flow_wc,
+        "p_wc": p_wc,
+        "r_wc": r_wc,
+        "R_total": R_total,
+        "violations": violations,
+    }
+
+
+def save_worst_case_flow_analysis(data, wc_result, label, out_dir):
+    """Save worst-case total-shortfall flow analysis CSV.
+
+    Columns: line, period, flow_nominal, flow_wc, Fmax,
+             loading_nominal_pct, loading_wc_pct, violation, excess_mw
+    """
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    flow_nom = wc_result["flow_nominal"]
+    flow_wc = wc_result["flow_wc"]
+    Fmax = data.Fmax
+    L, T = flow_nom.shape
+
+    rows = []
+    for l in range(L):
+        for t in range(T):
+            f_nom = flow_nom[l, t]
+            f_wc = flow_wc[l, t]
+            fmax = Fmax[l]
+            excess = max(abs(f_wc) - fmax, 0.0)
+            rows.append({
+                "line": data.line_ids[l],
+                "period": data.time[t],
+                "flow_nominal": round(f_nom, 2),
+                "flow_wc": round(f_wc, 2),
+                "Fmax": round(fmax, 2),
+                "loading_nominal_pct": round(abs(f_nom) / fmax * 100, 1) if fmax > 0 else 0.0,
+                "loading_wc_pct": round(abs(f_wc) / fmax * 100, 1) if fmax > 0 else 0.0,
+                "violation": abs(f_wc) > fmax + 1.0,
+                "excess_mw": round(excess, 2),
+            })
+
+    df = pd.DataFrame(rows)
+    fname = out_dir / f"worst_case_flow_analysis_{label}.csv"
+    df.to_csv(fname, index=False)
+
+    # Summary
+    viols = df[df["violation"]]
+    n_lines = viols["line"].nunique()
+    n_pairs = len(viols)
+    if n_pairs > 0:
+        print(f"  [{label}] {n_lines} lines violated ({n_pairs} line-period pairs), "
+              f"max excess {viols['excess_mw'].max():.1f} MW")
+    else:
+        print(f"  [{label}] No line violations under worst-case total shortfall")
+
+    return df
+
+
+# ---------------------------------------------------------------------------
 # Output saving helpers
 # ---------------------------------------------------------------------------
 

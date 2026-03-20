@@ -1467,7 +1467,7 @@ def plot_reserve_network_map(
         _style_map_ax(ax, title)
 
     fig, (ax1, ax2) = plt.subplots(
-        1, 2, figsize=(IEEE_TWO_COL_WIDTH, 4.0))
+        1, 2, figsize=(IEEE_TWO_COL_WIDTH*1.5, 4.0))
 
     _draw_reserve_panel(ax1, bus, branch, dam_bus,
                         f"DAM+Reserve (h{snapshot_hour:02d})")
@@ -1499,6 +1499,127 @@ def plot_reserve_network_map(
 
     fig.tight_layout(rect=[0, 0.05, 1, 1.0])
     _save_figure(fig, out_dir / f"fig_reserve_map_h{snapshot_hour:02d}")
+
+
+# ---------------------------------------------------------------------------
+# Chart 10: Worst-case total-shortfall line flows (DAM+Reserve vs DARUC)
+# ---------------------------------------------------------------------------
+
+def load_worst_case_flow_data(case_dir: Path, hour: int):
+    """Load worst-case flow analysis CSVs for DAM+Reserve and DARUC.
+
+    Returns (dam_hour, daruc_hour) DataFrames indexed by line UID,
+    or (None, None) if files are missing.
+    """
+    dam_path = case_dir / "dam_reserve" / "worst_case_flow_analysis_dam_reserve.csv"
+    daruc_path = case_dir / "daruc" / "worst_case_flow_analysis_daruc.csv"
+
+    results = []
+    for path in [dam_path, daruc_path]:
+        if not path.exists():
+            raise FileNotFoundError(f"Missing: {path}")
+        df = pd.read_csv(path, parse_dates=["period"])
+        hour_ts = _find_hour_ts(df, hour)
+        if hour_ts is None:
+            raise ValueError(f"Hour {hour} not found in {path.name}")
+        results.append(df[df["period"] == hour_ts].set_index("line"))
+
+    return results[0], results[1]
+
+
+def plot_worst_case_flow_map(
+    case_dir: Path,
+    out_dir: Path,
+    hour: int = 16,
+):
+    """Two-panel network map: line flows under worst-case total wind shortfall.
+
+    Left: DAM+Reserve (likely shows violations — no network-aware LDR).
+    Right: DARUC (should respect limits via adaptive Z).
+
+    Line thickness ∝ |flow| / Fmax.  Color: blue for normal loading,
+    red for violations (|flow| > Fmax).  Violated lines get labels
+    showing excess MW.
+    """
+    from matplotlib.lines import Line2D
+
+    dam_hour, daruc_hour = load_worst_case_flow_data(case_dir, hour)
+    bus, branch = load_network_topology()
+
+    fs = FONT_SIZES_TWO_COL
+
+    # Shared Fmax for consistent scaling
+    fmax_max = max(dam_hour["Fmax"].max(), daruc_hour["Fmax"].max())
+
+    C_NORMAL = "#4393c3"   # blue
+    C_VIOLATE = "#d62728"  # red
+
+    def _draw_wc_panel(ax, bus_df, branch_df, hour_data, title):
+        """Draw one worst-case flow panel."""
+        _draw_base_network(ax, bus_df, branch_df)
+
+        n_viols = 0
+        for uid in hour_data.index:
+            coords = _get_branch_coords(uid, branch_df, bus_df)
+            if coords is None:
+                continue
+            x, y = coords
+            row = hour_data.loc[uid]
+            fmax = row["Fmax"]
+            f_wc = row["flow_wc"]
+            abs_wc = abs(f_wc)
+            is_viol = bool(row["violation"])
+
+            loading = min(abs_wc / fmax, 1.5) if fmax > 0 else 0
+            lw = _LW_MIN + (_LW_MAX - _LW_MIN) * min(loading, 1.0)
+
+            color = C_VIOLATE if is_viol else C_NORMAL
+            alpha = max(0.3, min(loading, 1.0))
+
+            ax.plot(x, y, color=color, linewidth=lw, zorder=3,
+                    solid_capstyle="round", alpha=alpha)
+
+            if is_viol:
+                n_viols += 1
+                # Red halo
+                ax.plot(x, y, color=C_VIOLATE, linewidth=lw + 3,
+                        zorder=2, alpha=0.2)
+                excess = row["excess_mw"]
+                _label_binding(ax, x, y, uid, f"+{excess:.0f} MW")
+
+        _style_map_ax(ax, title)
+        return n_viols
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(IEEE_TWO_COL_WIDTH, 4.0))
+
+    n_dam = _draw_wc_panel(ax1, bus, branch, dam_hour,
+                           f"DAM+Reserve (h{hour:02d})")
+    n_daruc = _draw_wc_panel(ax2, bus, branch, daruc_hour,
+                             f"DARUC (h{hour:02d})")
+
+    # Subtitle with violation counts
+    fig.text(0.25, 0.97, f"{n_dam} violations" if n_dam else "No violations",
+             ha="center", fontsize=fs["small"],
+             color=C_VIOLATE if n_dam else "#2ca02c", fontweight="bold")
+    fig.text(0.75, 0.97, f"{n_daruc} violations" if n_daruc else "No violations",
+             ha="center", fontsize=fs["small"],
+             color=C_VIOLATE if n_daruc else "#2ca02c", fontweight="bold")
+
+    legend_elements = [
+        Line2D([0], [0], color=C_NORMAL, lw=4, label="Normal flow"),
+        Line2D([0], [0], color=C_VIOLATE, lw=4, label="Violation (|f| > Fmax)"),
+        Line2D([0], [0], color=C_VIOLATE, lw=5, alpha=0.2,
+               label="Violation halo"),
+        Line2D([0], [0], marker="^", color="w", markerfacecolor="#2ca02c",
+               markeredgecolor="black", markersize=8, label="Wind bus"),
+    ]
+    fig.legend(handles=legend_elements, loc="lower center", ncol=4,
+               fontsize=fs["small"], bbox_to_anchor=(0.5, -0.02))
+
+    fig.suptitle("Line flows under worst-case total wind shortfall",
+                 fontsize=fs["large"], y=1.02)
+    fig.tight_layout(rect=[0, 0.05, 1, 0.96])
+    _save_figure(fig, out_dir / f"fig_worst_case_flow_map_h{hour:02d}")
 
 
 # ---------------------------------------------------------------------------
@@ -1590,6 +1711,12 @@ def main():
         plot_reserve_network_map(case_dir, out_dir, snapshot_hour=args.reserve_hour)
     except FileNotFoundError as e:
         print(f"  Skipping reserve network map: {e}")
+
+    print(f"\nChart 10: Worst-case total-shortfall flow map (hour {args.reserve_hour})...")
+    try:
+        plot_worst_case_flow_map(case_dir, out_dir, hour=args.reserve_hour)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"  Skipping worst-case flow map: {e}")
 
     print(f"\nDone. Figures saved to {out_dir}/")
 

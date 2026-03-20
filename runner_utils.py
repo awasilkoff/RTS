@@ -288,44 +288,60 @@ def compute_worst_case_total_shortfall_flows(
     # Compute worst-case dispatch
     p_wc = p0_arr.copy()
 
+    # Pmax for clamping (handle both (I,) and (I,T) shapes)
+    Pmax = np.array(data.Pmax, dtype=float)
+    if Pmax.ndim == 1:
+        Pmax_2d = np.broadcast_to(Pmax[:, None], (I, T))
+    else:
+        Pmax_2d = Pmax
+
     if Z_arr is not None:
-        # DARUC/ARUC: p_wc = p0 + Z @ r_wc  (r_wc is wind shortfall, positive)
-        # Z for thermals is negative (they ramp up), Z for wind ~identity (they lose)
-        # The convention: r is the *reduction* in wind output, so
-        # p_wc[i,t] = p0[i,t] + Z[i,t,:] @ r_wc[t,:]
-        # For wind: Z[wind_k, t, k] ~ 1, so p_wc = p0 + r_wc (wrong direction)
-        # Actually: the LDR is p(r) = p0 + Z @ r where r is the deviation.
-        # Wind shortfall means wind produces LESS, so we want negative deviation.
-        # In the ARUC model, r represents the actual deviation (can be +/-),
-        # and the worst-case for total shortfall is r = -r_wc (negative).
-        # But compute_reserve_equivalent uses r_wc as positive shortfall and
-        # negates: reserve_eq = -Z @ r_wc.
+        # DARUC/ARUC: p_wc = p0 - Z @ r_wc
+        # The LDR is p(r) = p0 + Z @ r.  The worst-case total shortfall
+        # direction is r = -r_wc (wind produces less), so:
+        #   p_adjusted = p0 + Z @ (-r_wc) = p0 - Z @ r_wc
+        # Thermals go UP (Z negative -> -Z positive), wind goes DOWN
+        # (Z ~identity -> -Z ~negative).
         #
-        # For flows: p_adjusted = p0 + Z @ (-r_wc) = p0 - Z @ r_wc
-        # This makes thermals go UP (Z negative, so -Z positive) and wind go
-        # DOWN (Z positive/identity, so -Z negative). Correct!
+        # The ARUC model's SOC constraints ensure p_wc ∈ [Pmin, Pmax]
+        # for the solved Z, but clamp for numerical safety.
         for t in range(T):
             p_wc[:, t] = p0_arr[:, t] - Z_arr[:, t, :] @ r_wc[t, :]
+        # Clamp to [0, Pmax]
+        np.clip(p_wc, 0.0, Pmax_2d, out=p_wc)
 
     elif r_arr is not None:
-        # DAM+Reserve: no adaptive policy, deploy reserves proportionally
-        # Wind loses output per its share of r_wc
+        # DAM+Reserve: no adaptive policy.
+        #
+        # Wind curtailment matters: if wind is already dispatched below
+        # forecast (p0 < Pmax), the effective shortfall from dispatched
+        # level is less than r_wc.  Actual wind under worst case:
+        #   p_wc[wind_k] = max(0, Pmax[wind_k] - r_wc[k])
+        # but can't exceed what was dispatched (curtailed):
+        #   p_wc[wind_k] = min(p0[wind_k], max(0, Pmax[wind_k] - r_wc[k]))
+        # Effective reduction from dispatch:
+        #   delta_wind[k] = p0[wind_k] - p_wc[wind_k]
+        actual_net_shortfall = np.zeros(T)
         for k, i in enumerate(wind_idx):
             for t in range(T):
-                p_wc[i, t] = p0_arr[i, t] - r_wc[t, k]
+                available_wc = max(0.0, Pmax_2d[i, t] - r_wc[t, k])
+                p_wc[i, t] = min(p0_arr[i, t], available_wc)
+                actual_net_shortfall[t] += p0_arr[i, t] - p_wc[i, t]
 
-        # Thermals deploy reserves proportionally to cover the total shortfall
+        # Thermals deploy reserves proportionally to cover the actual
+        # net shortfall (which may be < R_total due to wind curtailment)
         is_thermal = np.array([gt == "THERMAL" for gt in data.gen_type])
         for t in range(T):
-            if R_total[t] < 1e-6:
+            if actual_net_shortfall[t] < 1e-6:
                 continue
             thermal_reserve_total = r_arr[is_thermal, t].sum()
             if thermal_reserve_total < 1e-6:
                 continue
-            # Scale factor: deploy just enough to cover total shortfall
-            scale = min(R_total[t] / thermal_reserve_total, 1.0)
+            # Deploy just enough to cover actual shortfall
+            scale = min(actual_net_shortfall[t] / thermal_reserve_total, 1.0)
             for i in np.where(is_thermal)[0]:
-                p_wc[i, t] = p0_arr[i, t] + r_arr[i, t] * scale
+                deployed = r_arr[i, t] * scale
+                p_wc[i, t] = min(p0_arr[i, t] + deployed, Pmax_2d[i, t])
     else:
         raise ValueError("Must provide either Z_arr (DARUC) or r_arr (DAM+Reserve)")
 

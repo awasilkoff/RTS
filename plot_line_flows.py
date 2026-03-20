@@ -251,7 +251,7 @@ def plot_flow_decomposition(
 
     rec_df = pd.DataFrame(records).sort_values("wc_loading", ascending=True)
 
-    fig, ax = plt.subplots(figsize=(IEEE_TWO_COL_WIDTH, max(2.5, len(lines) * 0.6 + 1)))
+    fig, ax = plt.subplots(figsize=(IEEE_TWO_COL_WIDTH, max(2.0, len(lines) * 0.4 + 0.8)))
 
     y_pos = range(len(rec_df))
     bar_labels = [f"{r['line']} (h{r['hour']})" for _, r in rec_df.iterrows()]
@@ -276,14 +276,14 @@ def plot_flow_decomposition(
     ax.scatter(
         rec_df["dam_nominal_abs"], y_pos,
         marker="D", s=50, c="#2166ac", edgecolors="black", linewidths=0.5,
-        zorder=4, label="DAM+Res |nominal|",
+        zorder=4, label="DAM w/ Res |nominal|",
     )
 
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(bar_labels, fontsize=FONT_SIZES_TWO_COL["small"])
-    ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax.set_yticklabels(bar_labels, fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["large"])
 
-    ax.legend(loc="upper right", fontsize=FONT_SIZES_TWO_COL["small"])
+    ax.legend(loc="upper right", fontsize=FONT_SIZES_TWO_COL["medium"])
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
 
     fig.tight_layout()
@@ -344,7 +344,7 @@ def plot_flow_decomposition_hour(
     rec_df = rec_df.iloc[::-1].reset_index(drop=True)
 
     n = len(rec_df)
-    fig, ax = plt.subplots(figsize=(IEEE_TWO_COL_WIDTH, max(3, n * 0.35 + 1.5)))
+    fig, ax = plt.subplots(figsize=(IEEE_TWO_COL_WIDTH, max(2.0, n * 0.28 + 0.8)))
 
     y_pos = np.arange(n)
 
@@ -360,19 +360,19 @@ def plot_flow_decomposition_hour(
 
     ax.scatter(rec_df["dam_nominal_abs"], y_pos,
                marker="D", s=40, c="#2166ac", edgecolors="black", linewidths=0.4,
-               zorder=4, label="DAM+Res |nominal|")
+               zorder=4, label="DAM w/ Res |nominal|")
 
     labels = rec_df["line"].tolist()
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(labels, fontsize=FONT_SIZES_TWO_COL["small"])
+    ax.set_yticklabels(labels, fontsize=FONT_SIZES_TWO_COL["medium"])
     for i, (_, row) in enumerate(rec_df.iterrows()):
         if row["binding"]:
             ax.get_yticklabels()[i].set_color("#b2182b")
             ax.get_yticklabels()[i].set_fontweight("bold")
 
-    ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["large"])
 
-    ax.legend(loc="upper right", fontsize=FONT_SIZES_TWO_COL["small"])
+    ax.legend(loc="upper right", fontsize=FONT_SIZES_TWO_COL["medium"])
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
 
     fig.tight_layout()
@@ -424,7 +424,7 @@ def plot_flow_decomposition_binding(
     rec_df = pd.DataFrame(records).sort_values("wc_loading", ascending=True).reset_index(drop=True)
 
     n = len(rec_df)
-    fig, ax = plt.subplots(figsize=(IEEE_TWO_COL_WIDTH, max(2.5, n * 0.55 + 1.5)))
+    fig, ax = plt.subplots(figsize=(IEEE_TWO_COL_WIDTH, max(2.0, n * 0.4 + 0.8)))
     y_pos = np.arange(n)
 
     ax.barh(y_pos, rec_df["nominal_abs"], height=0.6,
@@ -439,19 +439,19 @@ def plot_flow_decomposition_binding(
 
     ax.scatter(rec_df["dam_wc_abs"], y_pos,
                marker="D", s=50, c="#2166ac", edgecolors="black", linewidths=0.5,
-               zorder=4, label="DAM+Res worst-case")
+               zorder=4, label="DAM w/ Res worst-case")
 
     labels = rec_df["line"].tolist()
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(labels, fontsize=FONT_SIZES_TWO_COL["small"])
+    ax.set_yticklabels(labels, fontsize=FONT_SIZES_TWO_COL["medium"])
     for i, (_, row) in enumerate(rec_df.iterrows()):
         if row["binding"]:
             ax.get_yticklabels()[i].set_color("#b2182b")
             ax.get_yticklabels()[i].set_fontweight("bold")
 
-    ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["large"])
 
-    ax.legend(loc="upper right", fontsize=FONT_SIZES_TWO_COL["small"])
+    ax.legend(loc="upper right", fontsize=FONT_SIZES_TWO_COL["medium"])
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
 
     fig.tight_layout()

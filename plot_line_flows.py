@@ -1311,6 +1311,73 @@ def plot_reserve_comparison(
     _save_figure(fig, out_dir / "fig_reserve_comparison")
 
 
+def plot_reserve_per_unit(
+    case_dir: Path,
+    out_dir: Path,
+    snapshot_hour: int = 16,
+    top_n: int = 15,
+):
+    """Single-column per-unit reserve allocation chart (DAM+Reserve vs DARUC).
+
+    Standalone version of panel (b) from plot_reserve_comparison.
+    """
+    dam_r, daruc_eq, _R_req, time_labels = load_reserve_data(case_dir)
+    fs = FONT_SIZES  # single-column sizes
+
+    # Colors
+    C_DAM = "#4682B4"
+    C_DARUC = "#E07B39"
+
+    # Find snapshot column
+    snap_cols = [c for c in time_labels if c.hour == snapshot_hour]
+    if not snap_cols:
+        hours = np.array([c.hour for c in time_labels])
+        closest_idx = np.argmin(np.abs(hours - snapshot_hour))
+        snap_cols = [time_labels[closest_idx]]
+        print(f"  Hour {snapshot_hour}:00 not found, using {snap_cols[0]}")
+    snap_col = snap_cols[0]
+
+    # Thermal generators only (non-zero in DAM reserve)
+    dam_thermal = dam_r.loc[(dam_r != 0).any(axis=1)]
+    thermal_gens = dam_thermal.index
+    daruc_thermal = daruc_eq.loc[daruc_eq.index.isin(thermal_gens)]
+    common_thermal = thermal_gens.intersection(daruc_thermal.index)
+    dam_thermal = dam_thermal.loc[common_thermal]
+    daruc_thermal = daruc_thermal.loc[common_thermal]
+
+    # Snapshot values
+    dam_snap = dam_thermal[snap_col].sort_values(ascending=True)
+    daruc_snap = daruc_thermal[snap_col].reindex(dam_snap.index)
+
+    # Top generators by max(dam, daruc)
+    combined_max = pd.concat([dam_snap.abs(), daruc_snap.abs()], axis=1).max(axis=1)
+    top_gens = combined_max.nlargest(top_n).index
+    dam_top = dam_snap.loc[top_gens].sort_values(ascending=True)
+    daruc_top = daruc_snap.loc[dam_top.index]
+
+    # Shorten labels
+    labels = [g[:14] for g in dam_top.index]
+    y_pos = np.arange(len(labels))
+    bar_h = 0.35
+
+    fig_h = max(3.0, len(labels) * 0.32 + 1.2)
+    fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, fig_h))
+
+    ax.barh(y_pos + bar_h / 2, dam_top.values, height=bar_h,
+            color=C_DAM, label="DAM+Res", edgecolor="white", linewidth=0.3)
+    ax.barh(y_pos - bar_h / 2, daruc_top.values, height=bar_h,
+            color=C_DARUC, label="DARUC", edgecolor="white", linewidth=0.3)
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(labels, fontsize=fs["small"] - 1)
+    ax.set_xlabel("Reserve (MW)", fontsize=fs["medium"])
+    ax.set_title(f"Per-unit reserve at {snapshot_hour:02d}:00", fontsize=fs["large"])
+    ax.legend(fontsize=fs["small"], loc="lower right")
+    ax.tick_params(labelsize=fs["small"])
+
+    fig.tight_layout()
+    _save_figure(fig, out_dir / "fig_reserve_per_unit")
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -1388,6 +1455,12 @@ def main():
         plot_reserve_comparison(case_dir, out_dir, snapshot_hour=args.reserve_hour)
     except FileNotFoundError as e:
         print(f"  Skipping reserve comparison: {e}")
+
+    print(f"\nChart 8: Per-unit reserve allocation (hour {args.reserve_hour})...")
+    try:
+        plot_reserve_per_unit(case_dir, out_dir, snapshot_hour=args.reserve_hour)
+    except FileNotFoundError as e:
+        print(f"  Skipping per-unit reserve: {e}")
 
     print(f"\nDone. Figures saved to {out_dir}/")
 

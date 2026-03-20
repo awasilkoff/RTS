@@ -1467,7 +1467,7 @@ def plot_reserve_network_map(
         _style_map_ax(ax, title)
 
     fig, (ax1, ax2) = plt.subplots(
-        1, 2, figsize=(IEEE_TWO_COL_WIDTH, 4.0))
+        1, 2, figsize=(IEEE_TWO_COL_WIDTH*1.5, 4.0))
 
     _draw_reserve_panel(ax1, bus, branch, dam_bus,
                         f"DAM+Reserve (h{snapshot_hour:02d})")

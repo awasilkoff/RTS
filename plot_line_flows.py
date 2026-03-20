@@ -1157,6 +1157,10 @@ def load_reserve_data(case_dir: Path):
     daruc_eq = pd.read_csv(daruc_path, index_col=0, parse_dates=True)
     R_req = np.load(req_path)
 
+    # Ensure RUC reserve equivalent is positive for upward response.
+    # Old CSVs may have wrong sign (Z @ r_wc instead of -Z @ r_wc).
+    daruc_eq = daruc_eq.abs()
+
     # Convert column labels to Timestamps for consistent matching
     dam_r.columns = pd.to_datetime(dam_r.columns)
     daruc_eq.columns = pd.to_datetime(daruc_eq.columns)

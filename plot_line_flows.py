@@ -1824,6 +1824,9 @@ def main():
     print(f"\nChart 3c: Flow decomposition — binding lines (hour {args.map_hour})...")
     plot_flow_decomposition_binding(dam_raw, daruc_raw, binding_lines, args.map_hour, out_dir)
 
+    print(f"\nChart 3d: Flow decomposition — binding-only lines (hour {args.map_hour})...")
+    plot_flow_decomposition_binding_only(dam_raw, daruc_raw, args.map_hour, out_dir)
+
     print(f"\nChart 4: Network maps (hour {args.map_hour}) — 3 options...")
     plot_network_maps(dam_raw, daruc_raw, args.map_hour, out_dir)
 

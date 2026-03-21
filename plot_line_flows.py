@@ -458,6 +458,85 @@ def plot_flow_decomposition_binding(
     _save_figure(fig, out_dir / f"fig_flow_decomp_binding_h{hour:02d}")
 
 
+def plot_flow_decomposition_binding_only(
+    dam_raw: pd.DataFrame,
+    daruc_raw: pd.DataFrame,
+    hour: int,
+    out_dir: Path,
+):
+    """Stacked bar decomposition at a specific hour, restricted to lines binding in DARUC at that hour."""
+    hour_ts = _find_hour_ts(dam_raw, hour)
+    if hour_ts is None:
+        print(f"  WARNING: hour {hour} not found, skipping binding-only decomposition")
+        return
+
+    daruc_h = daruc_raw[daruc_raw["period"] == hour_ts].copy()
+    # Keep only lines that are actually binding at this hour
+    daruc_h = daruc_h[daruc_h["binding"]].copy()
+
+    if daruc_h.empty:
+        print(f"  No binding lines in DARUC at hour {hour}")
+        return
+
+    binding_lines = daruc_h["line"].unique().tolist()
+    dam_h = dam_raw[
+        (dam_raw["period"] == hour_ts) & (dam_raw["line"].isin(binding_lines))
+    ].copy()
+    dam_lookup = dam_h.set_index("line")
+
+    records = []
+    for _, row in daruc_h.iterrows():
+        line = row["line"]
+        dam_nom = abs(dam_lookup.loc[line, "flow_nominal"]) if line in dam_lookup.index else 0
+        dam_wc = dam_lookup.loc[line, "worst_case_abs_flow"] if line in dam_lookup.index else dam_nom
+        records.append({
+            "line": line,
+            "nominal_abs": abs(row["flow_nominal"]),
+            "margin": row["margin_rho_norm"],
+            "Fmax": row["Fmax"],
+            "dam_nominal_abs": dam_nom,
+            "dam_wc_abs": dam_wc,
+            "wc_loading": row["loading_worst_case_pct"],
+        })
+
+    rec_df = pd.DataFrame(records).sort_values("wc_loading", ascending=True).reset_index(drop=True)
+
+    n = len(rec_df)
+    fig, ax = plt.subplots(figsize=(IEEE_TWO_COL_WIDTH, max(2.5, n * 0.55 + 1.5)))
+    y_pos = np.arange(n)
+
+    ax.barh(y_pos, rec_df["nominal_abs"], height=0.6,
+            color="#4393c3", label="DARUC |nominal|", zorder=2)
+    ax.barh(y_pos, rec_df["margin"], height=0.6,
+            left=rec_df["nominal_abs"].values,
+            color="#e08060", label="DARUC robust margin", zorder=2)
+
+    ax.barh(y_pos, rec_df["Fmax"], height=0.65,
+            color="none", edgecolor="black", linewidth=1.0,
+            label="Fmax", zorder=3)
+
+    ax.scatter(rec_df["dam_wc_abs"], y_pos,
+               marker="D", s=50, c="#2166ac", edgecolors="black", linewidths=0.5,
+               zorder=4, label="DAM w/Res worst-case")
+
+    labels = rec_df["line"].tolist()
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(labels, fontsize=FONT_SIZES_TWO_COL["small"])
+    # All lines are binding, highlight them all
+    for tick in ax.get_yticklabels():
+        tick.set_color("#b2182b")
+        tick.set_fontweight("bold")
+
+    ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["medium"])
+    ax.set_title(f"Binding Lines — Hour {hour}", fontsize=FONT_SIZES_TWO_COL["large"])
+
+    ax.legend(loc="upper right", fontsize=FONT_SIZES_TWO_COL["small"])
+    ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
+
+    fig.tight_layout()
+    _save_figure(fig, out_dir / f"fig_flow_decomp_binding_only_h{hour:02d}")
+
+
 def _find_hour_ts(df, hour):
     """Find the pd.Timestamp matching the given hour (0-23)."""
     for t in sorted(df["period"].unique()):

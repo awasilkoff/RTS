@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Line flow comparison visualizations: DAM w/ Res vs DARUC.
+Line flow comparison visualizations: DAM w/ Res vs DAM w/Res + RUC.
 
 Generates four charts:
   1. Side-by-side worst-case loading heatmaps (lines x hours)
-  2. Binding status diff heatmap (both / only-DAM / only-DARUC / neither)
+  2. Binding status diff heatmap (both / only-DAM / only-DAM w/Res + RUC / neither)
   3. Stacked bar decomposition: nominal flow + robust margin at peak hour
   4. Network map at a specific hour showing flows on the RTS-GMLC topology
 
@@ -56,7 +56,7 @@ def _save_figure(fig: plt.Figure, path: Path):
 # ---------------------------------------------------------------------------
 
 def load_line_flow_analysis(case_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Load DAM w/ Res and DARUC line_flow_analysis CSVs."""
+    """Load DAM w/ Res and DAM w/Res + RUC line_flow_analysis CSVs."""
     dam_path = case_dir / "dam_reserve" / "line_flows" / "line_flow_analysis_dam.csv"
     daruc_path = case_dir / "daruc" / "line_flows" / "line_flow_analysis.csv"
 
@@ -131,7 +131,7 @@ def plot_loading_heatmaps(
 
     for ax, data_load, data_bind, title in [
         (ax1, dam_load, dam_bind, "DAM + Reserve"),
-        (ax2, daruc_load, daruc_bind, "DARUC"),
+        (ax2, daruc_load, daruc_bind, "DAM w/Res + RUC"),
     ]:
         im = ax.imshow(
             data_load.values,
@@ -186,7 +186,7 @@ def plot_binding_diff(
     cat[dam_bind & daruc_bind] = 3
 
     colors = ["#f5f5f5", "#4682B4", "#2A9D8F", "#2F4F4F"]
-    labels = ["Neither", "DAM w/Res only", "DARUC only", "Both"]
+    labels = ["Neither", "DAM w/Res only", "DAM w/Res + RUC only", "Both"]
     cmap = mcolors.ListedColormap(colors)
     bounds = [-0.5, 0.5, 1.5, 2.5, 3.5]
     norm = mcolors.BoundaryNorm(bounds, cmap.N)
@@ -258,12 +258,12 @@ def plot_flow_decomposition(
 
     ax.barh(
         y_pos, rec_df["nominal_abs"], height=0.6,
-        color="#4393c3", label="DARUC |nominal flow|", zorder=2,
+        color="#4393c3", label="DAM w/Res + RUC |nominal flow|", zorder=2,
     )
     ax.barh(
         y_pos, rec_df["margin"], height=0.6,
         left=rec_df["nominal_abs"].values,
-        color="#f4a582", label=r"DARUC robust margin ($\rho \cdot \|Z_{\mathrm{line}}\|$)",
+        color="#f4a582", label=r"DAM w/Res + RUC robust margin ($\rho \cdot \|Z_{\mathrm{line}}\|$)",
         zorder=2,
     )
 
@@ -315,7 +315,7 @@ def plot_flow_decomposition_hour(
     dam_h = dam_raw[dam_raw["period"] == hour_ts].copy()
 
     if daruc_h.empty:
-        print(f"  No DARUC data at hour {hour}")
+        print(f"  No DAM w/Res + RUC data at hour {hour}")
         return
 
     # Sort by worst-case loading, take top N
@@ -349,10 +349,10 @@ def plot_flow_decomposition_hour(
     y_pos = np.arange(n)
 
     ax.barh(y_pos, rec_df["nominal_abs"], height=0.6,
-            color="#4393c3", label="DARUC |nominal|", zorder=2)
+            color="#4393c3", label="DAM w/Res + RUC |nominal|", zorder=2)
     ax.barh(y_pos, rec_df["margin"], height=0.6,
             left=rec_df["nominal_abs"].values,
-            color="#e08060", label="DARUC robust margin", zorder=2)
+            color="#e08060", label="DAM w/Res + RUC robust margin", zorder=2)
 
     ax.barh(y_pos, rec_df["Fmax"], height=0.65,
             color="none", edgecolor="black", linewidth=1.0,
@@ -400,7 +400,7 @@ def plot_flow_decomposition_binding(
     ].copy()
 
     if daruc_h.empty:
-        print(f"  No DARUC data for binding lines at hour {hour}")
+        print(f"  No DAM w/Res + RUC data for binding lines at hour {hour}")
         return
 
     dam_lookup = dam_h.set_index("line")
@@ -428,10 +428,10 @@ def plot_flow_decomposition_binding(
     y_pos = np.arange(n)
 
     ax.barh(y_pos, rec_df["nominal_abs"], height=0.6,
-            color="#4393c3", label="DARUC |nominal|", zorder=2)
+            color="#4393c3", label="DAM w/Res + RUC |nominal|", zorder=2)
     ax.barh(y_pos, rec_df["margin"], height=0.6,
             left=rec_df["nominal_abs"].values,
-            color="#e08060", label="DARUC robust margin", zorder=2)
+            color="#e08060", label="DAM w/Res + RUC robust margin", zorder=2)
 
     ax.barh(y_pos, rec_df["Fmax"], height=0.65,
             color="none", edgecolor="black", linewidth=1.0,
@@ -439,7 +439,7 @@ def plot_flow_decomposition_binding(
 
     ax.scatter(rec_df["dam_wc_abs"], y_pos,
                marker="D", s=50, c="#2166ac", edgecolors="black", linewidths=0.5,
-               zorder=4, label="DAM w/Res worst-case")
+               zorder=4, label="DAM w/Res |nominal|")
 
     labels = rec_df["line"].tolist()
     ax.set_yticks(y_pos)
@@ -506,10 +506,10 @@ def plot_flow_decomposition_binding_only(
     y_pos = np.arange(n)
 
     ax.barh(y_pos, rec_df["nominal_abs"], height=0.6,
-            color="#4393c3", label="DARUC |nominal|", zorder=2)
+            color="#4393c3", label="DAM w/Res + RUC |nominal|", zorder=2)
     ax.barh(y_pos, rec_df["margin"], height=0.6,
             left=rec_df["nominal_abs"].values,
-            color="#e08060", label="DARUC robust margin", zorder=2)
+            color="#e08060", label="DAM w/Res + RUC robust margin", zorder=2)
 
     ax.barh(y_pos, rec_df["Fmax"], height=0.65,
             color="none", edgecolor="black", linewidth=1.0,
@@ -517,7 +517,7 @@ def plot_flow_decomposition_binding_only(
 
     ax.scatter(rec_df["dam_wc_abs"], y_pos,
                marker="D", s=50, c="#2166ac", edgecolors="black", linewidths=0.5,
-               zorder=4, label="DAM w/Res worst-case")
+               zorder=4, label="DAM w/Res |nominal|")
 
     labels = rec_df["line"].tolist()
     ax.set_yticks(y_pos)
@@ -806,13 +806,13 @@ def plot_network_maps(
     # --- Option B: Three panels (DAM wc | DARUC nominal | DARUC margin) ---
     fig_b, (bx1, bx2, bx3) = plt.subplots(1, 3, figsize=(IEEE_TWO_COL_WIDTH * 1.5, 3.5))
     _draw_panel_single_metric(bx1, bus, branch, dam_hour,
-                               f"DAM w/Res worst-case (h{hour:02d})",
+                               f"DAM w/Res |nominal| (h{hour:02d})",
                                "worst_case_abs_flow", "#4393c3", vmax_mw=fmax_max)
     _draw_panel_single_metric(bx2, bus, branch, daruc_hour,
-                               f"DARUC nominal (h{hour:02d})",
+                               f"DAM w/Res + RUC nominal (h{hour:02d})",
                                "flow_nominal", "#4393c3", vmax_mw=fmax_max)
     _draw_panel_single_metric(bx3, bus, branch, daruc_hour,
-                               f"DARUC margin only (h{hour:02d})",
+                               f"DAM w/Res + RUC margin only (h{hour:02d})",
                                "margin_rho_norm", "#e08060", vmax_mw=fmax_max)
     legend_b = [
         Line2D([0], [0], color="#4393c3", lw=4, label="Flow (thickness=MW)"),
@@ -832,7 +832,7 @@ def plot_network_maps(
     _draw_panel_dual_encode(cx1, bus, branch, dam_hour,
                             f"DAM + Reserve (h{hour:02d})")
     cmap_c, norm_c = _draw_panel_dual_encode(
-        cx2, bus, branch, daruc_hour, f"DARUC (h{hour:02d})")
+        cx2, bus, branch, daruc_hour, f"DAM w/Res + RUC (h{hour:02d})")
     sm = plt.cm.ScalarMappable(cmap=cmap_c, norm=norm_c)
     fig_c.colorbar(sm, ax=[cx1, cx2], label="Nominal Loading %", shrink=0.7, pad=0.02)
     legend_c = [
@@ -1348,7 +1348,7 @@ def plot_reserve_comparison(
     ax.barh(y_pos + bar_h / 2, dam_top.values, height=bar_h,
             color=C_DAM, label="DAM w/Res", edgecolor="white", linewidth=0.3)
     ax.barh(y_pos - bar_h / 2, daruc_top.values, height=bar_h,
-            color=C_DARUC, label="DARUC", edgecolor="white", linewidth=0.3)
+            color=C_DARUC, label="DAM w/Res + RUC", edgecolor="white", linewidth=0.3)
     ax.set_yticks(y_pos)
     ax.set_yticklabels(labels, fontsize=fs["small"] - 1)
     ax.set_xlabel("Reserve (MW)", fontsize=fs["medium"])
@@ -1446,7 +1446,7 @@ def plot_reserve_per_unit(
     ax.barh(y_pos + bar_h / 2, dam_top.values, height=bar_h,
             color=C_DAM, label="DAM w/Res", edgecolor="white", linewidth=0.3)
     ax.barh(y_pos - bar_h / 2, daruc_top.values, height=bar_h,
-            color=C_DARUC, label="DARUC", edgecolor="white", linewidth=0.3)
+            color=C_DARUC, label="DAM w/Res + RUC", edgecolor="white", linewidth=0.3)
     ax.set_yticks(y_pos)
     ax.set_yticklabels(labels, fontsize=fs["small"] - 1)
     ax.set_xlabel("Reserve-Equivalent (MW)", fontsize=fs["medium"])
@@ -1743,7 +1743,7 @@ def plot_worst_case_flow_map(
     n_dam = _draw_wc_panel(ax1, bus, branch, dam_hour,
                            f"DAM w/Reserve (h{hour:02d})")
     n_daruc = _draw_wc_panel(ax2, bus, branch, daruc_hour,
-                             f"DARUC (h{hour:02d})")
+                             f"DAM w/Res + RUC (h{hour:02d})")
 
     # Subtitle with violation counts
     fig.text(0.25, 0.97, f"{n_dam} violations" if n_dam else "No violations",

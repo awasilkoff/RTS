@@ -1378,6 +1378,74 @@ def plot_reserve_per_unit(
     _save_figure(fig, out_dir / "fig_reserve_per_unit")
 
 
+def plot_reserve_per_unit_horizontal(
+    case_dir: Path,
+    out_dir: Path,
+    snapshot_hour: int = 16,
+    top_n: int = 15,
+):
+    """Wide-format per-unit reserve chart with generators on x-axis.
+
+    Same data as plot_reserve_per_unit but rotated: generators along the
+    horizontal axis, reserve (MW) on the vertical axis.  Better suited for
+    two-column paper layouts where width is available but height is limited.
+    """
+    dam_r, daruc_eq, _R_req, time_labels = load_reserve_data(case_dir)
+    fs = FONT_SIZES_TWO_COL
+
+    C_DAM = "#4682B4"
+    C_DARUC = "#E07B39"
+
+    # Find snapshot column
+    snap_cols = [c for c in time_labels if c.hour == snapshot_hour]
+    if not snap_cols:
+        hours = np.array([c.hour for c in time_labels])
+        closest_idx = np.argmin(np.abs(hours - snapshot_hour))
+        snap_cols = [time_labels[closest_idx]]
+        print(f"  Hour {snapshot_hour}:00 not found, using {snap_cols[0]}")
+    snap_col = snap_cols[0]
+
+    # Thermal generators only (non-zero in DAM reserve)
+    dam_thermal = dam_r.loc[(dam_r != 0).any(axis=1)]
+    thermal_gens = dam_thermal.index
+    daruc_thermal = daruc_eq.loc[daruc_eq.index.isin(thermal_gens)]
+    common_thermal = thermal_gens.intersection(daruc_thermal.index)
+    dam_thermal = dam_thermal.loc[common_thermal]
+    daruc_thermal = daruc_thermal.loc[common_thermal]
+
+    # Snapshot values
+    dam_snap = dam_thermal[snap_col].sort_values(ascending=False)
+    daruc_snap = daruc_thermal[snap_col].reindex(dam_snap.index)
+
+    # Top generators by max(dam, daruc)
+    combined_max = pd.concat([dam_snap.abs(), daruc_snap.abs()], axis=1).max(axis=1)
+    top_gens = combined_max.nlargest(top_n).index
+    dam_top = dam_snap.loc[top_gens].sort_values(ascending=False)
+    daruc_top = daruc_snap.loc[dam_top.index]
+
+    # Shorten labels
+    labels = [g[:14] for g in dam_top.index]
+    x_pos = np.arange(len(labels))
+    bar_w = 0.35
+
+    fig_w = max(IEEE_TWO_COL_WIDTH, len(labels) * 0.45 + 1.5)
+    fig, ax = plt.subplots(figsize=(fig_w, 3.0))
+
+    ax.bar(x_pos - bar_w / 2, dam_top.values, width=bar_w,
+           color=C_DAM, label="DAM+Res", edgecolor="white", linewidth=0.3)
+    ax.bar(x_pos + bar_w / 2, daruc_top.values, width=bar_w,
+           color=C_DARUC, label="DARUC", edgecolor="white", linewidth=0.3)
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(labels, fontsize=fs["small"] - 1, rotation=45, ha="right")
+    ax.set_ylabel("Reserve (MW)", fontsize=fs["medium"])
+    ax.set_title(f"Per-unit reserve at {snapshot_hour:02d}:00", fontsize=fs["large"])
+    ax.legend(fontsize=fs["small"], loc="upper right")
+    ax.tick_params(labelsize=fs["small"])
+
+    fig.tight_layout()
+    _save_figure(fig, out_dir / "fig_reserve_per_unit_h")
+
+
 def plot_reserve_network_map(
     case_dir: Path,
     out_dir: Path,
@@ -1703,6 +1771,7 @@ def main():
     print(f"\nChart 8: Per-unit reserve allocation (hour {args.reserve_hour})...")
     try:
         plot_reserve_per_unit(case_dir, out_dir, snapshot_hour=args.reserve_hour)
+        plot_reserve_per_unit_horizontal(case_dir, out_dir, snapshot_hour=args.reserve_hour)
     except FileNotFoundError as e:
         print(f"  Skipping per-unit reserve: {e}")
 

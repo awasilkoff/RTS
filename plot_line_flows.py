@@ -530,8 +530,10 @@ def plot_flow_decomposition_binding_only(
     ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["medium"])
     ax.set_title(f"Binding Lines — Hour {hour}", fontsize=FONT_SIZES_TWO_COL["large"])
 
-    ax.legend(loc="upper right", fontsize=FONT_SIZES_TWO_COL["small"])
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
+
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=4,
+              fontsize=FONT_SIZES_TWO_COL["small"], frameon=False)
 
     fig.tight_layout()
     _save_figure(fig, out_dir / f"fig_flow_decomp_binding_only_h{hour:02d}")

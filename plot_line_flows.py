@@ -531,7 +531,7 @@ def plot_flow_decomposition_binding_only(
 
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
 
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=4,
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18), ncol=2,
               fontsize=FONT_SIZES_TWO_COL["small"], frameon=False)
 
     fig.tight_layout()

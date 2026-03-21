@@ -514,7 +514,7 @@ def main():
     if args.out_dir:
         out_dir = Path(args.out_dir)
     else:
-        tag = f"rho{args.rho}_{args.hours}h_m{args.start_month:02d}d{args.start_day:02d}_costscaled{args.dispatch_cost_scale}{'_linefrac'+str(args.rho_lines_frac) if args.rho_lines_frac else ''}"
+        tag = f"rho{args.rho}_{args.hours}h_m{args.start_month:02d}d{args.start_day:02d}_costscaled{args.dispatch_cost_scale}{'_linefrac'+str(args.rho_lines_frac) if args.rho_lines_frac else ''}_v2"
         out_dir = Path("reserve_then_daruc_outputs") / tag
 
     run_reserve_then_daruc(

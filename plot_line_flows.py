@@ -186,7 +186,7 @@ def plot_binding_diff(
     cat[dam_bind & daruc_bind] = 3
 
     colors = ["#f5f5f5", "#4682B4", "#2A9D8F", "#2F4F4F"]
-    labels = ["Neither", "DAM+Res only", "DARUC only", "Both"]
+    labels = ["Neither", "DAM w/Res only", "DARUC only", "Both"]
     cmap = mcolors.ListedColormap(colors)
     bounds = [-0.5, 0.5, 1.5, 2.5, 3.5]
     norm = mcolors.BoundaryNorm(bounds, cmap.N)
@@ -276,7 +276,7 @@ def plot_flow_decomposition(
     ax.scatter(
         rec_df["dam_nominal_abs"], y_pos,
         marker="D", s=50, c="#2166ac", edgecolors="black", linewidths=0.5,
-        zorder=4, label="DAM+Res |nominal|",
+        zorder=4, label="DAM w/Res |nominal|",
     )
 
     ax.set_yticks(y_pos)
@@ -360,7 +360,7 @@ def plot_flow_decomposition_hour(
 
     ax.scatter(rec_df["dam_nominal_abs"], y_pos,
                marker="D", s=40, c="#2166ac", edgecolors="black", linewidths=0.4,
-               zorder=4, label="DAM+Res |nominal|")
+               zorder=4, label="DAM w/Res |nominal|")
 
     labels = rec_df["line"].tolist()
     ax.set_yticks(y_pos)
@@ -439,7 +439,7 @@ def plot_flow_decomposition_binding(
 
     ax.scatter(rec_df["dam_wc_abs"], y_pos,
                marker="D", s=50, c="#2166ac", edgecolors="black", linewidths=0.5,
-               zorder=4, label="DAM+Res worst-case")
+               zorder=4, label="DAM w/Res worst-case")
 
     labels = rec_df["line"].tolist()
     ax.set_yticks(y_pos)
@@ -726,7 +726,7 @@ def plot_network_maps(
     # --- Option B: Three panels (DAM wc | DARUC nominal | DARUC margin) ---
     fig_b, (bx1, bx2, bx3) = plt.subplots(1, 3, figsize=(IEEE_TWO_COL_WIDTH * 1.5, 3.5))
     _draw_panel_single_metric(bx1, bus, branch, dam_hour,
-                               f"DAM+Res worst-case (h{hour:02d})",
+                               f"DAM w/Res worst-case (h{hour:02d})",
                                "worst_case_abs_flow", "#4393c3", vmax_mw=fmax_max)
     _draw_panel_single_metric(bx2, bus, branch, daruc_hour,
                                f"DARUC nominal (h{hour:02d})",
@@ -1132,7 +1132,7 @@ def plot_network_commitment_map(
 
 
 # ---------------------------------------------------------------------------
-# Chart 7: Reserve distribution comparison (DAM+Reserve vs DARUC)
+# Chart 7: Reserve distribution comparison (DAM w/Reserve vs DARUC)
 # ---------------------------------------------------------------------------
 
 def load_reserve_data(case_dir: Path):
@@ -1140,7 +1140,7 @@ def load_reserve_data(case_dir: Path):
 
     Returns
     -------
-    dam_r : DataFrame (gen_ids x day-1 times) — DAM+Reserve r[i,t]
+    dam_r : DataFrame (gen_ids x day-1 times) — DAM w/Reserve r[i,t]
     daruc_eq : DataFrame (gen_ids x day-1 times) — DARUC reserve equivalent
     R_req : (T_day1,) array — system reserve requirement per period
     time_labels : list — day-1 column labels
@@ -1188,7 +1188,7 @@ def plot_reserve_comparison(
     snapshot_hour: int = 16,
     top_n: int = 15,
 ):
-    """Three-panel reserve distribution comparison: DAM+Reserve vs DARUC.
+    """Three-panel reserve distribution comparison: DAM w/Reserve vs DARUC.
 
     (a) System total reserve by period (day 1)
     (b) Per-unit allocation at snapshot hour (top generators)
@@ -1240,7 +1240,7 @@ def plot_reserve_comparison(
     # --- (a) System total reserve by period ---
     ax = axes[0]
     ax.plot(x_hours, R_req, "--", color=C_REQ, linewidth=1.5, label="Requirement")
-    ax.plot(x_hours, dam_total, "-", color=C_DAM, linewidth=1.5, label="DAM+Res")
+    ax.plot(x_hours, dam_total, "-", color=C_DAM, linewidth=1.5, label="DAM w/Res")
     ax.plot(x_hours, daruc_total, "-", color=C_DARUC, linewidth=1.5, label="DARUC")
     ax.axvline(snapshot_hour, color="k", linewidth=0.6, linestyle=":", alpha=0.5)
     ax.set_xlabel("Hour", fontsize=fs["medium"])
@@ -1266,7 +1266,7 @@ def plot_reserve_comparison(
     bar_h = 0.35
 
     ax.barh(y_pos + bar_h / 2, dam_top.values, height=bar_h,
-            color=C_DAM, label="DAM+Res", edgecolor="white", linewidth=0.3)
+            color=C_DAM, label="DAM w/Res", edgecolor="white", linewidth=0.3)
     ax.barh(y_pos - bar_h / 2, daruc_top.values, height=bar_h,
             color=C_DARUC, label="DARUC", edgecolor="white", linewidth=0.3)
     ax.set_yticks(y_pos)
@@ -1317,7 +1317,7 @@ def plot_reserve_per_unit(
     snapshot_hour: int = 16,
     top_n: int = 15,
 ):
-    """Single-column per-unit reserve allocation chart (DAM+Reserve vs DARUC).
+    """Single-column per-unit reserve allocation chart (DAM w/Reserve vs DARUC).
 
     Standalone version of panel (b) from plot_reserve_comparison.
     """
@@ -1364,13 +1364,13 @@ def plot_reserve_per_unit(
     fig, ax = plt.subplots(figsize=(IEEE_COL_WIDTH, fig_h))
 
     ax.barh(y_pos + bar_h / 2, dam_top.values, height=bar_h,
-            color=C_DAM, label="DAM+Res", edgecolor="white", linewidth=0.3)
+            color=C_DAM, label="DAM w/Res", edgecolor="white", linewidth=0.3)
     ax.barh(y_pos - bar_h / 2, daruc_top.values, height=bar_h,
             color=C_DARUC, label="DARUC", edgecolor="white", linewidth=0.3)
     ax.set_yticks(y_pos)
     ax.set_yticklabels(labels, fontsize=fs["small"] - 1)
-    ax.set_xlabel("Reserve (MW)", fontsize=fs["medium"])
-    ax.set_title(f"Per-unit reserve at {snapshot_hour:02d}:00", fontsize=fs["large"])
+    ax.set_xlabel("Reserve-Equivalent (MW)", fontsize=fs["medium"])
+    # ax.set_title(f"Per-unit reserve at {snapshot_hour:02d}:00", fontsize=fs["large"])
     ax.legend(fontsize=fs["small"], loc="lower right")
     ax.tick_params(labelsize=fs["small"])
 
@@ -1432,13 +1432,13 @@ def plot_reserve_per_unit_horizontal(
     fig, ax = plt.subplots(figsize=(fig_w, 3.0))
 
     ax.bar(x_pos - bar_w / 2, dam_top.values, width=bar_w,
-           color=C_DAM, label="DAM+Res", edgecolor="white", linewidth=0.3)
+           color=C_DAM, label="DAM w/Res", edgecolor="white", linewidth=0.3)
     ax.bar(x_pos + bar_w / 2, daruc_top.values, width=bar_w,
            color=C_DARUC, label="DARUC", edgecolor="white", linewidth=0.3)
     ax.set_xticks(x_pos)
     ax.set_xticklabels(labels, fontsize=fs["small"] - 1, rotation=45, ha="right")
-    ax.set_ylabel("Reserve (MW)", fontsize=fs["medium"])
-    ax.set_title(f"Per-unit reserve at {snapshot_hour:02d}:00", fontsize=fs["large"])
+    ax.set_ylabel("Reserve-Equivalent (MW)", fontsize=fs["medium"])
+    # ax.set_title(f"Per-unit reserve at {snapshot_hour:02d}:00", fontsize=fs["large"])
     ax.legend(fontsize=fs["small"], loc="upper right")
     ax.tick_params(labelsize=fs["small"])
 
@@ -1453,7 +1453,7 @@ def plot_reserve_network_map(
 ):
     """Two-panel network map showing per-bus reserve allocation at a snapshot hour.
 
-    Left panel: DAM+Reserve explicit reserves r[i,t].
+    Left panel: DAM w/Reserve explicit reserves r[i,t].
     Right panel: DARUC reserve equivalent from Z coefficients.
 
     Circle size ∝ total reserve at each bus.  Wind buses shown as triangles
@@ -1538,7 +1538,7 @@ def plot_reserve_network_map(
         1, 2, figsize=(IEEE_TWO_COL_WIDTH*1.5, 4.0))
 
     _draw_reserve_panel(ax1, bus, branch, dam_bus,
-                        f"DAM+Reserve (h{snapshot_hour:02d})")
+                        f"DAM w/Reserve (h{snapshot_hour:02d})")
     _draw_reserve_panel(ax2, bus, branch, daruc_bus,
                         f"DARUC equivalent (h{snapshot_hour:02d})")
 
@@ -1570,11 +1570,11 @@ def plot_reserve_network_map(
 
 
 # ---------------------------------------------------------------------------
-# Chart 10: Worst-case total-shortfall line flows (DAM+Reserve vs DARUC)
+# Chart 10: Worst-case total-shortfall line flows (DAM w/Reserve vs DARUC)
 # ---------------------------------------------------------------------------
 
 def load_worst_case_flow_data(case_dir: Path, hour: int):
-    """Load worst-case flow analysis CSVs for DAM+Reserve and DARUC.
+    """Load worst-case flow analysis CSVs for DAM w/Reserve and DARUC.
 
     Returns (dam_hour, daruc_hour) DataFrames indexed by line UID,
     or (None, None) if files are missing.
@@ -1602,7 +1602,7 @@ def plot_worst_case_flow_map(
 ):
     """Two-panel network map: line flows under worst-case total wind shortfall.
 
-    Left: DAM+Reserve (likely shows violations — no network-aware LDR).
+    Left: DAM w/Reserve (likely shows violations — no network-aware LDR).
     Right: DARUC (should respect limits via adaptive Z).
 
     Line thickness ∝ |flow| / Fmax.  Color: blue for normal loading,
@@ -1661,7 +1661,7 @@ def plot_worst_case_flow_map(
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(IEEE_TWO_COL_WIDTH, 4.0))
 
     n_dam = _draw_wc_panel(ax1, bus, branch, dam_hour,
-                           f"DAM+Reserve (h{hour:02d})")
+                           f"DAM w/Reserve (h{hour:02d})")
     n_daruc = _draw_wc_panel(ax2, bus, branch, daruc_hour,
                              f"DARUC (h{hour:02d})")
 
@@ -1705,7 +1705,7 @@ def main():
         help="Output directory for figures (default: same as case-dir)",
     )
     parser.add_argument(
-        "--map-hour", type=int, default=7,
+        "--map-hour", type=int, default=16,
         help="Hour (0-23) for network map snapshot (default: 7)",
     )
     parser.add_argument(

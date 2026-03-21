@@ -15,6 +15,55 @@ from compute_branch_flows import compute_branch_flows
 
 
 # ---------------------------------------------------------------------------
+# Generator metadata from gen.csv
+# ---------------------------------------------------------------------------
+
+_GEN_CSV_PATH = Path(__file__).parent / "RTS_Data" / "SourceData" / "gen.csv"
+
+_GEN_META_COLS = ["Fuel", "Category", "PMax MW", "PMin MW"]
+
+
+def load_gen_metadata(gen_csv=None):
+    """Load generator metadata from gen.csv, indexed by GEN UID.
+
+    Returns a DataFrame with columns: Fuel, Category, PMax MW, PMin MW.
+    Returns None if the file cannot be read.
+    """
+    path = Path(gen_csv) if gen_csv else _GEN_CSV_PATH
+    try:
+        df = pd.read_csv(path)
+        df = df.set_index("GEN UID")[_GEN_META_COLS]
+        return df
+    except Exception:
+        return None
+
+
+def _enrich_deviation_df(dev_df, gen_meta):
+    """Add fuel, category, pmax_mw, pmin_mw columns to a deviation DataFrame.
+
+    Merges on gen_id.  If gen_meta is None, adds empty columns.
+    """
+    if gen_meta is not None and not dev_df.empty:
+        merged = dev_df.merge(
+            gen_meta.rename(columns={
+                "Fuel": "fuel",
+                "Category": "category",
+                "PMax MW": "pmax_mw",
+                "PMin MW": "pmin_mw",
+            }),
+            left_on="gen_id",
+            right_index=True,
+            how="left",
+        )
+        return merged
+    else:
+        for col in ("fuel", "category", "pmax_mw", "pmin_mw"):
+            if col not in dev_df.columns:
+                dev_df[col] = ""
+        return dev_df
+
+
+# ---------------------------------------------------------------------------
 # Reserve requirement from uncertainty set
 # ---------------------------------------------------------------------------
 
@@ -490,6 +539,10 @@ def rebuild_deviation_summary(case_dir):
             "gen_id", "gen_type", "extra_committed_hours", "extra_startups",
             "dam_committed_hours", "daruc_committed_hours", "periods_added",
         ])
+
+    # Enrich with fuel type and capacity from gen.csv
+    gen_meta = load_gen_metadata()
+    dev_df = _enrich_deviation_df(dev_df, gen_meta)
 
     dev_df.to_csv(case_dir / "daruc" / "deviation_summary.csv", index=False)
     print(f"Rebuilt deviation_summary.csv: {len(dev_df)} generators with extra commitments")

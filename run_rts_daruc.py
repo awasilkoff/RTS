@@ -35,6 +35,7 @@ from run_rts_aruc import (
     reshape_uncertainty_for_variable_intervals,
 )
 from uncertainty_set_provider import UncertaintySetProvider
+from runner_utils import load_gen_metadata, _enrich_deviation_df
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +185,10 @@ def analyze_deviations(
                 "periods_added",
             ]
         )
+
+    # Enrich with fuel type and capacity from gen.csv
+    gen_meta = load_gen_metadata()
+    dev_df = _enrich_deviation_df(dev_df, gen_meta)
 
     return dev_df
 

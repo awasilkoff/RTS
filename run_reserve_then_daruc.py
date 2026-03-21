@@ -33,7 +33,7 @@ import pandas as pd
 from io_rts import build_damdata_from_rts
 from dam_model import build_dam_model
 from aruc_model import build_aruc_ldr_model, align_uncertainty_to_aruc
-from aruc_warm_start import warm_start_aruc_from_dam
+from aruc_warm_start import warm_start_aruc_from_dam, warm_start_aruc_from_prev_solution, load_prev_solution_from_dir
 from run_rts_dam import extract_solution as extract_dam_solution
 from run_rts_aruc import (
     build_uncertainty_set,
@@ -85,6 +85,7 @@ def run_reserve_then_daruc(
     threads: int | None = None,
     bar_qcp_conv_tol: float | None = 1e-4,
     reserve_ramp_multiplier: float | None = 1.0,
+    warm_start_dir: str | Path | None = None,
     out_dir: Path | None = None,
 ) -> dict:
     """
@@ -244,8 +245,11 @@ def run_reserve_then_daruc(
         flow_direction=flow_direction,
     )
 
-    # Warm start from reserve solution
-    if reserve_vars is not None:
+    # Warm start: prefer previous DARUC solution over DAM+Reserve
+    if warm_start_dir is not None:
+        prev_solution = load_prev_solution_from_dir(warm_start_dir)
+        warm_start_aruc_from_prev_solution(model, vars_dict, prev_solution, data)
+    elif reserve_vars is not None:
         warm_start_aruc_from_dam(model, vars_dict, reserve_vars, data)
 
     timings["daruc_build"] = time.time() - t0
@@ -486,6 +490,8 @@ def main():
     parser.add_argument("--time-limit", type=float, default=60000)
     parser.add_argument("--threads", type=int, default=None)
     parser.add_argument("--bar-qcp-conv-tol", type=float, default=1e-4)
+    parser.add_argument("--warm-start-dir", type=str, default=None,
+                        help="Path to a previous DARUC output dir (with commitment_u.csv, dispatch_p0.csv, Z_coefficients.csv) to warm-start from")
     parser.add_argument("--out-dir", type=str, default=None)
     args = parser.parse_args()
 
@@ -521,6 +527,7 @@ def main():
         threads=args.threads,
         bar_qcp_conv_tol=args.bar_qcp_conv_tol,
         reserve_ramp_multiplier=args.reserve_ramp_multiplier if args.reserve_ramp_multiplier > 0 else None,
+        warm_start_dir=args.warm_start_dir,
         out_dir=out_dir,
     )
 

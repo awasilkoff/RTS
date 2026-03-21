@@ -317,6 +317,33 @@ def warm_start_aruc_from_prev_solution(
     aruc_model.update()
 
 
+def load_prev_solution_from_dir(out_dir) -> Dict[str, Any]:
+    """Load a previous ARUC/DARUC solution from saved CSVs.
+
+    Reads commitment_u.csv, dispatch_p0.csv, and Z_coefficients.csv
+    as written by ``save_robust_outputs``.  Returns a dict compatible
+    with ``warm_start_aruc_from_prev_solution``.
+
+    Parameters
+    ----------
+    out_dir : str or Path
+        Directory containing the saved CSVs.
+
+    Returns
+    -------
+    dict with keys "u", "p0", "Z" (DataFrames).
+    """
+    from pathlib import Path
+    import pandas as pd
+
+    d = Path(out_dir)
+    u = pd.read_csv(d / "commitment_u.csv", index_col=0)
+    p0 = pd.read_csv(d / "dispatch_p0.csv", index_col=0)
+    Z = pd.read_csv(d / "Z_coefficients.csv", index_col=0)
+    print(f"Loaded previous solution from {d}  (u: {u.shape}, p0: {p0.shape}, Z: {Z.shape})")
+    return {"u": u, "p0": p0, "Z": Z}
+
+
 def _init_soc_auxiliaries(
     aruc_vars: Dict[str, Any],
     data: DAMData,

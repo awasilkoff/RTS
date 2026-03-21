@@ -84,6 +84,9 @@ def run_reserve_then_daruc(
     time_limit: float | None = 600.0,
     threads: int | None = None,
     bar_qcp_conv_tol: float | None = 1e-4,
+    mip_focus: int | None = None,
+    node_file_start: float | None = None,
+    cuts: int | None = None,
     reserve_ramp_multiplier: float | None = 1.0,
     warm_start_dir: str | Path | None = None,
     out_dir: Path | None = None,
@@ -241,6 +244,9 @@ def run_reserve_then_daruc(
         time_limit=time_limit,
         threads=threads,
         bar_qcp_conv_tol=bar_qcp_conv_tol,
+        mip_focus=mip_focus,
+        node_file_start=node_file_start,
+        cuts=cuts,
         line_mask=line_mask,
         flow_direction=flow_direction,
     )
@@ -490,6 +496,12 @@ def main():
     parser.add_argument("--time-limit", type=float, default=60000)
     parser.add_argument("--threads", type=int, default=None)
     parser.add_argument("--bar-qcp-conv-tol", type=float, default=1e-4)
+    parser.add_argument("--mip-focus", type=int, default=None,
+                        help="Gurobi MIPFocus (1=feasibility, 2=optimality, 3=bound)")
+    parser.add_argument("--node-file-start", type=float, default=None,
+                        help="Gurobi NodefileStart in GB (default 2.0)")
+    parser.add_argument("--cuts", type=int, default=None,
+                        help="Gurobi Cuts aggressiveness (-1 to 3)")
     parser.add_argument("--warm-start-dir", type=str, default=None,
                         help="Path to a previous DARUC output dir (with commitment_u.csv, dispatch_p0.csv, Z_coefficients.csv) to warm-start from")
     parser.add_argument("--out-dir", type=str, default=None)
@@ -526,6 +538,9 @@ def main():
         time_limit=args.time_limit,
         threads=args.threads,
         bar_qcp_conv_tol=args.bar_qcp_conv_tol,
+        mip_focus=args.mip_focus,
+        node_file_start=args.node_file_start,
+        cuts=args.cuts,
         reserve_ramp_multiplier=args.reserve_ramp_multiplier if args.reserve_ramp_multiplier > 0 else None,
         warm_start_dir=args.warm_start_dir,
         out_dir=out_dir,

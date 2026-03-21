@@ -233,6 +233,18 @@ def main():
         help="Barrier QCP convergence tolerance (default: Gurobi default 1e-8; try 1e-4 for speed)",
     )
     parser.add_argument(
+        "--mip-focus", type=int, default=None,
+        help="Gurobi MIPFocus (1=feasibility, 2=optimality, 3=bound). Default: 1",
+    )
+    parser.add_argument(
+        "--node-file-start", type=float, default=None,
+        help="Gurobi NodefileStart in GB (default 2.0). Raise on machines with more RAM.",
+    )
+    parser.add_argument(
+        "--cuts", type=int, default=None,
+        help="Gurobi Cuts aggressiveness (-1=auto, 0=off, 1=moderate, 2=aggressive, 3=very aggressive)",
+    )
+    parser.add_argument(
         "--fast",
         action=argparse.BooleanOptionalAction,
         default=False,
@@ -355,6 +367,9 @@ def main():
         time_limit=args.time_limit,
         threads=args.threads,
         bar_qcp_conv_tol=args.bar_qcp_conv_tol,
+        mip_focus=args.mip_focus,
+        node_file_start=args.node_file_start,
+        cuts=args.cuts,
     )
 
     daruc_results = daruc_outputs["daruc_results"]
@@ -440,6 +455,9 @@ def main():
         time_limit=args.time_limit,
         threads=args.threads,
         bar_qcp_conv_tol=args.bar_qcp_conv_tol,
+        mip_focus=args.mip_focus,
+        node_file_start=args.node_file_start,
+        cuts=args.cuts,
     )
 
     aruc_results = aruc_outputs["results"]

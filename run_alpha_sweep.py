@@ -207,6 +207,9 @@ def run_alpha_point(
     time_limit: float | None = None,
     threads: int | None = None,
     bar_qcp_conv_tol: float | None = None,
+    mip_focus: int | None = None,
+    node_file_start: float | None = None,
+    cuts: int | None = None,
     prev_daruc_results: dict | None = None,
     prev_aruc_results: dict | None = None,
 ) -> dict | None:
@@ -245,6 +248,9 @@ def run_alpha_point(
             time_limit=time_limit,
             threads=threads,
             bar_qcp_conv_tol=bar_qcp_conv_tol,
+            mip_focus=mip_focus,
+            node_file_start=node_file_start,
+            cuts=cuts,
             prev_daruc_solution=prev_daruc_results,
         )
         data = daruc_out["data"]
@@ -297,6 +303,9 @@ def run_alpha_point(
             time_limit=time_limit,
             threads=threads,
             bar_qcp_conv_tol=bar_qcp_conv_tol,
+            mip_focus=mip_focus,
+            node_file_start=node_file_start,
+            cuts=cuts,
             prev_aruc_solution=prev_aruc_results,
         )
         aruc_res = aruc_out["results"]
@@ -718,6 +727,12 @@ def main():
         default=None,
         help="Barrier QCP convergence tolerance (default: Gurobi default 1e-8; try 1e-4 for speed)",
     )
+    parser.add_argument("--mip-focus", type=int, default=None,
+                        help="Gurobi MIPFocus (1=feasibility, 2=optimality, 3=bound)")
+    parser.add_argument("--node-file-start", type=float, default=None,
+                        help="Gurobi NodefileStart in GB (default 2.0)")
+    parser.add_argument("--cuts", type=int, default=None,
+                        help="Gurobi Cuts aggressiveness (-1 to 3)")
     parser.add_argument(
         "--fast",
         action=argparse.BooleanOptionalAction,
@@ -848,6 +863,9 @@ def main():
             time_limit=args.time_limit,
             threads=args.threads,
             bar_qcp_conv_tol=args.bar_qcp_conv_tol,
+            mip_focus=args.mip_focus,
+            node_file_start=args.node_file_start,
+            cuts=args.cuts,
             prev_daruc_results=prev_daruc_results,
             prev_aruc_results=prev_aruc_results,
         )

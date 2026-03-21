@@ -254,6 +254,9 @@ def run_rts_daruc(
     time_limit: Optional[float] = None,
     threads: Optional[int] = None,
     bar_qcp_conv_tol: Optional[float] = None,
+    mip_focus: Optional[int] = None,
+    node_file_start: Optional[float] = None,
+    cuts: Optional[int] = None,
     prev_daruc_solution: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
@@ -414,6 +417,9 @@ def run_rts_daruc(
         time_limit=time_limit,
         threads=threads,
         bar_qcp_conv_tol=bar_qcp_conv_tol,
+        mip_focus=mip_focus,
+        node_file_start=node_file_start,
+        cuts=cuts,
         line_mask=line_mask,
         flow_direction=flow_direction,
     )

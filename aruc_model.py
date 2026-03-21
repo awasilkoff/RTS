@@ -87,6 +87,9 @@ def build_aruc_ldr_model(
     time_limit: Optional[float] = None,
     threads: Optional[int] = None,
     bar_qcp_conv_tol: Optional[float] = None,
+    mip_focus: Optional[int] = None,
+    node_file_start: Optional[float] = None,
+    cuts: Optional[int] = None,
     line_mask: Optional[np.ndarray] = None,
     flow_direction: Optional[np.ndarray] = None,
     gating_mask: Optional[np.ndarray] = None,
@@ -991,18 +994,16 @@ def build_aruc_ldr_model(
     m.Params.ScaleFlag = _nmode["ScaleFlag"]
     m.Params.MIPGap = mip_gap       # Default 0.5% — UC doesn't need 0.01% precision
 
-    # Heuristic tuning for MISOCP — default Gurobi heuristics produce
-    # terrible incumbents for this problem class (SOC + integer).
-    # Spend more effort finding good feasible solutions early.
+    # Heuristic tuning for MISOCP
     m.Params.Heuristics = 0.2       # 20% of node time on heuristics (default 5%)
-    m.Params.MIPFocus = 1           # Focus on finding feasible solutions quickly
+    m.Params.MIPFocus = mip_focus if mip_focus is not None else 1
 
     # Presolve: aggressive + sparsify helps SOC-heavy models
     m.Params.Presolve = 2
     m.Params.PreSparsify = 1
 
-    # Memory: spill B&B tree to disk after 0.5 GB to prevent OOM
-    m.Params.NodefileStart = 0.5
+    # Memory: spill B&B tree to disk (default 2 GB before swap to disk)
+    m.Params.NodefileStart = node_file_start if node_file_start is not None else 2.0
 
     # Optional MISOCP tuning knobs (exposed to callers)
     if time_limit is not None:
@@ -1011,6 +1012,8 @@ def build_aruc_ldr_model(
         m.Params.Threads = threads
     if bar_qcp_conv_tol is not None:
         m.Params.BarQCPConvTol = bar_qcp_conv_tol
+    if cuts is not None:
+        m.Params.Cuts = cuts
 
     vars_dict: Dict[str, object] = {
         "u": u,

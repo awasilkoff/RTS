@@ -622,3 +622,45 @@ def compute_day1_metrics(data, results_dict):
     curt = float(((wind_pmax_d1 - dispatch[is_wind, :]) * dt).sum())
 
     return {"unit_hours": uh, "wind_curtailment_mwh": curt}
+
+
+def committed_units_day1(directory, day1_hours=24):
+    """Count unique generators committed during day 1 across commitment_u.csv files.
+
+    Searches *directory* recursively for files named ``commitment_u.csv``,
+    reads each one, and counts the number of generators (rows) with u >= 0.5
+    in at least one day-1 period.
+
+    Day-1 periods are identified by taking the first *day1_hours* worth of
+    columns.  For hourly schedules this is simply the first 24 columns; for
+    variable-interval horizons the column timestamps are parsed and all
+    columns within 24 hours of the first timestamp are included.
+
+    Parameters
+    ----------
+    directory : str or Path
+        Root directory to search (recursively) for commitment_u.csv files.
+    day1_hours : int, optional
+        Number of hours in day 1 (default 24).
+
+    Returns
+    -------
+    dict[str, int]
+        Mapping from the relative path of each commitment_u.csv (relative to
+        *directory*) to the number of unique committed units in day 1.
+    """
+    directory = Path(directory)
+    results = {}
+    for csv_path in sorted(directory.rglob("commitment_u.csv")):
+        u = pd.read_csv(csv_path, index_col=0)
+        # Determine day-1 columns
+        try:
+            timestamps = pd.to_datetime(u.columns)
+            t0 = timestamps[0]
+            day1_cols = [c for c, ts in zip(u.columns, timestamps)
+                         if ts < t0 + pd.Timedelta(hours=day1_hours)]
+        except Exception:
+            day1_cols = list(u.columns[:day1_hours])
+        committed = (u[day1_cols].values >= 0.5).any(axis=1).sum()
+        results[str(csv_path.relative_to(directory))] = int(committed)
+    return results

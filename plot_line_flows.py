@@ -528,7 +528,6 @@ def plot_flow_decomposition_binding_only(
         tick.set_fontweight("bold")
 
     ax.set_xlabel("Flow (MW)", fontsize=FONT_SIZES_TWO_COL["medium"])
-    ax.set_title(f"Binding Lines — Hour {hour}", fontsize=FONT_SIZES_TWO_COL["large"])
 
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
 

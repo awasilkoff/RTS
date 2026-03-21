@@ -476,23 +476,43 @@ def save_worst_case_flow_analysis(data, wc_result, label, out_dir):
 # ---------------------------------------------------------------------------
 
 def rebuild_deviation_summary(case_dir):
-    """Rebuild deviation_summary.csv from dam_reserve and daruc commitment CSVs.
+    """Rebuild deviation_summary.csv from DAM and DARUC commitment CSVs.
 
     This avoids re-running the full pipeline when only the summary is needed.
-    Reads commitment_u.csv from both dam_reserve/ and daruc/ subdirectories,
-    computes extra commitments and extra startups, and writes the result.
+    Looks for the DAM baseline commitment in this order:
+      1. daruc/dam_commitment_u.csv  (saved alongside DARUC output)
+      2. dam_reserve/commitment_u.csv (reserve baseline layout)
+      3. dam/commitment_u.csv (plain DAM layout)
 
     Parameters
     ----------
-    case_dir : Path — root directory containing dam_reserve/ and daruc/ subdirs
+    case_dir : Path — root directory containing daruc/ subdir (and DAM baseline)
 
     Returns
     -------
     pd.DataFrame — the deviation summary (also saved to daruc/deviation_summary.csv)
     """
     case_dir = Path(case_dir)
-    dam_u = pd.read_csv(case_dir / "dam_reserve" / "commitment_u.csv", index_col=0)
     daruc_u = pd.read_csv(case_dir / "daruc" / "commitment_u.csv", index_col=0)
+
+    # Find DAM baseline commitment
+    dam_candidates = [
+        case_dir / "daruc" / "dam_commitment_u.csv",
+        case_dir / "dam_reserve" / "commitment_u.csv",
+        case_dir / "dam" / "commitment_u.csv",
+    ]
+    dam_path = None
+    for candidate in dam_candidates:
+        if candidate.exists():
+            dam_path = candidate
+            break
+    if dam_path is None:
+        raise FileNotFoundError(
+            f"No DAM baseline commitment found in {case_dir}. "
+            f"Searched: {[str(c) for c in dam_candidates]}"
+        )
+    dam_u = pd.read_csv(dam_path, index_col=0)
+    print(f"  DAM baseline: {dam_path.relative_to(case_dir)}")
 
     # Binarize (handle -0.0 and float noise)
     dam_arr = (dam_u.values > 0.5).astype(int)

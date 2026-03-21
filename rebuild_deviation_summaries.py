@@ -1,7 +1,8 @@
 """Rebuild deviation_summary.csv for completed case directories.
 
-Globs recursively for directories containing both dam_reserve/commitment_u.csv
-and daruc/commitment_u.csv, then rebuilds the deviation summary with enriched
+Globs recursively for directories containing daruc/commitment_u.csv plus a
+DAM baseline (daruc/dam_commitment_u.csv, dam_reserve/commitment_u.csv, or
+dam/commitment_u.csv), then rebuilds the deviation summary with enriched
 generator metadata (fuel, category, Pmax, Pmin from gen.csv).
 
 Usage:
@@ -21,16 +22,26 @@ from pathlib import Path
 
 from runner_utils import rebuild_deviation_summary
 
+# DAM baseline locations to check (relative to case_dir)
+_DAM_CANDIDATES = [
+    Path("daruc") / "dam_commitment_u.csv",
+    Path("dam_reserve") / "commitment_u.csv",
+    Path("dam") / "commitment_u.csv",
+]
+
+
+def _has_dam_baseline(case_dir):
+    """Check if a case directory has any recognized DAM baseline commitment."""
+    return any((case_dir / c).exists() for c in _DAM_CANDIDATES)
+
 
 def find_case_dirs(root):
-    """Find directories that contain both dam_reserve/ and daruc/ commitment CSVs."""
+    """Find directories that contain daruc/commitment_u.csv and a DAM baseline."""
     root = Path(root)
-    # Find all daruc/commitment_u.csv, then check for matching dam_reserve/
     cases = []
     for daruc_csv in sorted(root.rglob("daruc/commitment_u.csv")):
         case_dir = daruc_csv.parent.parent
-        dam_csv = case_dir / "dam_reserve" / "commitment_u.csv"
-        if dam_csv.exists():
+        if _has_dam_baseline(case_dir):
             cases.append(case_dir)
     return cases
 
@@ -48,8 +59,7 @@ def main():
     for d in args.directories:
         d = Path(d)
         # Check if this is itself a case directory
-        if (d / "daruc" / "commitment_u.csv").exists() and \
-           (d / "dam_reserve" / "commitment_u.csv").exists():
+        if (d / "daruc" / "commitment_u.csv").exists() and _has_dam_baseline(d):
             all_cases.append(d)
         else:
             all_cases.extend(find_case_dirs(d))
@@ -65,7 +75,7 @@ def main():
     all_cases = unique
 
     if not all_cases:
-        print("No case directories found (need dam_reserve/ + daruc/ with commitment_u.csv)")
+        print("No case directories found (need daruc/commitment_u.csv + DAM baseline)")
         return
 
     print(f"Found {len(all_cases)} case(s):\n")

@@ -789,7 +789,7 @@ def plot_network_maps(
     _draw_panel_parallel(ax1, bus, branch, dam_hour,
                          f"DAM + Reserve (h{hour:02d})")
     _draw_panel_parallel(ax2, bus, branch, daruc_hour,
-                         f"DARUC (h{hour:02d})")
+                         f"DAM w/Res + RUC (h{hour:02d})")
     legend_a = [
         Line2D([0], [0], color="#4393c3", lw=4, label="Nominal flow"),
         Line2D([0], [0], color="#e08060", lw=4, label="Robust margin"),
@@ -1321,7 +1321,7 @@ def plot_reserve_comparison(
     ax = axes[0]
     ax.plot(x_hours, R_req, "--", color=C_REQ, linewidth=1.5, label="Requirement")
     ax.plot(x_hours, dam_total, "-", color=C_DAM, linewidth=1.5, label="DAM w/Res")
-    ax.plot(x_hours, daruc_total, "-", color=C_DARUC, linewidth=1.5, label="DARUC")
+    ax.plot(x_hours, daruc_total, "-", color=C_DARUC, linewidth=1.5, label="DAM w/Res + RUC")
     ax.axvline(snapshot_hour, color="k", linewidth=0.6, linestyle=":", alpha=0.5)
     ax.set_xlabel("Hour", fontsize=fs["medium"])
     ax.set_ylabel("Reserve (MW)", fontsize=fs["medium"])
@@ -1366,7 +1366,7 @@ def plot_reserve_comparison(
         ax.text(0.5, 0.5, "No significant\ndifferences",
                 transform=ax.transAxes, ha="center", va="center",
                 fontsize=fs["medium"])
-        ax.set_title(f"(c) DARUC\u2212DAM at {snapshot_hour:02d}:00", fontsize=fs["large"])
+        ax.set_title(f"(c) DAM w/Res + RUC\u2212DAM at {snapshot_hour:02d}:00", fontsize=fs["large"])
     else:
         # Show top differences (limit to reasonable number)
         if len(delta) > 20:
@@ -1449,9 +1449,9 @@ def plot_reserve_per_unit(
             color=C_DARUC, label="DAM w/Res + RUC", edgecolor="white", linewidth=0.3)
     ax.set_yticks(y_pos)
     ax.set_yticklabels(labels, fontsize=fs["small"] - 1)
-    ax.set_xlabel("Reserve-Equivalent (MW)", fontsize=fs["medium"])
+    ax.set_xlabel("Response (MW)", fontsize=fs["medium"])
     # ax.set_title(f"Per-unit reserve at {snapshot_hour:02d}:00", fontsize=fs["large"])
-    ax.legend(fontsize=fs["small"], loc="lower right")
+    ax.legend(fontsize=fs["medium"], loc="lower right")
     ax.tick_params(labelsize=fs["small"])
 
     fig.tight_layout()
@@ -1473,7 +1473,7 @@ def plot_reserve_per_unit_horizontal(
     dam_r, daruc_eq, _R_req, time_labels = load_reserve_data(case_dir)
     fs = FONT_SIZES_TWO_COL
 
-    C_DAM = "#4682B4"
+    C_DAM = "#3fcc46"
     C_DARUC = "#E07B39"
 
     # Find snapshot column
@@ -1514,12 +1514,12 @@ def plot_reserve_per_unit_horizontal(
     ax.bar(x_pos - bar_w / 2, dam_top.values, width=bar_w,
            color=C_DAM, label="DAM w/Res", edgecolor="white", linewidth=0.3)
     ax.bar(x_pos + bar_w / 2, daruc_top.values, width=bar_w,
-           color=C_DARUC, label="DARUC", edgecolor="white", linewidth=0.3)
+           color=C_DARUC, label="DAM w/Res + RUC", edgecolor="white", linewidth=0.3)
     ax.set_xticks(x_pos)
     ax.set_xticklabels(labels, fontsize=fs["small"] - 1, rotation=45, ha="right")
-    ax.set_ylabel("Reserve-Equivalent (MW)", fontsize=fs["medium"])
+    ax.set_ylabel("Response (MW)", fontsize=fs["medium"])
     # ax.set_title(f"Per-unit reserve at {snapshot_hour:02d}:00", fontsize=fs["large"])
-    ax.legend(fontsize=fs["small"], loc="upper right")
+    ax.legend(fontsize=fs["medium"], loc="upper right")
     ax.tick_params(labelsize=fs["small"])
 
     fig.tight_layout()

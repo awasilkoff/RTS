@@ -921,6 +921,21 @@ def fig_worst_case_wind(
         print("  Skipping worst-case wind — no Z/Sigma/rho data in either formulation.")
         return
 
+    # Print worst-case deviation summary
+    for label, wc in [("DARUC", daruc_wc), ("ARUC", aruc_wc)]:
+        if wc is None:
+            continue
+        dev = wc["uncertain_ts"]
+        print(f"  {label} worst-case wind deviation (MW):")
+        print(f"    Total:  {dev.sum():.1f} MW·h")
+        print(f"    Mean:   {dev.mean():.1f} MW")
+        print(f"    Max:    {dev.max():.1f} MW  (hour {np.argmax(dev)})")
+        print(f"    Min:    {dev.min():.1f} MW  (hour {np.argmin(dev)})")
+        pct = np.divide(dev, wc["nominal_ts"],
+                        out=np.zeros_like(dev),
+                        where=wc["nominal_ts"] > 1e-3) * 100
+        print(f"    Mean %: {pct.mean():.1f}% of nominal dispatch")
+
     # DAM nominal wind dispatch (reference line)
     dam_nominal = None
     if dam is not None:

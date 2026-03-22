@@ -531,10 +531,10 @@ def plot_flow_decomposition_binding_only(
 
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
 
-    ax.legend(loc="lower right", ncol=2,
-              fontsize=FONT_SIZES_TWO_COL["small"], framealpha=0.9)
+    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), ncol=1,
+              fontsize=FONT_SIZES_TWO_COL["small"], frameon=False)
 
-    fig.tight_layout()
+    fig.tight_layout(rect=[0, 0, 0.72, 1])
     _save_figure(fig, out_dir / f"fig_flow_decomp_binding_only_h{hour:02d}")
 
 

@@ -1473,7 +1473,7 @@ def plot_reserve_per_unit_horizontal(
     dam_r, daruc_eq, _R_req, time_labels = load_reserve_data(case_dir)
     fs = FONT_SIZES_TWO_COL
 
-    C_DAM = "#3fcc46"
+    C_DAM = "#2A9D8F"
     C_DARUC = "#E07B39"
 
     # Find snapshot column

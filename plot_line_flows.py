@@ -499,7 +499,7 @@ def plot_flow_decomposition_binding_only(
             "wc_loading": row["loading_worst_case_pct"],
         })
 
-    rec_df = pd.DataFrame(records).sort_values("wc_loading", ascending=True).reset_index(drop=True)
+    rec_df = pd.DataFrame(records).sort_values("line", ascending=False).reset_index(drop=True)
 
     n = len(rec_df)
     fig, ax = plt.subplots(figsize=(IEEE_TWO_COL_WIDTH, max(2.5, n * 0.55 + 1.5)))

@@ -502,7 +502,7 @@ def plot_flow_decomposition_binding_only(
     rec_df = pd.DataFrame(records).sort_values("line", ascending=False).reset_index(drop=True)
 
     n = len(rec_df)
-    fig, ax = plt.subplots(figsize=(IEEE_TWO_COL_WIDTH, max(2.5, n * 0.55 + 1.5)))
+    fig, ax = plt.subplots(figsize=(IEEE_TWO_COL_WIDTH * 1.3, max(2.0, n * 0.38 + 1.0)))
     y_pos = np.arange(n)
 
     ax.barh(y_pos, rec_df["nominal_abs"], height=0.6,
@@ -531,10 +531,10 @@ def plot_flow_decomposition_binding_only(
 
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
 
-    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), ncol=1,
-              fontsize=FONT_SIZES_TWO_COL["small"], frameon=False)
+    ax.legend(loc="lower right", ncol=2,
+              fontsize=FONT_SIZES_TWO_COL["small"], framealpha=0.9)
 
-    fig.tight_layout(rect=[0, 0, 0.65, 1])
+    fig.tight_layout()
     _save_figure(fig, out_dir / f"fig_flow_decomp_binding_only_h{hour:02d}")
 
 

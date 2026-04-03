@@ -20,7 +20,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import numpy as np
 import pandas as pd
@@ -30,7 +33,7 @@ from runner_utils import (
     compute_worst_case_total_shortfall_flows,
     save_worst_case_flow_analysis,
 )
-from utils.backfill_reserves import _load_z_from_csv
+from backfill_reserves import _load_z_from_csv
 
 RTS_DIR = Path("RTS_Data")
 SOURCE_DIR = RTS_DIR / "SourceData"

@@ -3,6 +3,10 @@ Conformal prediction intuition figure.
 Left panel: histogram of calibration scores with Q_s marked.
 Right panel: forecast, base quantile, and conformalized lower bound on a timeline.
 """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches

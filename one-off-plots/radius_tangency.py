@@ -2,6 +2,10 @@
 Radius estimation figure: conformal lower bound hyperplane tangent to ellipsoid.
 The radius rho_h is chosen so the ellipsoid just touches the hyperplane W1+W2=Y_lo.
 """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import numpy as np
 import matplotlib.pyplot as plt
 import pathlib

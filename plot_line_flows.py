@@ -96,6 +96,97 @@ def pivot_column(df: pd.DataFrame, col: str, lines: list[str]) -> pd.DataFrame:
     return piv
 
 
+def plot_network_binding_lines_map(
+        dam_raw: pd.DataFrame,
+        daruc_raw: pd.DataFrame,
+        hour: int,
+        out_dir: Path,
+):
+    """Network map highlighting binding transmission constraints only.
+
+    All lines drawn thin/gray. Binding lines highlighted in red with labels.
+    No background grid. Wind buses marked. Clean layout for paper figures.
+    """
+    from matplotlib.lines import Line2D
+
+    bus, branch = load_network_topology()
+
+    hour_ts = _find_hour_ts(dam_raw, hour)
+    if hour_ts is None:
+        print(f"  WARNING: hour {hour} not found, skipping binding lines map")
+        return
+
+    dam_hour = _get_hour_data(dam_raw, hour_ts)
+    daruc_hour = _get_hour_data(daruc_raw, hour_ts)
+
+    def _draw_panel(ax, bus_df, branch_df, hour_data, title):
+        # All branches: thin gray
+        for uid, row in branch_df.iterrows():
+            fb, tb = row["From Bus"], row["To Bus"]
+            if fb not in bus_df.index or tb not in bus_df.index:
+                continue
+            x = [bus_df.loc[fb, "lng"], bus_df.loc[tb, "lng"]]
+            y = [bus_df.loc[fb, "lat"], bus_df.loc[tb, "lat"]]
+            ax.plot(x, y, color="#cccccc", linewidth=0.8, zorder=1,
+                    solid_capstyle="round")
+
+        # Non-wind buses
+        non_wind = bus_df[~bus_df.index.isin(_WIND_BUSES)]
+        ax.scatter(non_wind["lng"], non_wind["lat"],
+                   s=6, c="#aaaaaa", zorder=4, edgecolors="none")
+
+        # Wind buses
+        wind = bus_df[bus_df.index.isin(_WIND_BUSES)]
+        ax.scatter(wind["lng"], wind["lat"], s=70, c="#2ca02c",
+                   marker="^", zorder=5, edgecolors="black", linewidths=0.6)
+
+        # Binding lines: thick red + label
+        for uid in hour_data.index:
+            if not bool(hour_data.loc[uid, "binding"]):
+                continue
+            coords = _get_branch_coords(uid, branch_df, bus_df)
+            if coords is None:
+                continue
+            x, y = coords
+            fmax = hour_data.loc[uid, "Fmax"]
+            nom_abs = abs(hour_data.loc[uid, "flow_nominal"])
+            loading_pct = hour_data.loc[uid, "loading_worst_case_pct"]
+
+            ax.plot(x, y, color="#b2182b", linewidth=2.5, zorder=3,
+                    solid_capstyle="round")
+
+            mx, my = 0.5 * (x[0] + x[1]), 0.5 * (y[0] + y[1])
+            ax.annotate(
+                f"{uid}\n{loading_pct:.0f}%",
+                (mx, my),
+                fontsize=5.5, fontweight="bold", color="#b2182b",
+                ha="center", va="bottom",
+                xytext=(0, 4), textcoords="offset points",
+                bbox=dict(boxstyle="round,pad=0.15", fc="white",
+                          ec="#b2182b", alpha=0.9, lw=0.5),
+                zorder=7,
+            )
+
+        ax.set_aspect("equal")
+        ax.set_title(title, fontsize=FONT_SIZES_TWO_COL["large"])
+        ax.axis("off")  # no axes, no grid
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(IEEE_TWO_COL_WIDTH, 4.0))
+    _draw_panel(ax1, bus, branch, dam_hour, f"DAM w/Reserve (h{hour:02d})")
+    _draw_panel(ax2, bus, branch, daruc_hour, f"DAM w/Res + RUC (h{hour:02d})")
+
+    legend_elements = [
+        Line2D([0], [0], color="#b2182b", lw=2.5, label="Binding constraint"),
+        Line2D([0], [0], color="#cccccc", lw=1.5, label="Non-binding line"),
+        Line2D([0], [0], marker="^", color="w", markerfacecolor="#2ca02c",
+               markeredgecolor="black", markersize=8, label="Wind bus"),
+    ]
+    fig.legend(handles=legend_elements, loc="lower center", ncol=3,
+               fontsize=FONT_SIZES_TWO_COL["small"],
+               bbox_to_anchor=(0.5, -0.01))
+
+    fig.tight_layout(rect=[0, 0.04, 1, 1.0])
+    _save_figure(fig, out_dir / f"fig_map_binding_lines_h{hour:02d}")
 # ---------------------------------------------------------------------------
 # Chart 1: Side-by-side loading heatmaps
 # ---------------------------------------------------------------------------
@@ -435,7 +526,7 @@ def plot_flow_decomposition_binding(
 
     ax.barh(y_pos, rec_df["Fmax"], height=0.65,
             color="none", edgecolor="black", linewidth=1.0,
-            label="Fmax", zorder=3)
+            label="Line Capacity", zorder=3)
 
     ax.scatter(rec_df["dam_wc_abs"], y_pos,
                marker="D", s=50, c="#2166ac", edgecolors="black", linewidths=0.5,
@@ -513,7 +604,7 @@ def plot_flow_decomposition_binding_only(
 
     ax.barh(y_pos, rec_df["Fmax"], height=0.65,
             color="none", edgecolor="black", linewidth=1.0,
-            label="Fmax", zorder=3)
+            label="Line Capacity", zorder=3)
 
     ax.scatter(rec_df["dam_wc_abs"], y_pos,
                marker="D", s=50, c="#2166ac", edgecolors="black", linewidths=0.5,
@@ -532,7 +623,7 @@ def plot_flow_decomposition_binding_only(
     ax.set_xlim(0, rec_df["Fmax"].max() * 1.08)
 
     ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), ncol=1,
-              fontsize=FONT_SIZES_TWO_COL["small"], frameon=False)
+              fontsize=FONT_SIZES_TWO_COL["medium"], frameon=False)
 
     fig.tight_layout(rect=[0, 0, 0.72, 1])
     _save_figure(fig, out_dir / f"fig_flow_decomp_binding_only_h{hour:02d}")
@@ -1448,11 +1539,11 @@ def plot_reserve_per_unit(
     ax.barh(y_pos - bar_h / 2, daruc_top.values, height=bar_h,
             color=C_DARUC, label="DAM w/Res + RUC", edgecolor="white", linewidth=0.3)
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(labels, fontsize=fs["small"] - 1)
-    ax.set_xlabel("Response (MW)", fontsize=fs["medium"])
+    ax.set_yticklabels(labels, fontsize=fs["medium"] - 1)
+    ax.set_ylabel("Reserve/Response (MW)", fontsize=fs["large"])
     # ax.set_title(f"Per-unit reserve at {snapshot_hour:02d}:00", fontsize=fs["large"])
-    ax.legend(fontsize=fs["medium"], loc="lower right")
-    ax.tick_params(labelsize=fs["small"])
+    ax.legend(fontsize=fs["large"], loc="upper right")
+    ax.tick_params(labelsize=fs["medium"])
 
     fig.tight_layout()
     _save_figure(fig, out_dir / "fig_reserve_per_unit")
@@ -1516,11 +1607,11 @@ def plot_reserve_per_unit_horizontal(
     ax.bar(x_pos + bar_w / 2, daruc_top.values, width=bar_w,
            color=C_DARUC, label="DAM w/Res + RUC", edgecolor="white", linewidth=0.3)
     ax.set_xticks(x_pos)
-    ax.set_xticklabels(labels, fontsize=fs["small"] - 1, rotation=45, ha="right")
-    ax.set_ylabel("Response (MW)", fontsize=fs["medium"])
+    ax.set_xticklabels(labels, fontsize=fs["medium"] - 1, rotation=45, ha="right")
+    ax.set_ylabel("Reserve/Response (MW)", fontsize=fs["large"])
     # ax.set_title(f"Per-unit reserve at {snapshot_hour:02d}:00", fontsize=fs["large"])
-    ax.legend(fontsize=fs["medium"], loc="upper right")
-    ax.tick_params(labelsize=fs["small"])
+    ax.legend(fontsize=fs["large"], loc="upper right")
+    ax.tick_params(labelsize=fs["medium"])
 
     fig.tight_layout()
     _save_figure(fig, out_dir / "fig_reserve_per_unit_h")
@@ -1530,20 +1621,23 @@ def plot_reserve_network_map(
     case_dir: Path,
     out_dir: Path,
     snapshot_hour: int = 16,
+    show_wind_curtailment=False
+
 ):
-    """Two-panel network map showing per-bus reserve allocation at a snapshot hour.
-
-    Left panel: DAM w/Reserve explicit reserves r[i,t].
-    Right panel: DARUC reserve equivalent from Z coefficients.
-
-    Circle size ∝ total reserve at each bus.  Wind buses shown as triangles
-    (negative reserve = curtailment) and thermals as circles (upward reserve).
-    """
     from matplotlib.lines import Line2D
 
     dam_r, daruc_eq, R_req, time_labels = load_reserve_data(case_dir)
     bus, branch = load_network_topology()
 
+    # Load flow data for binding line overlay
+    dam_flow_raw, daruc_flow_raw = load_line_flow_analysis(case_dir)
+    hour_ts = _find_hour_ts(dam_flow_raw, snapshot_hour)
+    if hour_ts is None:
+        print(f"  WARNING: hour {snapshot_hour} not found in flow data")
+        dam_hour = daruc_hour = None
+    else:
+        dam_hour   = _get_hour_data(dam_flow_raw,   hour_ts)
+        daruc_hour = _get_hour_data(daruc_flow_raw, hour_ts)
     # Find snapshot column
     snap_cols = [c for c in time_labels if c.hour == snapshot_hour]
     if not snap_cols:
@@ -1582,9 +1676,20 @@ def plot_reserve_network_map(
 
     fs = FONT_SIZES_TWO_COL
 
-    def _draw_reserve_panel(ax, bus_df, branch_df, bus_reserves, title):
-        """Draw one reserve map panel."""
+    def _draw_reserve_panel(ax, bus_df, branch_df, bus_reserves, hour_data, title):
         _draw_base_network(ax, bus_df, branch_df)
+
+        # Binding lines in red
+        if hour_data is not None:
+            for uid in hour_data.index:
+                if not bool(hour_data.loc[uid, "binding"]):
+                    continue
+                coords = _get_branch_coords(uid, branch_df, bus_df)
+                if coords is None:
+                    continue
+                x, y = coords
+                ax.plot(x, y, color="#b2182b", linewidth=2.0, zorder=3,
+                        solid_capstyle="round")
 
         for bid, mw in bus_reserves.items():
             if bid not in bus_df.index:
@@ -1594,6 +1699,8 @@ def plot_reserve_network_map(
             bx = bus_df.loc[bid, "lng"]
             by = bus_df.loc[bid, "lat"]
             is_wind = bid in _WIND_BUSES
+            if is_wind and not show_wind_curtailment:
+                continue
             color = C_WIND_DOWN if is_wind else C_THERMAL_UP
             marker = "v" if is_wind else "o"
             sz = _reserve_size(mw)
@@ -1613,13 +1720,14 @@ def plot_reserve_network_map(
                 )
 
         _style_map_ax(ax, title)
+        ax.axis("off")
 
     fig, (ax1, ax2) = plt.subplots(
         1, 2, figsize=(IEEE_TWO_COL_WIDTH*1.5, 4.0))
 
-    _draw_reserve_panel(ax1, bus, branch, dam_bus,
+    _draw_reserve_panel(ax1, bus, branch, dam_bus,dam_hour,
                         f"DAM w/Reserve (h{snapshot_hour:02d})")
-    _draw_reserve_panel(ax2, bus, branch, daruc_bus,
+    _draw_reserve_panel(ax2, bus, branch, daruc_bus,daruc_hour,
                         f"DARUC equivalent (h{snapshot_hour:02d})")
 
     # Shared legend
@@ -1804,7 +1912,8 @@ def main():
 
     print("Loading line flow data...")
     dam_raw, daruc_raw = load_line_flow_analysis(case_dir)
-
+    print(f"\nChart 4b: Binding lines map (hour {args.map_hour})...")
+    plot_network_binding_lines_map(dam_raw, daruc_raw, args.map_hour, out_dir)
     print("Filtering to day-1, binding lines only...")
     dam, daruc, binding_lines = filter_day1_binding(dam_raw, daruc_raw)
     print(f"  {len(binding_lines)} binding lines: {binding_lines}")

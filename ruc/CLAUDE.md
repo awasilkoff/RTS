@@ -1,5 +1,8 @@
 # CLAUDE.md — ruc (Paper 3)
 
+> **Status: Experimental — not part of the current (Paper 2) codebase.**
+> This directory will NOT be shipped with the Paper 2 release. It is future work for Paper 3 and lives here for convenience (shared data and infrastructure). Do not refactor, integrate, or depend on anything in this directory from the main codebase.
+
 This subdirectory implements a **new Robust Unit Commitment (RUC) formulation** for Paper 3, building on the ARUC/DARUC infrastructure from Paper 2.
 
 ## Policies (inherited from root CLAUDE.md)

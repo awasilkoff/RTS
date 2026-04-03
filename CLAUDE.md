@@ -10,6 +10,8 @@ The project has two main parts:
 1. **Unit Commitment models** (root directory) -- DAM, ARUC, DARUC formulations solved via Gurobi
 2. **Uncertainty Set Calibration** (`uncertainty_sets_refactored/`) -- Learned covariance estimation, conformal prediction, paper figures. See `uncertainty_sets_refactored/CLAUDE.md` for detailed documentation.
 
+> **`ruc/` is NOT part of this project.** It contains early-stage work for a future Paper 3 formulation (Notification-Gated RUC). It shares data and infrastructure with this repo for convenience but will not be shipped with the Paper 2 release. See `ruc/CLAUDE.md` for details.
+
 ## Key Commands
 
 **Primary script — `run_comparison.py`** is the main entry point for all ARUC/DARUC analysis:

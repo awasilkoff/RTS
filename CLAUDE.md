@@ -12,6 +12,72 @@ The project has two main parts:
 
 > **`ruc/` is NOT part of this project.** It contains early-stage work for a future Paper 3 formulation (Notification-Gated RUC). It shares data and infrastructure with this repo for convenience but will not be shipped with the Paper 2 release. See `ruc/CLAUDE.md` for details.
 
+## Directory Layout
+
+```
+RTS/
+├── CLAUDE.md
+├── environment.yml / requirements.txt
+│
+├── [Core library — always in root, imported by runners]
+│   ├── models.py                  DAMData Pydantic model
+│   ├── io_rts.py                  ETL: RTS-GMLC CSVs -> DAMData
+│   ├── dam_model.py               Deterministic DAM Gurobi model
+│   ├── aruc_model.py              ARUC with LDR (Gurobi MISOCP)
+│   ├── aruc_warm_start.py         Warm-start initialization for ARUC
+│   ├── network_ptdf.py            DC power flow PTDF computation
+│   ├── compute_branch_flows.py    Branch flow helpers (imported by runners)
+│   ├── uncertainty_set_provider.py  NPZ uncertainty set loader
+│   ├── runner_utils.py            Shared functions across runner scripts
+│   ├── utils.py                   Save/load model state helpers
+│   ├── debugging.py               IIS extraction and infeasibility tools
+│   └── plot_line_flows.py         Line flow visualization
+│
+├── [Runner scripts — entry points, run directly]
+│   ├── run_comparison.py          PRIMARY: DARUC + ARUC comparison
+│   ├── run_alpha_sweep.py         Conformal alpha -> cost/curtailment sweep
+│   ├── run_price_of_robustness.py Rho sweep
+│   ├── run_sensitivity_suite.py   Multi-scenario sensitivity runner
+│   ├── run_reserve_then_daruc.py  DAM+Reserve -> DARUC pipeline
+│   ├── run_reserve_vs_aruc.py     Reserve vs ARUC comparison
+│   ├── run_rts_dam.py             Standalone DAM
+│   ├── run_rts_aruc.py            Standalone ARUC
+│   ├── run_rts_daruc.py           Standalone DARUC
+│   └── compare_aruc_vs_daruc.py   Comparison figures and summary (used by run_comparison.py)
+│
+├── uncertainty_sets_refactored/   Uncertainty pipeline (own CLAUDE.md)
+│   ├── [core libs, runners, viz support — see CLAUDE.md]
+│   ├── docs/                      Markdown documentation
+│   └── archive/                   One-off experiments and legacy scripts
+│
+├── utils/                         Infrequently-used utility scripts
+│   │                              (add root to sys.path when run directly)
+│   ├── backfill_reserves.py       Backfill reserve_equivalent.csv for past runs
+│   ├── backfill_worst_case_flows.py  Backfill worst-case line flows for past runs
+│   ├── count_committed_units.py   Count committed units across output dirs
+│   ├── rebuild_deviation_summaries.py  Rebuild deviation_summary.csv for past runs
+│   ├── summarize_scenario.py      Print scenario summary table (load, wind, uncertainty)
+│   └── verify_dam_wind_forecasts.py   Visualize wind Pmax to confirm SPP forecast loading
+│
+├── one-off-plots/                 Standalone plot scripts (not part of pipeline)
+│   │                              (add root to sys.path when run directly)
+│   └── [CostComparisonChart, ellipsoid_*, ldr_*, motivation_forecasts, etc.]
+│
+├── docs/                          Project documentation
+│   ├── formulations.tex/.pdf      Standalone ARUC/DARUC formulations writeup
+│   └── [archived markdown notes]
+│
+├── archive/                       Superseded scripts and one-off artifacts
+│   └── [old test scripts, debug logs, one-off output files]
+│
+├── ruc/                           Paper 3 experimental (NOT shipping with Paper 2)
+│   └── [see ruc/CLAUDE.md]
+│
+└── RTS_Data/                      Static RTS-GMLC test case data (read-only)
+```
+
+**Running utils/ and one-off-plots/ scripts:** These insert the project root into `sys.path` at startup, so they resolve imports correctly when run directly from anywhere: `python utils/summarize_scenario.py --start-month 7 --start-day 15`.
+
 ## Key Commands
 
 **Primary script — `run_comparison.py`** is the main entry point for all ARUC/DARUC analysis:
@@ -76,21 +142,37 @@ SPP wind data (parquet)  ->  covariance_optimization.py (learn omega, predict Si
 
 ### Root-Level Modules
 
+**Core library (imported by runners):**
+
 | Module | Purpose |
 |--------|---------|
-| `models.py` | `DAMData` Pydantic class -- canonical data container for UC models |
+| `models.py` | `DAMData` Pydantic class — canonical data container for UC models |
 | `io_rts.py` | ETL: RTS-GMLC CSV files -> `DAMData` object |
 | `network_ptdf.py` | DC power flow PTDF matrix computation |
 | `dam_model.py` | Deterministic DAM UC model builder (Gurobi) |
-| `aruc_model.py` | Adaptive robust UC with linear decision rules |
-| `run_comparison.py` | **Primary script**: runs DARUC + ARUC, generates figures + summary |
-| `compare_aruc_vs_daruc.py` | Comparison figures and write_summary (used by run_comparison.py) |
+| `aruc_model.py` | Adaptive robust UC with linear decision rules (MISOCP) |
+| `aruc_warm_start.py` | Warm-start: initialize ARUC binaries/dispatch/Z from DAM solution |
+| `compute_branch_flows.py` | Branch flow helpers: `filter_monitored_lines`, `iterative_line_resolve` |
+| `uncertainty_set_provider.py` | Load time-varying (mu, Sigma, rho) from NPZ files |
+| `runner_utils.py` | Shared functions across runner scripts (reserve, deviation summary, etc.) |
+| `utils.py` | Save/load full model state helpers |
+| `debugging.py` | Infeasibility diagnosis (IIS extraction, progressive relaxation) |
+| `plot_line_flows.py` | Line flow visualization against thermal limits |
+
+**Runner scripts (run directly):**
+
+| Script | Purpose |
+|--------|---------|
+| `run_comparison.py` | **Primary**: DARUC + ARUC, generates figures + summary |
+| `compare_aruc_vs_daruc.py` | Comparison figures and `write_summary` (used by `run_comparison.py`) |
 | `run_rts_dam.py` | Standalone deterministic DAM pipeline |
 | `run_rts_aruc.py` | Standalone robust ARUC pipeline |
 | `run_rts_daruc.py` | Standalone two-step DARUC pipeline |
+| `run_reserve_then_daruc.py` | DAM+Reserve -> DARUC pipeline |
+| `run_reserve_vs_aruc.py` | DAM+Reserve vs ARUC comparison |
+| `run_sensitivity_suite.py` | Multi-scenario sensitivity sweep across configurations |
 | `run_price_of_robustness.py` | Rho sweep: cost/curtailment vs uncertainty budget |
-| `run_alpha_sweep.py` | Alpha sweep: conformal alpha -> NPZ -> DARUC/ARUC cost/curtailment |
-| `debugging.py` | Infeasibility diagnosis (IIS extraction, progressive relaxation) |
+| `run_alpha_sweep.py` | Conformal alpha -> NPZ -> DARUC/ARUC cost/curtailment sweep |
 
 ### Uncertainty Set Pipeline (`uncertainty_sets_refactored/`)
 

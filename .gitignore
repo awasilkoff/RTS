@@ -12,13 +12,20 @@ build/
 # OS
 .DS_Store
 
-# Generated outputs
+# Generated outputs — excluded because they are large, reproducible, and scenario-specific
 dam_outputs/
 aruc_outputs/
 daruc_outputs/
 comparison_outputs/
 price_of_robustness/
 aruc_debug/
+ruc/ruc_outputs/
+
+# Intentionally tracked output directories — these contain results from long-running
+# sweeps (40-60 min each) that collaborators should be able to use without re-running.
+# Do NOT add these to .gitignore:
+#   alpha_sweep/        conformal alpha sweep results
+#   sensitivity_suite/  multi-scenario sensitivity results
 
 # Old uncertainty sets (superseded by uncertainty_sets_refactored/)
 uncertainty_sets/

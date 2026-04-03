@@ -28,3 +28,8 @@ uncertainty_sets/
 # Exception: track constellation-filtered SPP parquets used by ARUC/DARUC pipeline
 !uncertainty_sets_refactored/data/*_constellation_*.parquet
 uncertainty_sets_refactored/data/viz_artifacts/
+
+# LaTeX build artifacts
+out/
+*.aux
+*.synctex.gz

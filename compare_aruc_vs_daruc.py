@@ -848,25 +848,37 @@ def compute_worst_case_wind(res: dict, data, common_times: list[str]) -> dict | 
     # Get time labels from Z columns
     z_time_labels = Z_df.columns.get_level_values(0).unique().tolist()
 
-    # Aggregate across wind farms
+    # Per-farm and aggregate arrays
     forecast_ts = np.zeros(T)
     nominal_ts = np.zeros(T)
     worst_case_ts = np.zeros(T)
+    per_farm = {}  # gid -> {forecast, nominal, worst_case, deviation}
 
     for wi, gid in zip(wind_idx, wind_ids):
+        farm_forecast = np.zeros(T)
+        farm_nominal = np.zeros(T)
+        farm_worst = np.zeros(T)
+
         # Forecast (Pmax)
         for t_idx, tp in enumerate(time_pos):
-            forecast_ts[t_idx] += pmax_2d[wi, tp]
+            farm_forecast[t_idx] = pmax_2d[wi, tp]
+        forecast_ts += farm_forecast
 
         # Nominal dispatch
         if gid in p0_df.index:
-            nominal_ts += p0_df.loc[gid, common_times].values.astype(float)
+            farm_nominal = p0_df.loc[gid, common_times].values.astype(float)
+            nominal_ts += farm_nominal
 
         # Worst-case deviation from Z coefficients
         if gid not in Z_df.index:
             # No Z row for this generator -> worst_case = nominal (no deviation)
             if gid in p0_df.index:
-                worst_case_ts += p0_df.loc[gid, common_times].values.astype(float)
+                farm_worst = p0_df.loc[gid, common_times].values.astype(float).copy()
+                worst_case_ts += farm_worst
+            per_farm[gid] = {
+                "forecast": farm_forecast, "nominal": farm_nominal,
+                "worst_case": farm_worst, "deviation": farm_nominal - farm_worst,
+            }
             continue
 
         for t_idx in range(T):
@@ -882,6 +894,9 @@ def compute_worst_case_wind(res: dict, data, common_times: list[str]) -> dict | 
                     worst_case_ts[t_idx] += (
                         p0_df.loc[gid, common_times[t_idx]] if gid in p0_df.index else 0.0
                     )
+                    farm_worst[t_idx] = (
+                        p0_df.loc[gid, common_times[t_idx]] if gid in p0_df.index else 0.0
+                    )
                     continue
 
             # Get Z row for this generator and time
@@ -892,7 +907,13 @@ def compute_worst_case_wind(res: dict, data, common_times: list[str]) -> dict | 
             deviation = rho[t_idx] * norm_val
 
             p0_val = p0_df.loc[gid, common_times[t_idx]] if gid in p0_df.index else 0.0
-            worst_case_ts[t_idx] += float(p0_val) - deviation
+            farm_worst[t_idx] = float(p0_val) - deviation
+            worst_case_ts[t_idx] += farm_worst[t_idx]
+
+        per_farm[gid] = {
+            "forecast": farm_forecast, "nominal": farm_nominal,
+            "worst_case": farm_worst, "deviation": farm_nominal - farm_worst,
+        }
 
     uncertain_ts = nominal_ts - worst_case_ts
 
@@ -901,6 +922,7 @@ def compute_worst_case_wind(res: dict, data, common_times: list[str]) -> dict | 
         "nominal_ts": nominal_ts,
         "worst_case_ts": worst_case_ts,
         "uncertain_ts": uncertain_ts,
+        "per_farm": per_farm,
     }
 
 
@@ -920,6 +942,31 @@ def fig_worst_case_wind(
     if daruc_wc is None and aruc_wc is None:
         print("  Skipping worst-case wind — no Z/Sigma/rho data in either formulation.")
         return
+
+    # Print worst-case deviation summary
+    for label, wc in [("DARUC", daruc_wc), ("ARUC", aruc_wc)]:
+        if wc is None:
+            continue
+        dev = wc["uncertain_ts"]
+        print(f"  {label} worst-case wind deviation (MW):")
+        print(f"    Aggregate:")
+        print(f"      Total:  {dev.sum():.1f} MW·h")
+        print(f"      Mean:   {dev.mean():.1f} MW")
+        print(f"      Max:    {dev.max():.1f} MW  (hour {np.argmax(dev)})")
+        print(f"      Min:    {dev.min():.1f} MW  (hour {np.argmin(dev)})")
+        pct = np.divide(dev, wc["nominal_ts"],
+                        out=np.zeros_like(dev),
+                        where=wc["nominal_ts"] > 1e-3) * 100
+        print(f"      Mean %: {pct.mean():.1f}% of nominal dispatch")
+        for gid, farm in wc["per_farm"].items():
+            fd = farm["deviation"]
+            fpct = np.divide(fd, farm["nominal"],
+                             out=np.zeros_like(fd),
+                             where=farm["nominal"] > 1e-3) * 100
+            print(f"    {gid}:")
+            print(f"      Total: {fd.sum():.1f} MW·h  |  Mean: {fd.mean():.1f} MW"
+                  f"  |  Max: {fd.max():.1f} MW (h{np.argmax(fd)})"
+                  f"  |  Mean%: {fpct.mean():.1f}%")
 
     # DAM nominal wind dispatch (reference line)
     dam_nominal = None

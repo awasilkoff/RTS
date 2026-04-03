@@ -15,6 +15,55 @@ from compute_branch_flows import compute_branch_flows
 
 
 # ---------------------------------------------------------------------------
+# Generator metadata from gen.csv
+# ---------------------------------------------------------------------------
+
+_GEN_CSV_PATH = Path(__file__).parent / "RTS_Data" / "SourceData" / "gen.csv"
+
+_GEN_META_COLS = ["Fuel", "Category", "PMax MW", "PMin MW"]
+
+
+def load_gen_metadata(gen_csv=None):
+    """Load generator metadata from gen.csv, indexed by GEN UID.
+
+    Returns a DataFrame with columns: Fuel, Category, PMax MW, PMin MW.
+    Returns None if the file cannot be read.
+    """
+    path = Path(gen_csv) if gen_csv else _GEN_CSV_PATH
+    try:
+        df = pd.read_csv(path)
+        df = df.set_index("GEN UID")[_GEN_META_COLS]
+        return df
+    except Exception:
+        return None
+
+
+def _enrich_deviation_df(dev_df, gen_meta):
+    """Add fuel, category, pmax_mw, pmin_mw columns to a deviation DataFrame.
+
+    Merges on gen_id.  If gen_meta is None, adds empty columns.
+    """
+    if gen_meta is not None and not dev_df.empty:
+        merged = dev_df.merge(
+            gen_meta.rename(columns={
+                "Fuel": "fuel",
+                "Category": "category",
+                "PMax MW": "pmax_mw",
+                "PMin MW": "pmin_mw",
+            }),
+            left_on="gen_id",
+            right_index=True,
+            how="left",
+        )
+        return merged
+    else:
+        for col in ("fuel", "category", "pmax_mw", "pmin_mw"):
+            if col not in dev_df.columns:
+                dev_df[col] = ""
+        return dev_df
+
+
+# ---------------------------------------------------------------------------
 # Reserve requirement from uncertainty set
 # ---------------------------------------------------------------------------
 
@@ -427,23 +476,43 @@ def save_worst_case_flow_analysis(data, wc_result, label, out_dir):
 # ---------------------------------------------------------------------------
 
 def rebuild_deviation_summary(case_dir):
-    """Rebuild deviation_summary.csv from dam_reserve and daruc commitment CSVs.
+    """Rebuild deviation_summary.csv from DAM and DARUC commitment CSVs.
 
     This avoids re-running the full pipeline when only the summary is needed.
-    Reads commitment_u.csv from both dam_reserve/ and daruc/ subdirectories,
-    computes extra commitments and extra startups, and writes the result.
+    Looks for the DAM baseline commitment in this order:
+      1. daruc/dam_commitment_u.csv  (saved alongside DARUC output)
+      2. dam_reserve/commitment_u.csv (reserve baseline layout)
+      3. dam/commitment_u.csv (plain DAM layout)
 
     Parameters
     ----------
-    case_dir : Path — root directory containing dam_reserve/ and daruc/ subdirs
+    case_dir : Path — root directory containing daruc/ subdir (and DAM baseline)
 
     Returns
     -------
     pd.DataFrame — the deviation summary (also saved to daruc/deviation_summary.csv)
     """
     case_dir = Path(case_dir)
-    dam_u = pd.read_csv(case_dir / "dam_reserve" / "commitment_u.csv", index_col=0)
     daruc_u = pd.read_csv(case_dir / "daruc" / "commitment_u.csv", index_col=0)
+
+    # Find DAM baseline commitment
+    dam_candidates = [
+        case_dir / "daruc" / "dam_commitment_u.csv",
+        case_dir / "dam_reserve" / "commitment_u.csv",
+        case_dir / "dam" / "commitment_u.csv",
+    ]
+    dam_path = None
+    for candidate in dam_candidates:
+        if candidate.exists():
+            dam_path = candidate
+            break
+    if dam_path is None:
+        raise FileNotFoundError(
+            f"No DAM baseline commitment found in {case_dir}. "
+            f"Searched: {[str(c) for c in dam_candidates]}"
+        )
+    dam_u = pd.read_csv(dam_path, index_col=0)
+    print(f"  DAM baseline: {dam_path.relative_to(case_dir)}")
 
     # Binarize (handle -0.0 and float noise)
     dam_arr = (dam_u.values > 0.5).astype(int)
@@ -490,6 +559,10 @@ def rebuild_deviation_summary(case_dir):
             "gen_id", "gen_type", "extra_committed_hours", "extra_startups",
             "dam_committed_hours", "daruc_committed_hours", "periods_added",
         ])
+
+    # Enrich with fuel type and capacity from gen.csv
+    gen_meta = load_gen_metadata()
+    dev_df = _enrich_deviation_df(dev_df, gen_meta)
 
     dev_df.to_csv(case_dir / "daruc" / "deviation_summary.csv", index=False)
     print(f"Rebuilt deviation_summary.csv: {len(dev_df)} generators with extra commitments")
@@ -622,3 +695,45 @@ def compute_day1_metrics(data, results_dict):
     curt = float(((wind_pmax_d1 - dispatch[is_wind, :]) * dt).sum())
 
     return {"unit_hours": uh, "wind_curtailment_mwh": curt}
+
+
+def committed_units_day1(directory, day1_hours=24):
+    """Count unique generators committed during day 1 across commitment_u.csv files.
+
+    Searches *directory* recursively for files named ``commitment_u.csv``,
+    reads each one, and counts the number of generators (rows) with u >= 0.5
+    in at least one day-1 period.
+
+    Day-1 periods are identified by taking the first *day1_hours* worth of
+    columns.  For hourly schedules this is simply the first 24 columns; for
+    variable-interval horizons the column timestamps are parsed and all
+    columns within 24 hours of the first timestamp are included.
+
+    Parameters
+    ----------
+    directory : str or Path
+        Root directory to search (recursively) for commitment_u.csv files.
+    day1_hours : int, optional
+        Number of hours in day 1 (default 24).
+
+    Returns
+    -------
+    dict[str, int]
+        Mapping from the relative path of each commitment_u.csv (relative to
+        *directory*) to the number of unique committed units in day 1.
+    """
+    directory = Path(directory)
+    results = {}
+    for csv_path in sorted(directory.rglob("commitment_u.csv")):
+        u = pd.read_csv(csv_path, index_col=0)
+        # Determine day-1 columns
+        try:
+            timestamps = pd.to_datetime(u.columns)
+            t0 = timestamps[0]
+            day1_cols = [c for c, ts in zip(u.columns, timestamps)
+                         if ts < t0 + pd.Timedelta(hours=day1_hours)]
+        except Exception:
+            day1_cols = list(u.columns[:day1_hours])
+        committed = (u[day1_cols].values >= 0.5).any(axis=1).sum()
+        results[str(csv_path.relative_to(directory))] = int(committed)
+    return results

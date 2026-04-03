@@ -218,7 +218,7 @@ def _load_calibration_metadata() -> dict:
 def fig1_kernel_distance_comparison(
     feature_set_dir: Path = None,  # resolved at call time via FOCUSED_2D_DIR
     output_path: Path = None,
-    k: int = 64,
+    k: int = 128,
     tau: float = None,
 ) -> plt.Figure:
     """
@@ -258,7 +258,7 @@ def fig1_kernel_distance_comparison(
 
     # Load learned omega
     omega_learned = _load_omega(feature_set_dir)
-
+    print(omega_learned)
     # Select target point (middle of dataset)
     target_idx = len(Xs) // 2
     X_target = Xs[target_idx]
@@ -359,7 +359,85 @@ def fig1_kernel_distance_comparison(
     ax_right.grid(True, alpha=0.3)
 
     fig.tight_layout()
+    # ── ADD THIS BLOCK at the end of fig1_kernel_distance_comparison,
+    # just before the final _save_figure and return statements ──────────────
 
+    import matplotlib.gridspec as gridspec2
+
+    fig_p, (ax_pl, ax_pr) = plt.subplots(
+        1, 2,
+        figsize=(IEEE_TWO_COL_WIDTH, IEEE_TWO_COL_WIDTH * 0.48),
+        sharey=True, sharex=True,
+    )
+
+    # Left: learned weights
+    sc_p = ax_pl.scatter(
+        Xs[:, 0], Xs[:, 1],
+        c=weights_learned, cmap="viridis",
+        s=18, alpha=0.75, rasterized=True,
+        norm=plt.matplotlib.colors.LogNorm(
+            vmin=max(weights_learned.min(), 1e-6),
+            vmax=weights_learned.max(),
+        ),
+    )
+    ax_pl.scatter(
+        X_target[0], X_target[1],
+        c=COLORS["learned"], s=280, marker="*",
+        edgecolors="black", linewidths=0.8, zorder=10, label="Target Hour",
+    )
+    ax_pl.set_xlabel("System Mean", fontweight="bold")
+    ax_pl.set_ylabel("System Std Dev", fontweight="bold")
+    ax_pl.set_title("Learned Kernel Weights", fontweight="bold", pad=4)
+    ax_pl.legend(loc="upper right", framealpha=0.9)
+    ax_pl.grid(True, alpha=0.25)
+
+    # Right: k-NN
+    knn_mask = weights_knn == 1.0
+    ax_pr.scatter(Xs[~knn_mask, 0], Xs[~knn_mask, 1],
+                  c="lightgray", s=18, alpha=0.4, rasterized=True)
+    ax_pr.scatter(Xs[knn_mask, 0], Xs[knn_mask, 1],
+                  c=COLORS["knn"], s=28, alpha=0.85)
+    ax_pr.scatter(
+        X_target[0], X_target[1],
+        c=COLORS["learned"], s=280, marker="*",
+        edgecolors="black", linewidths=0.8, zorder=10, label="Target Hour",
+    )
+    ax_pr.set_xlabel("System Mean", fontweight="bold")
+    ax_pr.set_title(f"$k$-NN ($k={k}$ neighbors)", fontweight="bold", pad=4)
+    ax_pr.legend(loc="upper right", framealpha=0.9)
+    ax_pr.grid(True, alpha=0.25)
+    # After all scatter calls, before tight_layout:
+    # Set equal axis ranges manually (same as set_aspect="equal" visually)
+    x_min = min(Xs[:, 0].min(), X_target[0]) - 0.3
+    x_max = max(Xs[:, 0].max(), X_target[0]) + 0.3
+    y_min = min(Xs[:, 1].min(), X_target[1]) - 0.3
+    y_max = max(Xs[:, 1].max(), X_target[1]) + 0.3
+    # Make it square by taking the wider range
+    x_range = x_max - x_min
+    y_range = y_max - y_min
+    if x_range > y_range:
+        pad = (x_range - y_range) / 2
+        y_min -= pad
+        y_max += pad
+    else:
+        pad = (y_range - x_range) / 2
+        x_min -= pad
+        x_max += pad
+    ax_pl.set_xlim(x_min, x_max)
+    ax_pl.set_ylim(y_min, y_max)
+    # ax_pr shares axes so limits propagate automatically
+
+    fig_p.tight_layout()
+    # fig_p.subplots_adjust(bottom=0.3)
+    # cax_p = fig_p.add_axes([0.12, 0.08, 0.38, 0.04])
+    #
+    #
+    # cbar_p = fig_p.colorbar(sc_p, cax=cax_p, orientation="horizontal")
+    # cbar_p.set_label("Kernel Weight")
+    # cbar_p.set_ticks([1e-6, 1e-4, 1e-2, 1e0])
+    # cbar_p.ax.tick_params(labelsize=7)
+    _save_figure(fig_p, output_path.parent / (output_path.name + "_presentation"))
+    plt.close(fig_p)
     # Save
     _save_figure(fig, output_path)
 
@@ -3490,7 +3568,8 @@ def generate_all_figures(use_residuals: bool = False):
     # Figure 1: Kernel distance comparison
     print("\n[1/15] Kernel distance comparison (Learned vs k-NN)...")
     try:
-        fig1_kernel_distance_comparison(k=64)
+        fig1_kernel_distance_comparison(k=128)
+
         figures_generated.append("fig1_kernel_distance")
     except Exception as e:
         print(f"  Error: {e}")

@@ -82,6 +82,9 @@ def run_sweep(args) -> pd.DataFrame:
                 time_limit=args.time_limit,
                 threads=args.threads,
                 bar_qcp_conv_tol=args.bar_qcp_conv_tol,
+                mip_focus=args.mip_focus,
+                node_file_start=args.node_file_start,
+                cuts=args.cuts,
                 prev_daruc_solution=prev_daruc_results,
             )
             data = daruc_out["data"]
@@ -127,6 +130,9 @@ def run_sweep(args) -> pd.DataFrame:
                 time_limit=args.time_limit,
                 threads=args.threads,
                 bar_qcp_conv_tol=args.bar_qcp_conv_tol,
+                mip_focus=args.mip_focus,
+                node_file_start=args.node_file_start,
+                cuts=args.cuts,
                 prev_aruc_solution=prev_aruc_results,
             )
             aruc_res = aruc_out["results"]
@@ -251,6 +257,9 @@ def main():
     parser.add_argument("--time-limit", type=float, default=None, help="Gurobi time limit in seconds (default: no limit)")
     parser.add_argument("--threads", type=int, default=None, help="Gurobi thread count (default: Gurobi auto)")
     parser.add_argument("--bar-qcp-conv-tol", type=float, default=None, help="Barrier QCP convergence tolerance (default: 1e-8; try 1e-4 for speed)")
+    parser.add_argument("--mip-focus", type=int, default=None, help="Gurobi MIPFocus (1=feasibility, 2=optimality, 3=bound)")
+    parser.add_argument("--node-file-start", type=float, default=None, help="Gurobi NodefileStart in GB (default 2.0)")
+    parser.add_argument("--cuts", type=int, default=None, help="Gurobi Cuts aggressiveness (-1 to 3)")
     parser.add_argument("--fast", action=argparse.BooleanOptionalAction, default=True, help="Performance defaults ON by default: bar-qcp-conv-tol=1e-4, time-limit=600, line-monitor-threshold=0.5 (when lines enforced). Use --no-fast to disable.")
     args = parser.parse_args()
 

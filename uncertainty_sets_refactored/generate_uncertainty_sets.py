@@ -49,6 +49,11 @@ from covariance_optimization import (
     predict_mu_sigma_topk_cross,
     implied_rho_from_total_lower_bound,
 )
+from conformal_flow import (
+    calibrate_flow_rho_per_line,
+    load_rts_wind_ptdf,
+    build_flow_forecast_matrices,
+)
 
 # ------------------------------------------------------------------------------
 # Logging
@@ -301,6 +306,7 @@ def pre_compute_covariance(
         "sigma_all": sigma_all,
         "omega_hat": omega_hat,
         "Xs_cov": Xs_cov,
+        "Y_cov": Y_cov,
         "times_cov": times_cov,
         "times_train": times_train,
         "df_tot": df_tot,
@@ -327,6 +333,10 @@ def generate_uncertainty_sets_for_alpha(
     x_cols: list,
     output_dir: Path,
     output_name: str = "sigma_rho",
+    flow_conformal: bool = False,
+    Y_cov: Optional[np.ndarray] = None,
+    paths: Optional[CachedPaths] = None,
+    rts_data_dir: Optional[Path] = None,
 ) -> Path:
     """
     Generate uncertainty sets for a single alpha value using pre-computed
@@ -461,15 +471,89 @@ def generate_uncertainty_sets_for_alpha(
     )
 
     # -------------------------------------------------------------------------
-    # Step 7: Save outputs
+    # Step 7 (optional): Per-line flow conformal calibration
+    # -------------------------------------------------------------------------
+    flow_result = None
+    if flow_conformal:
+        logger.info("Running per-line flow conformal calibration...")
+
+        if Y_cov is None or paths is None:
+            raise ValueError(
+                "flow_conformal=True requires Y_cov and paths to be provided"
+            )
+
+        # Determine RTS data directory for PTDF
+        if rts_data_dir is None:
+            rts_data_dir = Path(__file__).resolve().parent.parent / "RTS_Data" / "SourceData"
+        logger.info("Loading PTDF from %s", rts_data_dir)
+
+        H_wind, line_ids_all, bus_ids, wind_bus_ids = load_rts_wind_ptdf(
+            rts_data_dir=str(rts_data_dir),
+            wind_resource_ids=y_cols,
+        )
+        logger.info(
+            "PTDF loaded: %d lines, %d wind buses", H_wind.shape[0], H_wind.shape[1],
+        )
+
+        # Build per-resource forecast matrix aligned to times_cov
+        _, Y_forecast_full, fc_times, fc_resources = build_flow_forecast_matrices(
+            actuals_parquet=str(paths.actuals_parquet),
+            forecasts_parquet=str(paths.forecasts_parquet),
+            wind_resource_ids=y_cols,
+        )
+
+        # Align forecast matrix to times_cov (same timestamps as sigma_all)
+        # times_cov and fc_times may not be identical; match by timestamp
+        fc_time_idx = {t: i for i, t in enumerate(fc_times)}
+        valid_cov_idx = []
+        valid_fc_idx = []
+        for ci, t in enumerate(times_cov):
+            if t in fc_time_idx:
+                valid_cov_idx.append(ci)
+                valid_fc_idx.append(fc_time_idx[t])
+
+        if len(valid_cov_idx) < len(times_cov):
+            logger.warning(
+                "Flow conformal: %d/%d covariance timestamps matched forecasts",
+                len(valid_cov_idx), len(times_cov),
+            )
+
+        Y_actual_aligned = Y_cov[valid_cov_idx]       # (T_aligned, K)
+        Y_forecast_aligned = Y_forecast_full[valid_fc_idx]  # (T_aligned, K)
+        sigma_aligned = sigma_all[valid_cov_idx]       # (T_aligned, K, K)
+
+        # Build calibration indices: same train_frac split as covariance
+        n_aligned = len(valid_cov_idx)
+        n_train_flow = int(n_aligned * config.train_frac)
+        cal_indices = np.arange(n_train_flow, n_aligned)
+        train_indices = np.arange(n_train_flow)
+
+        logger.info(
+            "Flow conformal split: train=%d, cal=%d (total aligned=%d)",
+            len(train_indices), len(cal_indices), n_aligned,
+        )
+
+        flow_result = calibrate_flow_rho_per_line(
+            Y_actual=Y_actual_aligned,
+            Y_forecast=Y_forecast_aligned,
+            H_wind=H_wind,
+            Sigma=sigma_aligned,
+            cal_indices=cal_indices,
+            alpha=alpha_target,
+            line_ids=line_ids_all,
+            safety_margin=config.safety_margin,
+            test_indices=train_indices,  # use train as "test" for diagnostics
+        )
+
+    # -------------------------------------------------------------------------
+    # Step 8: Save outputs
     # -------------------------------------------------------------------------
     out_npz = output_dir / f"{output_name}.npz"
     out_metadata = output_dir / "metadata.json"
 
     logger.info("Saving to %s", out_npz)
 
-    np.savez_compressed(
-        out_npz,
+    npz_data = dict(
         mu=mu_arr,
         sigma=sigma_arr,
         rho=rho_arr,
@@ -478,6 +562,12 @@ def generate_uncertainty_sets_for_alpha(
         y_cols=np.array(y_cols, dtype=object),
         x_cols=np.array(x_cols, dtype=object),
     )
+
+    if flow_result is not None:
+        npz_data["rho_lines"] = flow_result.rho_lines
+        npz_data["rho_lines_line_ids"] = np.array(flow_result.line_ids, dtype=object)
+
+    np.savez_compressed(out_npz, **npz_data)
 
     metadata = {
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -513,6 +603,25 @@ def generate_uncertainty_sets_for_alpha(
         },
     }
 
+    if flow_result is not None:
+        metadata["flow_conformal"] = {
+            "n_lines_valid": int(flow_result.valid_mask.sum()),
+            "n_lines_total": int(len(flow_result.valid_mask)),
+            "rho_lines_stats": {
+                "min": float(flow_result.rho_lines.min()),
+                "max": float(flow_result.rho_lines.max()),
+                "mean": float(flow_result.rho_lines.mean()),
+                "median": float(np.median(flow_result.rho_lines)),
+                "std": float(flow_result.rho_lines.std()),
+            },
+            "coverage_cal_stats": {
+                "min": float(flow_result.coverage_cal.min()),
+                "mean": float(flow_result.coverage_cal.mean()),
+                "max": float(flow_result.coverage_cal.max()),
+            },
+            "sigma_flow_stats": flow_result.sigma_flow_stats,
+        }
+
     with open(out_metadata, "w") as f:
         json.dump(metadata, f, indent=2)
 
@@ -536,6 +645,8 @@ def generate_uncertainty_sets(
     paths: CachedPaths,
     output_dir: Path,
     output_name: str = "sigma_rho",
+    flow_conformal: bool = False,
+    rts_data_dir: Optional[Path] = None,
 ) -> Path:
     """
     Generate pre-computed (mu, Sigma, rho) for all available hours.
@@ -546,7 +657,8 @@ def generate_uncertainty_sets(
     3. Load or train omega
     4. Train conformal model for lower bounds
     5. For each hour: compute mu, Sigma, rho
-    6. Save to NPZ + metadata
+    6. (Optional) Calibrate per-line flow rho via conformal prediction
+    7. Save to NPZ + metadata
 
     Parameters
     ----------
@@ -558,6 +670,10 @@ def generate_uncertainty_sets(
         Directory to save outputs
     output_name : str
         Base name for output files (without extension)
+    flow_conformal : bool
+        If True, also calibrate per-line rho_l for flow constraints.
+    rts_data_dir : Path, optional
+        Path to RTS_Data/SourceData for PTDF. Auto-detected if None.
 
     Returns
     -------
@@ -583,6 +699,10 @@ def generate_uncertainty_sets(
         x_cols=cov["x_cols"],
         output_dir=output_dir,
         output_name=output_name,
+        flow_conformal=flow_conformal,
+        Y_cov=cov["Y_cov"],
+        paths=paths,
+        rts_data_dir=rts_data_dir,
     )
 
 
@@ -703,6 +823,19 @@ def main():
         help="Data version (v1=original, v2=scaled SUBMODEL-filtered)",
     )
 
+    # Flow conformal parameters
+    parser.add_argument(
+        "--flow-conformal",
+        action="store_true",
+        help="Also calibrate per-line rho_l for flow constraints",
+    )
+    parser.add_argument(
+        "--rts-data-dir",
+        type=Path,
+        default=None,
+        help="Path to RTS_Data/SourceData for PTDF (auto-detected if omitted)",
+    )
+
     args = parser.parse_args()
 
     # Build paths (use RTS4 data by default)
@@ -736,6 +869,8 @@ def main():
         paths=paths,
         output_dir=args.output_dir,
         output_name=args.output_name,
+        flow_conformal=args.flow_conformal,
+        rts_data_dir=args.rts_data_dir,
     )
 
 

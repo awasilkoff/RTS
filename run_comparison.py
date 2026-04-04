@@ -381,6 +381,7 @@ def main():
     daruc_margin = extract_line_margins(
         daruc_outputs["vars"], data, daruc_outputs["rho"],
         args.rho_lines_frac, daruc_outputs["time_varying"],
+        rho_per_line=daruc_outputs.get("rho_per_line"),
     )
     daruc_summary = {
         "daruc_objective": daruc_results["obj"],
@@ -466,6 +467,7 @@ def main():
     aruc_margin = extract_line_margins(
         aruc_outputs["vars"], data, aruc_outputs["rho"],
         aruc_outputs.get("rho_lines_frac"), aruc_outputs["time_varying"],
+        rho_per_line=aruc_outputs.get("rho_per_line"),
     )
     aruc_summary = {
         "objective": aruc_results["obj"],

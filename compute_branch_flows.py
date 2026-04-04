@@ -224,6 +224,7 @@ def find_worst_case_line_violations(
     rho_lines_frac: float | None,
     time_varying: bool,
     viol_tol: float = 1.0,
+    rho_per_line: np.ndarray | None = None,
 ) -> list[tuple[int, int, float, float]]:
     """Check all lines for worst-case flow violations under uncertainty.
 
@@ -266,10 +267,11 @@ def find_worst_case_line_violations(
     I, T = p0_arr.shape
     L = PTDF.shape[0]
 
-    if rho_lines_frac is not None:
-        rho_lines = rho_lines_frac * rho
-    else:
-        rho_lines = rho
+    if rho_per_line is None:
+        if rho_lines_frac is not None:
+            rho_lines = rho_lines_frac * rho
+        else:
+            rho_lines = rho
 
     # Nominal flows: PTDF @ (gen_injection - load)
     inj = np.zeros((N, T))
@@ -285,8 +287,6 @@ def find_worst_case_line_violations(
         Z_bus[gen_to_bus[i], :, :] += Z_arr[i, :, :]
 
     # Line sensitivity: a[l, t, k] = sum_n PTDF[l,n] * Z_bus[n,t,k]
-    # = PTDF @ Z_bus  reshaped appropriately
-    # PTDF is (L, N), Z_bus is (N, T, K) -> a is (L, T, K)
     a = np.einsum("ln,ntk->ltk", PTDF, Z_bus)
 
     violations = []
@@ -295,14 +295,15 @@ def find_worst_case_line_violations(
         for t in range(T):
             f_nom = flow_nom[l, t]
             if robust_mask[t]:
-                # Worst-case margin: rho_t * ||L_t^T @ a[l,t,:]||
-                L_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma  # (K, K)
-                rho_t = float(rho_lines[t]) if time_varying else float(rho_lines)
-                # y = L^T @ a  -> ||y||
-                y = L_t.T @ a[l, t, :]  # (K,)
+                L_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
+                if rho_per_line is not None:
+                    rho_t = float(rho_per_line[l, t])
+                elif time_varying:
+                    rho_t = float(rho_lines[t])
+                else:
+                    rho_t = float(rho_lines)
+                y = L_t.T @ a[l, t, :]
                 norm_y = np.linalg.norm(y)
-                # Worst case in positive direction: f_nom + rho_t * norm_y
-                # Worst case in negative direction: -f_nom + rho_t * norm_y
                 wc_pos = f_nom + rho_t * norm_y
                 wc_neg = -f_nom + rho_t * norm_y
                 excess = max(wc_pos - fmax_l, wc_neg - fmax_l)
@@ -325,6 +326,7 @@ def iterative_line_resolve(
     time_varying: bool,
     max_iter: int = 5,
     viol_tol: float = 1.0,
+    rho_per_line: np.ndarray | None = None,
 ) -> int:
     """Iteratively add violated line constraints and re-solve.
 
@@ -377,10 +379,12 @@ def iterative_line_resolve(
     d = data.d  # (N, T) — same as data_full.d
 
     # Resolve rho_lines (mirrors aruc_model.py logic)
-    if rho_lines_frac is not None:
-        rho_lines = rho_lines_frac * rho
-    else:
-        rho_lines = rho
+    # When rho_per_line is provided, rho_lines_t is resolved per (l, t) in the loop
+    if rho_per_line is None:
+        if rho_lines_frac is not None:
+            rho_lines = rho_lines_frac * rho
+        else:
+            rho_lines = rho
 
     added_pairs: set[tuple[int, int]] = set()
 
@@ -401,6 +405,7 @@ def iterative_line_resolve(
         violations = find_worst_case_line_violations(
             data_full, p0_arr, Z_arr, robust_mask,
             sqrt_Sigma, rho, rho_lines_frac, time_varying, viol_tol,
+            rho_per_line=rho_per_line,
         )
         if not violations:
             print(f"  [Line iter] No worst-case violations (tol={viol_tol} MW) — converged.")
@@ -441,7 +446,12 @@ def iterative_line_resolve(
             if robust_mask[t]:
                 # Robust constraints with SOC
                 sqrt_Sigma_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
-                rho_lines_t = float(rho_lines[t]) if time_varying else float(rho_lines)
+                if rho_per_line is not None:
+                    rho_lines_t = float(rho_per_line[l_full, t])
+                elif time_varying:
+                    rho_lines_t = float(rho_lines[t])
+                else:
+                    rho_lines_t = float(rho_lines)
 
                 z_var = model.addVar(lb=0.0, name=f"z_line_add_{tag}")
                 y_vars = {}
@@ -536,6 +546,7 @@ def iterative_line_resolve(
     remaining = find_worst_case_line_violations(
         data_full, p0_arr, Z_arr, robust_mask,
         sqrt_Sigma, rho, rho_lines_frac, time_varying, viol_tol,
+        rho_per_line=rho_per_line,
     )
     if remaining:
         print(f"  [Line iter] WARNING: {len(remaining)} worst-case violations remain after {max_iter} iterations")

@@ -23,7 +23,7 @@ import pandas as pd
 import gurobipy as gp
 
 from models import DAMData
-from aruc_model import build_aruc_ldr_model, align_uncertainty_to_aruc
+from aruc_model import build_aruc_ldr_model, align_uncertainty_to_aruc, align_rho_lines_to_data, reshape_rho_per_line_for_intervals
 from aruc_warm_start import warm_start_aruc_from_dam
 from run_rts_dam import run_rts_dam
 from run_rts_aruc import (
@@ -381,11 +381,19 @@ def run_rts_daruc(
         )
         time_varying = True
 
+        # Build per-line rho if provider has rho_lines
+        rho_per_line = align_rho_lines_to_data(horizon, data)
+        rho_per_line_full = align_rho_lines_to_data(horizon, data_full) if data_full is not None else rho_per_line
+
         # Reshape if using variable intervals
         if data.period_duration is not None:
             Sigma, rho_arr, sqrt_Sigma = reshape_uncertainty_for_variable_intervals(
                 Sigma, rho_arr, data.period_duration, sqrt_Sigma
             )
+            if rho_per_line is not None:
+                rho_per_line = reshape_rho_per_line_for_intervals(rho_per_line, data.period_duration)
+            if rho_per_line_full is not None and data_full is not None and data_full.period_duration is not None:
+                rho_per_line_full = reshape_rho_per_line_for_intervals(rho_per_line_full, data_full.period_duration)
             print(f"  Reshaped uncertainty to {T} variable-interval periods")
 
         print(f"  Sigma shape: {Sigma.shape}")
@@ -397,6 +405,8 @@ def run_rts_daruc(
         Sigma, rho_val = build_uncertainty_set(
             data, rho=rho, wind_std_fraction=wind_std_fraction
         )
+        rho_per_line = None
+        rho_per_line_full = None
         model_name = "DARUC_RTS"
 
     t0 = time.time()
@@ -427,6 +437,7 @@ def run_rts_daruc(
         cuts=cuts,
         line_mask=line_mask,
         flow_direction=flow_direction,
+        rho_per_line=rho_per_line,
     )
 
     # Warm start: prefer previous DARUC solution (sweep mode) over DAM
@@ -463,6 +474,7 @@ def run_rts_daruc(
             model, vars_dict, data, data_full,
             _rmask, sqrt_Sigma, rho_val,
             rho_lines_frac, time_varying,
+            rho_per_line=rho_per_line_full,
         )
         timings["line_iterations_solve"] = time.time() - t0
 
@@ -498,6 +510,7 @@ def run_rts_daruc(
         "Sigma": Sigma,
         "rho": rho_val,
         "rho_lines_frac": rho_lines_frac,
+        "rho_per_line": rho_per_line,
         "time_varying": time_varying,
         "line_mask": line_mask,
         "timings": timings,
@@ -527,6 +540,7 @@ if __name__ == "__main__":
     margin_df = extract_line_margins(
         outputs["vars"], outputs["data"], outputs["rho"],
         outputs.get("rho_lines_frac"), outputs["time_varying"],
+        rho_per_line=outputs.get("rho_per_line"),
     )
     if margin_df is not None:
         margin_df.to_csv(out_dir / "line_margin.csv")

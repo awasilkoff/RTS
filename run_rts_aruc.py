@@ -28,7 +28,7 @@ import pandas as pd
 import gurobipy as gp
 
 from models import DAMData
-from aruc_model import build_aruc_ldr_model, align_uncertainty_to_aruc
+from aruc_model import build_aruc_ldr_model, align_uncertainty_to_aruc, align_rho_lines_to_data, reshape_rho_per_line_for_intervals
 from aruc_warm_start import warm_start_aruc_from_dam
 from dam_model import build_dam_model
 from io_rts import build_damdata_from_rts
@@ -253,11 +253,17 @@ def extract_solution(
     return results
 
 
-def extract_line_margins(vars_dict, data, rho, rho_lines_frac=None, time_varying=False):
+def extract_line_margins(vars_dict, data, rho, rho_lines_frac=None, time_varying=False, rho_per_line=None):
     """Extract robust line flow margins: rho_t * z_line[l,t] for each (line, period).
 
     Returns DataFrame (line_ids x time) with margin in MW, or None if no line
     SOC constraints exist (copperplate mode).
+
+    Parameters
+    ----------
+    rho_per_line : np.ndarray or None
+        Per-line rho array (L, T) from conformal calibration. Takes precedence
+        over rho_lines_frac when provided.
     """
     z_line = vars_dict.get("z_line", {})
     if not z_line:
@@ -265,6 +271,13 @@ def extract_line_margins(vars_dict, data, rho, rho_lines_frac=None, time_varying
 
     L = len(data.line_ids)
     T = len(data.time)
+
+    # Per-line rho takes precedence
+    if rho_per_line is not None:
+        margin = np.zeros((L, T))
+        for (l, t) in z_line:
+            margin[l, t] = float(rho_per_line[l, t]) * z_line[l, t].X
+        return pd.DataFrame(margin, index=data.line_ids, columns=data.time)
 
     # Compute rho_lines (same logic as aruc_model.py lines 228-257)
     if time_varying:
@@ -583,11 +596,19 @@ def run_rts_aruc(
         )
         time_varying = True
 
+        # Build per-line rho if provider has rho_lines
+        rho_per_line = align_rho_lines_to_data(horizon, data)
+        rho_per_line_full = align_rho_lines_to_data(horizon, data_full) if data is not data_full else rho_per_line
+
         # Reshape if using variable intervals
         if data.period_duration is not None:
             Sigma, rho, sqrt_Sigma = reshape_uncertainty_for_variable_intervals(
                 Sigma, rho, data.period_duration, sqrt_Sigma
             )
+            if rho_per_line is not None:
+                rho_per_line = reshape_rho_per_line_for_intervals(rho_per_line, data.period_duration)
+            if rho_per_line_full is not None and data_full.period_duration is not None:
+                rho_per_line_full = reshape_rho_per_line_for_intervals(rho_per_line_full, data_full.period_duration)
             print(f"  Reshaped uncertainty to {T} variable-interval periods")
 
         print(f"  Wind IDs from provider: {provider.get_wind_gen_ids()}")
@@ -600,6 +621,8 @@ def run_rts_aruc(
         Sigma, rho = build_uncertainty_set(
             data, rho=rho, wind_std_fraction=wind_std_fraction
         )
+        rho_per_line = None
+        rho_per_line_full = None
         model_name = "ARUC_LDR_RTS"
 
     t0 = time.time()
@@ -627,6 +650,7 @@ def run_rts_aruc(
         cuts=cuts,
         line_mask=line_mask,
         flow_direction=flow_direction,
+        rho_per_line=rho_per_line,
     )
 
     # Warm start: prefer previous ARUC solution (sweep mode) over DAM
@@ -667,6 +691,7 @@ def run_rts_aruc(
             model, vars_dict, data, data_full,
             _rmask, sqrt_Sigma, rho,
             rho_lines_frac, time_varying,
+            rho_per_line=rho_per_line_full,
         )
         timings["line_iterations_solve"] = time.time() - t0
 
@@ -690,6 +715,7 @@ def run_rts_aruc(
         "Sigma": Sigma,
         "rho": rho,
         "rho_lines_frac": rho_lines_frac,
+        "rho_per_line": rho_per_line,
         "time_varying": time_varying,
         "timings": timings,
         "line_iterations": line_iterations,
@@ -736,6 +762,7 @@ if __name__ == "__main__":
     margin_df = extract_line_margins(
         outputs_aruc["vars"], outputs_aruc["data"], outputs_aruc["rho"],
         outputs_aruc.get("rho_lines_frac"), outputs_aruc["time_varying"],
+        rho_per_line=outputs_aruc.get("rho_per_line"),
     )
     if margin_df is not None:
         margin_df.to_csv(out_dir / "line_margin.csv")

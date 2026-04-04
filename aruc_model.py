@@ -66,6 +66,74 @@ def align_uncertainty_to_aruc(
     return Sigma_aligned, horizon.rho.copy(), sqrt_Sigma_aligned
 
 
+def align_rho_lines_to_data(
+    horizon: "HorizonUncertaintySet",
+    data: DAMData,
+) -> Optional[np.ndarray]:
+    """
+    Map per-line rho from NPZ to DAMData's (potentially filtered) line ordering.
+
+    Parameters
+    ----------
+    horizon : HorizonUncertaintySet
+        Must have rho_lines (L_npz, T) and rho_lines_line_ids.
+    data : DAMData
+        Contains line_ids (possibly filtered by filter_monitored_lines).
+
+    Returns
+    -------
+    rho_per_line : (L_data, T) array, or None if horizon has no rho_lines.
+        Lines in data not found in NPZ fall back to horizon.rho[t].
+    """
+    if horizon.rho_lines is None or horizon.rho_lines_line_ids is None:
+        return None
+
+    T = horizon.rho_lines.shape[1]
+    L_data = len(data.line_ids)
+
+    # Build lookup: NPZ line ID (str) -> row index
+    npz_id_to_row = {str(lid): i for i, lid in enumerate(horizon.rho_lines_line_ids)}
+
+    result = np.empty((L_data, T))
+    n_matched = 0
+    n_fallback = 0
+
+    for l, lid in enumerate(data.line_ids):
+        key = str(lid)
+        if key in npz_id_to_row:
+            result[l, :] = horizon.rho_lines[npz_id_to_row[key], :]
+            n_matched += 1
+        else:
+            # Fall back to system-level rho
+            result[l, :] = horizon.rho[:T]
+            n_fallback += 1
+
+    print(f"  [ARUC] rho_per_line: {n_matched}/{L_data} lines matched NPZ, "
+          f"{n_fallback} fell back to system rho")
+
+    return result
+
+
+def reshape_rho_per_line_for_intervals(
+    rho_pl_hourly: np.ndarray,
+    period_duration: np.ndarray,
+) -> np.ndarray:
+    """
+    Reshape hourly rho_per_line (L, T_hourly) to variable-interval periods (L, T_periods).
+
+    Uses mean within each block (consistent with Sigma averaging).
+    """
+    T_periods = len(period_duration)
+    L = rho_pl_hourly.shape[0]
+    out = np.zeros((L, T_periods))
+    h = 0
+    for t in range(T_periods):
+        dt = int(period_duration[t])
+        out[:, t] = rho_pl_hourly[:, h:h + dt].mean(axis=1)
+        h += dt
+    return out
+
+
 def build_aruc_ldr_model(
     data: DAMData,
     Sigma: np.ndarray,
@@ -93,7 +161,7 @@ def build_aruc_ldr_model(
     line_mask: Optional[np.ndarray] = None,
     flow_direction: Optional[np.ndarray] = None,
     gating_mask: Optional[np.ndarray] = None,
-    rho_per_line: Optional[Dict[int, float]] = None,
+    rho_per_line: Optional[np.ndarray] = None,
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Adaptive robust UC with linear decision rules:
@@ -261,6 +329,20 @@ def build_aruc_ldr_model(
                   f"[{rho_lines.min():.3f}, {rho_lines.max():.3f}]")
         else:
             print(f"  [ARUC] rho_lines_frac={rho_lines_frac} -> rho_lines={rho_lines:.3f}")
+
+    # Per-line rho override (takes precedence over rho_lines_frac)
+    rho_lines_2d = False
+    if rho_per_line is not None:
+        if enforce_lines:
+            assert rho_per_line.shape == (L, T), (
+                f"Expected rho_per_line shape ({L}, {T}), got {rho_per_line.shape}"
+            )
+            rho_lines = rho_per_line  # (L, T) array
+            rho_lines_2d = True
+            print(f"  [ARUC] Using per-line rho_lines: shape {rho_lines.shape}, "
+                  f"range [{rho_lines.min():.3f}, {rho_lines.max():.3f}]")
+        else:
+            print("  [ARUC] rho_per_line provided but enforce_lines=False, ignoring")
 
     # Map bus -> list of generators
     gens_at_bus = [[] for _ in range(N)]
@@ -805,7 +887,12 @@ def build_aruc_ldr_model(
                 # --- Robust period ---
                 # Get time-specific values
                 sqrt_Sigma_t = sqrt_Sigma[t] if time_varying else sqrt_Sigma
-                rho_lines_t = rho_lines[t] if time_varying else rho_lines
+                if rho_lines_2d:
+                    rho_lines_t = float(rho_lines[l, t])
+                elif time_varying:
+                    rho_lines_t = rho_lines[t]
+                else:
+                    rho_lines_t = rho_lines
 
                 # 2) a_expr[k] = d(flow) / d r_k
                 a_expr = [gp.LinExpr() for _ in range(K)]

@@ -102,7 +102,9 @@ class HorizonUncertaintySet:
     mu: np.ndarray
     sqrt_sigma: Optional[np.ndarray] = None
     rho_lines: Optional[np.ndarray] = None
+    """Per-line ellipsoid radii, shape (L, T) — time-varying per constraint."""
     rho_lines_line_ids: Optional[List[str]] = None
+    """Line IDs corresponding to rho_lines rows (length L)."""
 
     @property
     def n_periods(self) -> int:
@@ -239,9 +241,9 @@ class UncertaintySetProvider:
         metadata : dict, optional
             Additional metadata from generation
         rho_lines : np.ndarray, optional
-            Per-line ellipsoid radii, shape (L,). Static (same for all hours).
+            Per-line ellipsoid radii, shape (L, N). Time-varying per constraint.
         rho_lines_line_ids : List[str], optional
-            Line IDs corresponding to rho_lines rows.
+            Line IDs corresponding to rho_lines rows (length L).
         """
         self._mu = np.asarray(mu)
         self._sigma = np.asarray(sigma)
@@ -409,13 +411,18 @@ class UncertaintySetProvider:
             for t in range(n_hours):
                 sqrt_sigma[t] = _safe_cholesky(sigma[t])
 
+        # Slice rho_lines by time horizon: (L, N) -> (L, n_hours)
+        rho_lines_slice = None
+        if self._rho_lines is not None:
+            rho_lines_slice = self._rho_lines[:, start_idx:end_idx].copy()
+
         return HorizonUncertaintySet(
             indices=indices,
             sigma=sigma,
             rho=rho,
             mu=mu,
             sqrt_sigma=sqrt_sigma,
-            rho_lines=self._rho_lines.copy() if self._rho_lines is not None else None,
+            rho_lines=rho_lines_slice,
             rho_lines_line_ids=(
                 self._rho_lines_line_ids.copy()
                 if self._rho_lines_line_ids is not None

@@ -495,54 +495,47 @@ def generate_uncertainty_sets_for_alpha(
             "PTDF loaded: %d lines, %d wind buses", H_wind.shape[0], H_wind.shape[1],
         )
 
-        # Build per-resource forecast matrix aligned to times_cov
-        _, Y_forecast_full, fc_times, fc_resources = build_flow_forecast_matrices(
-            actuals_parquet=str(paths.actuals_parquet),
-            forecasts_parquet=str(paths.forecasts_parquet),
-            wind_resource_ids=y_cols,
-        )
+        # Align Y_cov and sigma_all to df_tot timestamps (for conformal model)
+        # df_tot has TIME_HOURLY as column; times_cov has matching timestamps
+        # We need to restrict to the valid_indices that survived the rho computation
+        Y_actual_valid = Y_cov[valid_indices]          # (T_valid, K)
+        sigma_valid = sigma_arr                         # (T_valid, K, K)
+        mu_valid = mu_arr                               # (T_valid, K)
 
-        # Align forecast matrix to times_cov (same timestamps as sigma_all)
-        # times_cov and fc_times may not be identical; match by timestamp
-        fc_time_idx = {t: i for i, t in enumerate(fc_times)}
-        valid_cov_idx = []
-        valid_fc_idx = []
-        for ci, t in enumerate(times_cov):
-            if t in fc_time_idx:
-                valid_cov_idx.append(ci)
-                valid_fc_idx.append(fc_time_idx[t])
+        # Build df_features for the flow conformal — align df_tot to valid times
+        times_valid_set = set(pd.Timestamp(t) for t in times_list)
+        df_flow = df_tot[df_tot["TIME_HOURLY"].isin(times_valid_set)].copy()
+        df_flow = df_flow.sort_values("TIME_HOURLY").reset_index(drop=True)
 
-        if len(valid_cov_idx) < len(times_cov):
+        if len(df_flow) != len(mu_valid):
             logger.warning(
-                "Flow conformal: %d/%d covariance timestamps matched forecasts",
-                len(valid_cov_idx), len(times_cov),
+                "Flow conformal: df_features has %d rows but mu/sigma has %d — "
+                "falling back to index-based alignment",
+                len(df_flow), len(mu_valid),
             )
-
-        Y_actual_aligned = Y_cov[valid_cov_idx]       # (T_aligned, K)
-        Y_forecast_aligned = Y_forecast_full[valid_fc_idx]  # (T_aligned, K)
-        sigma_aligned = sigma_all[valid_cov_idx]       # (T_aligned, K, K)
-
-        # Build calibration indices: same train_frac split as covariance
-        n_aligned = len(valid_cov_idx)
-        n_train_flow = int(n_aligned * config.train_frac)
-        cal_indices = np.arange(n_train_flow, n_aligned)
-        train_indices = np.arange(n_train_flow)
-
-        logger.info(
-            "Flow conformal split: train=%d, cal=%d (total aligned=%d)",
-            len(train_indices), len(cal_indices), n_aligned,
-        )
+            # Use first len(mu_valid) rows if lengths mismatch
+            n_use = min(len(df_flow), len(mu_valid))
+            df_flow = df_flow.iloc[:n_use].reset_index(drop=True)
+            Y_actual_valid = Y_actual_valid[:n_use]
+            sigma_valid = sigma_valid[:n_use]
+            mu_valid = mu_valid[:n_use]
 
         flow_result = calibrate_flow_rho_per_line(
-            Y_actual=Y_actual_aligned,
-            Y_forecast=Y_forecast_aligned,
+            df_features=df_flow,
+            Y_actual=Y_actual_valid,
             H_wind=H_wind,
-            Sigma=sigma_aligned,
-            cal_indices=cal_indices,
+            Sigma=sigma_valid,
+            mu=mu_valid,
+            feature_cols=config.conformal_feature_cols,
             alpha=alpha_target,
+            times_train=times_train,
             line_ids=line_ids_all,
-            safety_margin=config.safety_margin,
-            test_indices=train_indices,  # use train as "test" for diagnostics
+            conformal_kwargs={
+                "quantile_alpha": config.quantile_alpha,
+                "n_bins": config.n_bins,
+                "safety_margin": config.safety_margin,
+                "model_kwargs": config.conformal_model_kwargs,
+            },
         )
 
     # -------------------------------------------------------------------------
@@ -607,17 +600,12 @@ def generate_uncertainty_sets_for_alpha(
         metadata["flow_conformal"] = {
             "n_lines_valid": int(flow_result.valid_mask.sum()),
             "n_lines_total": int(len(flow_result.valid_mask)),
-            "rho_lines_stats": {
-                "min": float(flow_result.rho_lines.min()),
-                "max": float(flow_result.rho_lines.max()),
-                "mean": float(flow_result.rho_lines.mean()),
-                "median": float(np.median(flow_result.rho_lines)),
-                "std": float(flow_result.rho_lines.std()),
-            },
-            "coverage_cal_stats": {
-                "min": float(flow_result.coverage_cal.min()),
-                "mean": float(flow_result.coverage_cal.mean()),
-                "max": float(flow_result.coverage_cal.max()),
+            "rho_lines_shape": list(flow_result.rho_lines.shape),
+            "rho_lines_stats": flow_result.rho_stats,
+            "coverage_per_line_stats": {
+                "min": float(flow_result.coverage_per_line.min()),
+                "mean": float(flow_result.coverage_per_line.mean()),
+                "max": float(flow_result.coverage_per_line.max()),
             },
             "sigma_flow_stats": flow_result.sigma_flow_stats,
         }

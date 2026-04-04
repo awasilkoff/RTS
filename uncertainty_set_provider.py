@@ -101,6 +101,8 @@ class HorizonUncertaintySet:
     rho: np.ndarray
     mu: np.ndarray
     sqrt_sigma: Optional[np.ndarray] = None
+    rho_lines: Optional[np.ndarray] = None
+    rho_lines_line_ids: Optional[List[str]] = None
 
     @property
     def n_periods(self) -> int:
@@ -212,6 +214,8 @@ class UncertaintySetProvider:
         times: Optional[np.ndarray] = None,
         x_cols: Optional[List[str]] = None,
         metadata: Optional[dict] = None,
+        rho_lines: Optional[np.ndarray] = None,
+        rho_lines_line_ids: Optional[List[str]] = None,
     ):
         """
         Initialize provider with pre-computed arrays.
@@ -234,6 +238,10 @@ class UncertaintySetProvider:
             Feature column names
         metadata : dict, optional
             Additional metadata from generation
+        rho_lines : np.ndarray, optional
+            Per-line ellipsoid radii, shape (L,). Static (same for all hours).
+        rho_lines_line_ids : List[str], optional
+            Line IDs corresponding to rho_lines rows.
         """
         self._mu = np.asarray(mu)
         self._sigma = np.asarray(sigma)
@@ -243,6 +251,10 @@ class UncertaintySetProvider:
         self._times = times
         self._x_cols = list(x_cols) if x_cols is not None else None
         self._metadata = metadata or {}
+        self._rho_lines = np.asarray(rho_lines) if rho_lines is not None else None
+        self._rho_lines_line_ids = (
+            list(rho_lines_line_ids) if rho_lines_line_ids is not None else None
+        )
 
         # Validation
         n = len(self._rho)
@@ -286,6 +298,12 @@ class UncertaintySetProvider:
         if x_cols is not None:
             x_cols = list(x_cols)
 
+        # Load per-line rho if available
+        rho_lines = data.get("rho_lines", None)
+        rho_lines_line_ids = data.get("rho_lines_line_ids", None)
+        if rho_lines_line_ids is not None:
+            rho_lines_line_ids = list(rho_lines_line_ids)
+
         return cls(
             mu=data["mu"],
             sigma=data["sigma"],
@@ -295,6 +313,8 @@ class UncertaintySetProvider:
             times=times,
             x_cols=x_cols,
             metadata=metadata,
+            rho_lines=rho_lines,
+            rho_lines_line_ids=rho_lines_line_ids,
         )
 
     @property
@@ -316,6 +336,19 @@ class UncertaintySetProvider:
     def metadata(self) -> dict:
         """Metadata from generation (read-only copy)."""
         return self._metadata.copy()
+
+    @property
+    def has_rho_lines(self) -> bool:
+        """Whether per-line rho values are available."""
+        return self._rho_lines is not None
+
+    def get_rho_lines(self) -> Optional[np.ndarray]:
+        """Return per-line rho values, or None if not available."""
+        return self._rho_lines.copy() if self._rho_lines is not None else None
+
+    def get_rho_lines_line_ids(self) -> Optional[List[str]]:
+        """Return line IDs corresponding to rho_lines, or None."""
+        return self._rho_lines_line_ids.copy() if self._rho_lines_line_ids is not None else None
 
     def get_wind_gen_ids(self) -> List[str]:
         """Return wind generator IDs."""
@@ -382,6 +415,12 @@ class UncertaintySetProvider:
             rho=rho,
             mu=mu,
             sqrt_sigma=sqrt_sigma,
+            rho_lines=self._rho_lines.copy() if self._rho_lines is not None else None,
+            rho_lines_line_ids=(
+                self._rho_lines_line_ids.copy()
+                if self._rho_lines_line_ids is not None
+                else None
+            ),
         )
 
     def get_single(

@@ -93,6 +93,7 @@ def build_aruc_ldr_model(
     line_mask: Optional[np.ndarray] = None,
     flow_direction: Optional[np.ndarray] = None,
     gating_mask: Optional[np.ndarray] = None,
+    rho_per_line: Optional[Dict[int, float]] = None,
 ) -> Tuple[gp.Model, Dict[str, object]]:
     """
     Adaptive robust UC with linear decision rules:

@@ -2,6 +2,10 @@
 Motivation figure: point forecast (left) vs ensemble spaghetti (right).
 Synthetic but realistic diurnal wind power pattern.
 """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec

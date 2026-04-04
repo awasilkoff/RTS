@@ -8,6 +8,10 @@ Outputs:
     Figures/cost_stacked_detail.pdf  (paper quality)
     Figures/cost_stacked_detail.png  (for Beamer)
 """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np

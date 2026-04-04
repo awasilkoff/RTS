@@ -2,6 +2,10 @@
 2D illustration: Ellipsoidal vs. Box uncertainty set for two wind farms.
 Styled to match paper plot_config.
 """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches

@@ -10,6 +10,7 @@ Usage:
     python print_wind_forecast.py --start-month 7 --start-day 15
     python print_wind_forecast.py --start-month 7 --start-day 15 --no-spp
     python print_wind_forecast.py --start-month 7 --start-day 15 --out forecast.csv
+    python print_wind_forecast.py --start-month 1 --start-day 5 --day2-interval 1
 """
 
 from __future__ import annotations
@@ -37,8 +38,6 @@ def main():
     parser.add_argument("--hours", type=int, default=48)
     parser.add_argument("--day2-interval", type=int, default=2,
                         help="Day-2 block size in hours (default 2, matching run_comparison.py)")
-    parser.add_argument("--provider-start", type=int, default=2448,
-                        help="SPP time-series start index (default 2448)")
     parser.add_argument("--no-spp", action="store_true",
                         help="Use original DAY_AHEAD_wind.csv instead of SPP ensemble mean")
     parser.add_argument("--out", type=Path, default=None,
@@ -61,7 +60,7 @@ def main():
         horizon_hours=args.hours,
         day2_interval_hours=args.day2_interval,
         spp_forecasts_parquet=spp_path,
-        spp_start_idx=args.provider_start,
+        spp_start_idx=0,
     )
 
     # Extract wind generators

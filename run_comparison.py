@@ -245,6 +245,13 @@ def main():
         help="Gurobi Cuts aggressiveness (-1=auto, 0=off, 1=moderate, 2=aggressive, 3=very aggressive)",
     )
     parser.add_argument(
+        "--fix-and-resolve",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="After MIP solve, fix binary commitments and re-solve SOCP exactly for optimal Z/p0. "
+             "Useful when MIP gap is large: commitment is likely correct but Z may be suboptimal.",
+    )
+    parser.add_argument(
         "--fast",
         action=argparse.BooleanOptionalAction,
         default=False,
@@ -370,6 +377,7 @@ def main():
         mip_focus=args.mip_focus,
         node_file_start=args.node_file_start,
         cuts=args.cuts,
+        fix_and_resolve=args.fix_and_resolve,
     )
 
     daruc_results = daruc_outputs["daruc_results"]
@@ -458,6 +466,7 @@ def main():
         mip_focus=args.mip_focus,
         node_file_start=args.node_file_start,
         cuts=args.cuts,
+        fix_and_resolve=args.fix_and_resolve,
     )
 
     aruc_results = aruc_outputs["results"]

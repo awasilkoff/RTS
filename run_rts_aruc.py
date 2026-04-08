@@ -475,6 +475,7 @@ def run_rts_aruc(
     node_file_start: Optional[float] = None,
     cuts: Optional[int] = None,
     prev_aruc_solution: Optional[Dict[str, Any]] = None,
+    fix_and_resolve: bool = False,
 ) -> Dict[str, Any]:
     """
     Full pipeline for ARUC-LDR:
@@ -669,6 +670,12 @@ def run_rts_aruc(
             rho_lines_frac, time_varying,
         )
         timings["line_iterations_solve"] = time.time() - t0
+
+    if fix_and_resolve:
+        from aruc_model import fix_and_resolve_continuous
+        t0 = time.time()
+        fix_and_resolve_continuous(model, vars_dict)
+        timings["fix_and_resolve"] = time.time() - t0
 
     results = extract_solution(data, model, vars_dict)
     print_brief_summary(results, data)

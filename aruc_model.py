@@ -1049,6 +1049,65 @@ def build_aruc_ldr_model(
     return m, vars_dict
 
 
+def fix_and_resolve_continuous(model, vars_dict: dict) -> bool:
+    """Fix integer commitment variables and re-solve for optimal Z/p0.
+
+    After a MIP solve the Z matrix may not be optimal — Z lives in a
+    nearly-flat cost landscape (dispatch scale 0.01) so many different Z
+    configurations sit within the MIP gap.  This function:
+
+      1. Fixes u/v/w (and u_prime/v_prime/w_prime if present) to their
+         current incumbent values.
+      2. Re-solves the resulting pure SOCP exactly.
+      3. Leaves the model with the optimal Z/p0 for that commitment.
+
+    The re-solve is typically fast (seconds) since integrality is gone.
+
+    Parameters
+    ----------
+    model : gurobipy.Model
+        Solved ARUC/DARUC model with at least one feasible incumbent.
+    vars_dict : dict
+        Variable dict from ``build_aruc_ldr_model``.
+
+    Returns
+    -------
+    bool
+        True if re-solve found a solution, False otherwise.
+    """
+    import time as _time
+    from gurobipy import GRB
+
+    # Fix all binary commitment variables to their incumbent values.
+    n_fixed = 0
+    for name in ("u", "v", "w", "u_prime", "v_prime", "w_prime"):
+        if name not in vars_dict:
+            continue
+        for var in vars_dict[name].values():
+            val = round(var.X)
+            var.lb = val
+            var.ub = val
+            n_fixed += 1
+
+    model.update()
+    print(f"  [fix-and-resolve] Fixed {n_fixed} binary variables. "
+          f"Re-solving SOCP for optimal Z/p0...")
+
+    t0 = _time.time()
+    model.optimize()
+    elapsed = _time.time() - t0
+
+    if model.SolCount == 0:
+        print(f"  [fix-and-resolve] WARNING: no solution found "
+              f"(status={model.Status}). Keeping original MIP solution.")
+        return False
+
+    status_str = "optimal" if model.Status == GRB.OPTIMAL else f"status={model.Status}"
+    print(f"  [fix-and-resolve] {status_str} in {elapsed:.1f}s  "
+          f"obj={model.ObjVal:,.2f}")
+    return True
+
+
 if __name__ == "__main__":
     from models import DAMData
 

@@ -57,22 +57,22 @@ def build_base_args(args, script: str = "run_comparison.py") -> list[str]:
 
 
 SCENARIOS = [
-    {
-        "name": "reserve_then_daruc",
-        "desc": "DAM+Reserve -> DARUC (lines + robust ramps, incremental obj)",
-        "script": "run_reserve_then_daruc.py",  # uses different script
-        "extra": [],
-    },
-    {
-        "name": "stripped",
-        "desc": "Copperplate, nominal ramps (per-gen hedging only)",
-        "extra": ["--no-robust-ramp", "--enforce-lines", "--rho-lines-frac", "0.0"],
-    },
-    {
-        "name": "lines_only",
-        "desc": "Lines enabled, nominal ramps",
-        "extra": ["--enforce-lines", "--no-robust-ramp"],
-    },
+    # {
+    #     "name": "reserve_then_daruc",
+    #     "desc": "DAM+Reserve -> DARUC (lines + robust ramps, incremental obj)",
+    #     "script": "run_reserve_then_daruc.py",  # uses different script
+    #     "extra": ["--no-fix-wind-z"],
+    # },
+    # {
+    #     "name": "stripped",
+    #     "desc": "Copperplate, nominal ramps (per-gen hedging only)",
+    #     "extra": ["--no-robust-ramp", "--enforce-lines", "--rho-lines-frac", "0.0","--no-fix-wind-z"],
+    # },
+    # {
+    #     "name": "lines_only",
+    #     "desc": "Lines enabled, nominal ramps",
+    #     "extra": ["--enforce-lines", "--no-robust-ramp","--no-fix-wind-z"],
+    # },
     # {
     #     "name": "ramps_only",
     #     "desc": "Copperplate, robust ramps",
@@ -90,14 +90,14 @@ SCENARIOS = [
     #     "extra": ["--no-robust-ramp", "--no-worst-case-cost","--enforce-lines"],
     # },
     {
-        "name": "stripped_free_z",
-        "desc": "Stripped + wind Z free (not fixed to identity)",
-        "extra": ["--no-robust-ramp", "--no-fix-wind-z","--enforce-lines"],
+        "name": "full_free_z",
+        "desc": "Full robust + wind Z free (not fixed to identity)",
+        "extra": ["--enforce-lines", "--robust-ramp", "--with-reserve", "--no-fix-wind-z"],
     },
 
     {
-        "name": "full_robust",
-        "desc": "Full model: lines + robust ramps",
+        "name": "full_robust_fixed",
+        "desc": "Full model: lines + robust ramps, fixed Z",
         "extra": ["--enforce-lines", "--robust-ramp", "--with-reserve"],
     },
 ]
@@ -277,7 +277,7 @@ def main():
     parser.add_argument("--rho-lines-frac", type=float, default=None)
     parser.add_argument("--mip-gap", type=float, default=0.005)
     parser.add_argument("--day2-interval", type=int, default=2)
-    parser.add_argument("--time-limit", type=float, default=12000)
+    parser.add_argument("--time-limit", type=float, default=1200000)
     parser.add_argument("--bar-qcp-conv-tol", type=float, default=1e-4)
     parser.add_argument("--out-dir", type=str, default=None,
                         help="Root output directory (default: auto-generated)")
@@ -294,7 +294,7 @@ def main():
         rho_tag = f"rho{args.rho}_linesfrac{args.rho_lines_frac}"
     else:
         rho_tag = f"rho{args.rho}"
-    tag = f"rho{rho_tag}_{args.hours}h_m{args.start_month:02d}d{args.start_day:02d}"
+    tag = f"rho{rho_tag}_{args.hours}h_m{args.start_month:02d}d{args.start_day:02d}_freeZmatrix"
     out_root = Path(args.out_dir) if args.out_dir else Path("sensitivity_suite") / tag
     out_root.mkdir(parents=True, exist_ok=True)
 

@@ -44,6 +44,7 @@ def build_base_args(args, script: str = "run_comparison.py") -> list[str]:
         "--start-hour", str(args.start_hour),
         "--mip-gap", str(args.mip_gap),
         "--day2-interval", str(args.day2_interval),
+        "--line-monitor-threshold", str(args.line_monitor_threshold),
         "--day1-only-robust",
         "--time-limit", str(args.time_limit),
         "--bar-qcp-conv-tol", str(args.bar_qcp_conv_tol),

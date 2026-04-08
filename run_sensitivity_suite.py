@@ -274,6 +274,7 @@ def main():
     parser.add_argument("--hours", type=int, default=48)
     parser.add_argument("--uncertainty-npz", type=str, default="uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha99.npz")
     parser.add_argument("--provider-start", type=int, default=2448)
+    parser.add_argument("--line-monitor-threshold",type=float,default=0.9)
     parser.add_argument("--rho-lines-frac", type=float, default=None)
     parser.add_argument("--mip-gap", type=float, default=0.005)
     parser.add_argument("--day2-interval", type=int, default=2)

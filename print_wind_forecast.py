@@ -1,15 +1,15 @@
 """print_wind_forecast.py
 
-Print the wind forecast (Pmax) used in the DAM for each wind generator,
-for the two-day optimization horizon.
+Print the mean wind forecast (mu) from an uncertainty set NPZ — this is the
+center of the ellipsoidal uncertainty set and the forecast used in the DAM.
 
-By default uses the SPP ensemble mean (same as the main scripts).
-Pass --no-spp to fall back to the original DAY_AHEAD_wind.csv.
+Mirrors print_worst_case_wind.py but prints mu directly instead of the
+worst-case realization.
 
 Usage:
-    python print_wind_forecast.py --start-month 7 --start-day 15
-    python print_wind_forecast.py --start-month 7 --start-day 15 --no-spp
-    python print_wind_forecast.py --start-month 7 --start-day 15 --out forecast.csv
+    python print_wind_forecast.py <npz_path> [--start 2448] [--hours 48]
+    python print_wind_forecast.py uncertainty_sets_refactored/data/uncertainty_sets.npz --start 2448 --hours 48
+    python print_wind_forecast.py alpha_sweep/.../sigma_rho.npz --start 0 --hours 24 --out forecast.csv
 """
 
 from __future__ import annotations
@@ -17,85 +17,58 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
-
-RTS_DIR = Path("RTS_Data")
-SOURCE_DIR = RTS_DIR / "SourceData"
-TS_DIR = RTS_DIR / "timeseries_data_files"
-DEFAULT_SPP = Path(
-    "uncertainty_sets_refactored/data/forecasts_filtered_rts4_constellation_v2.parquet"
-)
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Print wind Pmax forecast used in the DAM"
+        description="Print mean wind forecast (mu) from uncertainty set NPZ"
     )
-    parser.add_argument("--start-month", type=int, default=7)
-    parser.add_argument("--start-day", type=int, default=15)
-    parser.add_argument("--start-hour", type=int, default=0)
-    parser.add_argument("--hours", type=int, default=48)
-    parser.add_argument("--day2-interval", type=int, default=2,
-                        help="Day-2 block size in hours (default 2, matching run_comparison.py)")
-    parser.add_argument("--provider-start", type=int, default=2448,
-                        help="SPP time-series start index (default 2448)")
-    parser.add_argument("--no-spp", action="store_true",
-                        help="Use original DAY_AHEAD_wind.csv instead of SPP ensemble mean")
+    parser.add_argument("npz", type=Path, help="Path to NPZ file (mu, sigma, rho, y_cols)")
+    parser.add_argument("--start", type=int, default=2448,
+                        help="Start index into NPZ (default: 2448, aligned to July 15)")
+    parser.add_argument("--hours", type=int, default=48,
+                        help="Number of hours to print (default: 48)")
     parser.add_argument("--out", type=Path, default=None,
                         help="Output CSV path (default: print to stdout only)")
     args = parser.parse_args()
 
-    from io_rts import build_damdata_from_rts
+    data = np.load(args.npz, allow_pickle=True)
+    mu = data["mu"]     # (T_total, K)
+    y_cols = list(data["y_cols"]) if "y_cols" in data else [f"wind_{k}" for k in range(mu.shape[1])]
 
-    start = pd.Timestamp(year=2020, month=args.start_month, day=args.start_day,
-                         hour=args.start_hour)
+    T_total, K = mu.shape
+    s, e = args.start, args.start + args.hours
+    if e > T_total:
+        print(f"Warning: requested [{s},{e}) but only {T_total} hours available. Truncating.")
+        e = T_total
 
-    spp_path = None if args.no_spp else DEFAULT_SPP
-    source_label = "DAY_AHEAD_wind.csv" if args.no_spp else f"SPP ensemble mean ({DEFAULT_SPP.name})"
+    mu_slice = mu[s:e]   # (T, K)
+    T = len(mu_slice)
+    hours = list(range(T))
 
-    print(f"Loading RTS data: start={start}  horizon={args.hours}h  source={source_label}")
-    data = build_damdata_from_rts(
-        source_dir=SOURCE_DIR,
-        ts_dir=TS_DIR,
-        start_time=start,
-        horizon_hours=args.hours,
-        day2_interval_hours=args.day2_interval,
-        spp_forecasts_parquet=spp_path,
-        spp_start_idx=args.provider_start,
-    )
+    df = pd.DataFrame(mu_slice, index=hours, columns=y_cols)
+    df.index.name = "hour"
 
-    # Extract wind generators
-    wind_mask = [gt.upper() == "WIND" for gt in data.gen_type]
-    wind_ids = [data.gen_ids[i] for i, w in enumerate(wind_mask) if w]
-
-    if not wind_ids:
-        print("No wind generators found.")
-        return
-
-    Pmax_2d = data.Pmax_2d()                    # (I, T)
-    wind_pmax = Pmax_2d[wind_mask, :]            # (n_wind, T)
-
-    df = pd.DataFrame(wind_pmax, index=wind_ids, columns=data.time)
-    df.index.name = "generator"
-
-    # Print table
-    print(f"\nWind forecast (MW)  —  {len(wind_ids)} units  x  {data.n_periods} periods\n")
+    print(f"NPZ: {args.npz}")
+    print(f"Indices [{s}, {e})  ({T} hours, {K} wind farms)")
+    print(f"Farms: {', '.join(y_cols)}")
+    print(f"\nMean wind forecast mu (MW)  —  {K} units  x  {T} hours\n")
     with pd.option_context("display.max_columns", None, "display.width", 200,
                            "display.float_format", "{:.1f}".format):
         print(df.to_string())
 
-    # Summary row
     print(f"\nTotal wind (sum across units):")
-    totals = df.sum(axis=0)
+    totals = df.sum(axis=1)
     with pd.option_context("display.max_columns", None, "display.width", 200,
                            "display.float_format", "{:.1f}".format):
         print(totals.to_string())
 
-    print(f"\nNameplate capacity (static Pmax):")
-    static_pmax = data.Pmax if data.Pmax.ndim == 1 else data.Pmax[:, 0]
-    for i, gid in enumerate(data.gen_ids):
-        if wind_mask[i]:
-            print(f"  {gid:<20}  {static_pmax[i]:.1f} MW")
+    print(f"\nSummary:")
+    print(f"  Mean total forecast:  {totals.mean():10.1f} MW")
+    print(f"  Min  total forecast:  {totals.min():10.1f} MW  (hour {totals.idxmin()})")
+    print(f"  Max  total forecast:  {totals.max():10.1f} MW  (hour {totals.idxmax()})")
 
     if args.out:
         df.to_csv(args.out, float_format="%.2f")

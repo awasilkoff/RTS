@@ -477,40 +477,19 @@ def iterative_line_resolve(
                     name=f"soc_line_add_{tag}",
                 )
 
-                # Determine which directions violate under worst case.
-                # wc_pos = f_nom + rho*||y|| can exceed +Fmax
-                # wc_neg = -f_nom + rho*||y|| can exceed +Fmax (i.e. f_nom - rho*||y|| < -Fmax)
-                # With uncertainty, both directions can bind even if nominal
-                # flow is small, so we check both and add both if needed.
-                Z_arr_lt = Z_arr[:, t, :]  # (I, K)
-                Z_bus_lt = np.zeros((N, K))
-                for ii in range(I):
-                    Z_bus_lt[gen_to_bus[ii], :] += Z_arr_lt[ii, :]
-                a_num = PTDF_full[l_full, :] @ Z_bus_lt  # (K,)
-                y_num = sqrt_Sigma_t.T @ a_num
-                norm_y = np.linalg.norm(y_num)
-                margin = rho_lines_t * norm_y
-
-                add_pos = (flow_val + margin > fmax_l + viol_tol)
-                add_neg = (-flow_val + margin > fmax_l + viol_tol)
-                if not add_pos and not add_neg:
-                    # Shouldn't happen (we detected a violation), add based on nominal
-                    add_pos = (flow_val >= 0)
-                    add_neg = not add_pos
-
-                if add_pos:
-                    model.addConstr(flow_nom + rho_lines_t * z_var <= fmax_l,
-                                    name=f"line_max_add_{tag}")
-                if add_neg:
-                    model.addConstr(-flow_nom + rho_lines_t * z_var <= fmax_l,
-                                    name=f"line_min_add_{tag}")
+                # Always add both directions: once (l,t) is in added_pairs it
+                # can never be revisited, so a single-direction add here would
+                # permanently miss the other side if the flow reverses after
+                # re-solve.  The two extra linear constraints are cheap vs a
+                # full re-solve.
+                model.addConstr(flow_nom + rho_lines_t * z_var <= fmax_l,
+                                name=f"line_max_add_{tag}")
+                model.addConstr(-flow_nom + rho_lines_t * z_var <= fmax_l,
+                                name=f"line_min_add_{tag}")
             else:
-                # Nominal flow limit — add both directions since we're here
-                positive_binding = (flow_val >= 0)
-                if positive_binding:
-                    model.addConstr(flow_nom <= fmax_l, name=f"line_max_add_{tag}")
-                else:
-                    model.addConstr(flow_nom >= -fmax_l, name=f"line_min_add_{tag}")
+                # Nominal flow limit — add both directions for the same reason.
+                model.addConstr(flow_nom <= fmax_l, name=f"line_max_add_{tag}")
+                model.addConstr(flow_nom >= -fmax_l, name=f"line_min_add_{tag}")
 
             n_added += 1
 

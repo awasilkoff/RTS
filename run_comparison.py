@@ -642,9 +642,9 @@ def main():
         out_dir,
     )
 
-    # Text summary (day-1 metrics)
+    # Text summary (day-1 metrics) — also computes worst-case dispatch costs
     print()
-    write_summary(
+    wc_costs = write_summary(
         aruc_loaded,
         daruc_loaded,
         dam_loaded,
@@ -711,6 +711,8 @@ def main():
         "daruc_cost": cost_daruc,
         "dam_cost": cost_dam,
         "reserve_cost": cost_reserve,
+        "aruc_wc_dispatch_cost": wc_costs.get("ARUC") if wc_costs else None,
+        "daruc_wc_dispatch_cost": wc_costs.get("DARUC") if wc_costs else None,
         "aruc_metrics": metrics_aruc,
         "daruc_metrics": metrics_daruc,
         "dam_metrics": compute_day1_metrics(data, dam_results) if dam_loaded is not None else None,

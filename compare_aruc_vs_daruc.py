@@ -937,6 +937,132 @@ def compute_worst_case_wind(res: dict, data, common_times: list[str]) -> dict | 
     }
 
 
+def compute_worst_case_dispatch_cost(
+    res: dict, data, common_times: list[str]
+) -> dict | None:
+    """Compute the energy dispatch cost at the worst-case (wind-minimizing) r.
+
+    Uses the same adversarial direction as the wind figures:
+        r_wc[t] = rho[t] * Sigma[t] @ 1 / sqrt(1^T Sigma[t] 1)
+
+    Worst-case dispatch for each generator:
+        p_wc[i,t] = p0[i,t] - Z[i,t,:] @ r_wc[t]
+
+    Only the energy cost changes; commitment/startup/shutdown are identical.
+
+    Returns None for formulations without Z (DAM, DAM+Reserve).
+
+    Returns dict:
+        nom_energy  : float  nominal energy cost (day-1 common_times)
+        wc_energy   : float  worst-case energy cost
+        premium     : float  wc_energy - nom_energy (always >= 0)
+        pct         : float  premium as % of nom_energy
+    """
+    Z_df = res.get("Z")
+    Sigma = res.get("Sigma")
+    rho = res.get("rho")
+    if Z_df is None or Sigma is None or rho is None:
+        return None
+
+    p0_df = res["p0"]
+    T = len(common_times)
+    common_str = [str(t) for t in common_times]
+
+    # Map common_times -> positions in the full data.time axis (for Sigma/rho indexing)
+    time_list = [str(t) for t in data.time]
+    time_pos = []
+    for t_str in common_str:
+        try:
+            time_pos.append(time_list.index(t_str))
+        except ValueError:
+            time_pos.append(0)
+
+    # Number of wind generators (= K, uncertainty dimension)
+    is_wind = np.array([gt.upper() == "WIND" for gt in data.gen_type])
+    K = int(is_wind.sum())
+
+    # Normalize Sigma -> (T, K, K)
+    if Sigma.ndim == 2:
+        Sigma_3d = np.broadcast_to(Sigma[np.newaxis, :, :], (len(time_pos), K, K))
+    else:
+        Sigma_3d = Sigma
+
+    rho_arr = np.atleast_1d(rho).astype(float)
+    if rho_arr.shape[0] == 1:
+        rho_full = np.full(max(time_pos) + 1, rho_arr[0])
+    else:
+        rho_full = rho_arr
+
+    # Compute r_wc[t] = rho[t] * Sigma[t] @ 1 / sqrt(1^T Sigma[t] 1)
+    ones = np.ones(K)
+    r_wc = np.zeros((T, K))
+    for t_idx, tp in enumerate(time_pos):
+        S = Sigma_3d[tp] if Sigma.ndim == 3 else Sigma_3d[0]
+        Se = S @ ones
+        denom = np.sqrt(ones @ Se)
+        rho_t = rho_full[tp] if tp < len(rho_full) else rho_full[-1]
+        if denom > 1e-12:
+            r_wc[t_idx] = rho_t * Se / denom
+
+    # Build delta_p (I, T) = -Z[i,t,:] @ r_wc[t] for generators with Z rows
+    gen_ids = list(p0_df.index)
+    I = len(gen_ids)
+    delta_p = np.zeros((I, T))
+    z_time_labels = set(Z_df.columns.get_level_values(0).unique())
+    z_gen_ids = set(Z_df.index)
+
+    for t_idx, t_str in enumerate(common_str):
+        if t_str not in z_time_labels:
+            continue
+        Z_t = Z_df[t_str]  # DataFrame: index=gen_ids, columns=k (shape I_z × K)
+        for i_idx, gid in enumerate(gen_ids):
+            if gid not in z_gen_ids:
+                continue
+            z_row = Z_t.loc[gid].values.astype(float)  # (K,)
+            delta_p[i_idx, t_idx] = -float(z_row @ r_wc[t_idx])
+
+    # Get p0 matrix aligned to common_times
+    p0_vals = np.zeros((I, T))
+    for i_idx, gid in enumerate(gen_ids):
+        if gid in p0_df.index:
+            p0_vals[i_idx] = p0_df.loc[gid, common_str].values.astype(float)
+
+    p_wc_vals = p0_vals + delta_p
+
+    # Compute energy cost for both nominal and worst-case dispatch
+    block_cap = data.block_cap    # (I, B)
+    block_cost = data.block_cost  # (I, B)
+    B = block_cap.shape[1]
+    dt = data.dt[:T]
+
+    nom_energy = 0.0
+    wc_energy = 0.0
+    for i in range(I):
+        for t in range(T):
+            for p_val, is_wc in [(p0_vals[i, t], False), (p_wc_vals[i, t], True)]:
+                remaining = max(0.0, float(p_val))
+                cost = 0.0
+                for b in range(B):
+                    alloc = min(remaining, float(block_cap[i, b]))
+                    cost += alloc * float(block_cost[i, b]) * float(dt[t])
+                    remaining -= alloc
+                    if remaining <= 1e-9:
+                        break
+                if is_wc:
+                    wc_energy += cost
+                else:
+                    nom_energy += cost
+
+    premium = wc_energy - nom_energy
+    pct = 100.0 * premium / nom_energy if nom_energy > 0 else 0.0
+    return {
+        "nom_energy": nom_energy,
+        "wc_energy": wc_energy,
+        "premium": premium,
+        "pct": pct,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Figure: Worst-case wind dispatch
 # ---------------------------------------------------------------------------
@@ -1177,7 +1303,7 @@ def write_summary(
     data=None,
     reserve: dict | None = None,
     cost_reserve: dict | None = None,
-):
+) -> dict:
     """Write comparison summary to console and file."""
     lines = []
     lines.append("=" * 70)
@@ -1295,6 +1421,38 @@ def write_summary(
             lines.append(f"    {row['gen_id']} ({row['gen_type']}): "
                          f"+{row['extra_committed_hours']}h (DAM={row['dam_committed_hours']}h)")
 
+    # Worst-case dispatch cost
+    wc_costs = {}
+    if data is not None:
+        for name, res in [("DARUC", daruc), ("ARUC", aruc)]:
+            wc_costs[name] = compute_worst_case_dispatch_cost(res, data, common_times)
+
+        lines.append("\n--- Worst-Case Dispatch Cost (wind-minimizing r_wc) ---")
+        lines.append("  Commitment/startup costs are fixed; only energy changes.")
+        lines.append("  DAM/DAM+Reserve have no Z response so worst-case = nominal.")
+
+        nom_header  = f"  {'':20s}  {'Nom energy':>14s}  {'WC energy':>14s}  {'Premium ($)':>12s}  {'Premium (%)':>11s}"
+        lines.append(nom_header)
+        for name, cost, wc in [
+            ("DAM",        cost_dam,     None),
+            ("DAM+Reserve",cost_reserve, None),
+            ("DARUC",      cost_daruc,   wc_costs.get("DARUC")),
+            ("ARUC-LDR",   cost_aruc,    wc_costs.get("ARUC")),
+        ]:
+            if cost is None:
+                continue
+            nom_e = cost.get("energy", 0.0)
+            if wc is not None:
+                lines.append(
+                    f"  {name:20s}  {nom_e:>14,.2f}  {wc['wc_energy']:>14,.2f}"
+                    f"  {wc['premium']:>+12,.2f}  {wc['pct']:>+10.2f}%"
+                )
+            else:
+                lines.append(
+                    f"  {name:20s}  {nom_e:>14,.2f}  {'(=nominal)':>14s}"
+                    f"  {'N/A':>12s}  {'N/A':>11s}"
+                )
+
     # Wind curtailment
     if data is not None:
         lines.append("\n--- Wind Curtailment ---")
@@ -1319,6 +1477,8 @@ def write_summary(
     with open(out_dir / "comparison_summary.txt", "w", encoding="utf-8") as f:
         f.write(text)
     print(f"\n  Saved comparison_summary.txt")
+
+    return wc_costs  # {"DARUC": {...}, "ARUC": {...}} — for summary.json
 
 
 # ---------------------------------------------------------------------------

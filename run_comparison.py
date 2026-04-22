@@ -139,7 +139,7 @@ def main():
         "--fix-wind-z",
         action=argparse.BooleanOptionalAction,
         help="Fix wind Z diagonal to 1 (wind fully tracks own realization, no curtailment)",
-        default=True,
+        default=False,
     )
     parser.add_argument(
         "--three-blocks",
@@ -204,7 +204,7 @@ def main():
     parser.add_argument(
         "--line-monitor-threshold",
         type=float,
-        default=0.9,
+        default=0.95,
         help="DAM loading threshold for line filtering (e.g. 0.5 = keep lines loaded >=50%%)",
     )
     parser.add_argument(
@@ -233,7 +233,7 @@ def main():
         help="Barrier QCP convergence tolerance (default: Gurobi default 1e-8; try 1e-4 for speed)",
     )
     parser.add_argument(
-        "--mip-focus", type=int, default=None,
+        "--mip-focus", type=int, default=3,
         help="Gurobi MIPFocus (1=feasibility, 2=optimality, 3=bound). Default: 1",
     )
     parser.add_argument(
@@ -270,9 +270,9 @@ def main():
         if args.bar_qcp_conv_tol is None:
             args.bar_qcp_conv_tol = 1e-4
         if args.time_limit is None:
-            args.time_limit = 60000.0
+            args.time_limit = 600000.0
         if args.line_monitor_threshold is None and args.enforce_lines:
-            args.line_monitor_threshold = 0.5
+            args.line_monitor_threshold = 0.9
 
     start_time = pd.Timestamp(
         year=2020, month=args.start_month, day=args.start_day, hour=args.start_hour
@@ -295,6 +295,7 @@ def main():
             f"comparison_outputs/"
             f"m{args.start_month:02d}d{args.start_day:02d}_"
             f"{args.hours}h_{rho_tag}_{net}{ramp_tag}{pmin_tag}"
+            f"{'fixedZmatrix' if args.fix_wind_z else 'freeZmatrix'}"
         )
     out_dir.mkdir(parents=True, exist_ok=True)
     aruc_dir = out_dir / "aruc"

@@ -44,7 +44,7 @@ def main():
                         help="Horizon hours (default 48)")
     parser.add_argument("--spp-start-idx", type=int, default=0,
                         help="Positional start index into SPP parquet (default 0, matches run_rts_daruc.py)")
-    parser.add_argument("--npz", type=Path, default=None,
+    parser.add_argument("--npz", type=Path, default="uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha99.npz",
                         help="Optional NPZ path to compare mu vs DAM Pmax")
     parser.add_argument("--provider-start", type=int, default=2448,
                         help="NPZ start index (default 2448, matches run_comparison.py default)")

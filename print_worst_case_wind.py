@@ -75,7 +75,7 @@ def main():
                         help="NPZ file path (default: sigma_rho_alpha99.npz)")
     parser.add_argument("--provider-start",  type=int,  default=2448,
                         help="Start index into NPZ (default 2448, matches run_comparison.py)")
-    parser.add_argument("--out",             type=Path, default=None,
+    parser.add_argument("--out",             type=Path, default="99",
                         help="Save worst-case table to CSV")
     args = parser.parse_args()
 
@@ -191,7 +191,8 @@ def main():
     # 5. Save CSV
     # ------------------------------------------------------------------
     if args.out:
-        df_wc.to_csv(args.out, float_format="%.2f")
+        df_wc.to_csv(str(args.out) + str("wc.csv"), float_format="%.2f")
+        df_dev.to_csv(str(args.out) + str('dev.csv'), float_format="%.2f")
         print(f"\nSaved worst-case table to {args.out}")
 
 

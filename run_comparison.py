@@ -409,6 +409,7 @@ def main():
         daruc_results, data, daruc_dir, daruc_outputs["Sigma"], daruc_outputs["rho"],
         deviation_df=dev_df, margin_df=daruc_margin,
         summary_dict=daruc_summary, analyze_z_fn=analyze_Z,
+        mu=daruc_outputs.get("mu"),
     )
 
     # Save DAM results (DAM uses "p" not "p0")
@@ -489,6 +490,7 @@ def main():
     save_robust_outputs(
         aruc_results, data, aruc_dir, aruc_outputs["Sigma"], aruc_outputs["rho"],
         margin_df=aruc_margin, summary_dict=aruc_summary, analyze_z_fn=analyze_Z,
+        mu=aruc_outputs.get("mu"),
     )
     save_line_flows_if_enabled(args.enforce_lines, data_full, aruc_results["p0"].values, aruc_margin, "ARUC", aruc_dir, "aruc_line_flows")
 

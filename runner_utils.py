@@ -571,7 +571,7 @@ def rebuild_deviation_summary(case_dir):
 
 def save_robust_outputs(results, data, out_dir, Sigma, rho,
                         deviation_df=None, margin_df=None,
-                        summary_dict=None, analyze_z_fn=None):
+                        summary_dict=None, analyze_z_fn=None, mu=None):
     """Save standard robust model (ARUC/DARUC) outputs to a directory.
 
     Saves: commitment_u.csv, dispatch_p0.csv, Z_coefficients.csv,
@@ -597,6 +597,8 @@ def save_robust_outputs(results, data, out_dir, Sigma, rho,
         deviation_df.to_csv(out_dir / "deviation_summary.csv", index=False)
     np.save(out_dir / "Sigma.npy", Sigma)
     np.save(out_dir / "rho.npy", np.atleast_1d(rho))
+    if mu is not None:
+        np.save(out_dir / "mu.npy", mu)
     if analyze_z_fn is not None:
         analyze_z_fn(results["Z"], data, out_dir, rho=rho)
     if margin_df is not None:

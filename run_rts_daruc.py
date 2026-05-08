@@ -35,6 +35,7 @@ from run_rts_aruc import (
     reshape_uncertainty_for_variable_intervals,
 )
 from uncertainty_set_provider import UncertaintySetProvider
+from runner_utils import load_gen_metadata, _enrich_deviation_df
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +57,22 @@ SPP_FORECASTS_PARQUET = Path(
     "uncertainty_sets_refactored/data/forecasts_filtered_rts4_constellation_v2.parquet"
 )
 SPP_START_IDX = 0
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _reshape_mu_for_variable_intervals(mu_hourly: np.ndarray, period_duration) -> np.ndarray:
+    """Average hourly mu rows into variable-length periods (same logic as rho reshaping)."""
+    K = mu_hourly.shape[1]
+    mu_out = np.zeros((len(period_duration), K))
+    hour = 0
+    for t, dur in enumerate(period_duration):
+        n = max(1, int(round(float(dur))))
+        mu_out[t] = mu_hourly[hour:hour + n].mean(axis=0)
+        hour += n
+    return mu_out
 
 
 # ---------------------------------------------------------------------------
@@ -185,6 +202,10 @@ def analyze_deviations(
             ]
         )
 
+    # Enrich with fuel type and capacity from gen.csv
+    gen_meta = load_gen_metadata()
+    dev_df = _enrich_deviation_df(dev_df, gen_meta)
+
     return dev_df
 
 
@@ -254,7 +275,11 @@ def run_rts_daruc(
     time_limit: Optional[float] = None,
     threads: Optional[int] = None,
     bar_qcp_conv_tol: Optional[float] = None,
+    mip_focus: Optional[int] = None,
+    node_file_start: Optional[float] = None,
+    cuts: Optional[int] = None,
     prev_daruc_solution: Optional[Dict[str, Any]] = None,
+    fix_and_resolve: bool = False,
 ) -> Dict[str, Any]:
     """
     Two-step DARUC pipeline (Setup 1):
@@ -373,11 +398,19 @@ def run_rts_daruc(
         )
         time_varying = True
 
+        # Align mu to model wind ordering (same permutation as Sigma)
+        _daruc_wind_ids = [data.gen_ids[i] for i in range(len(data.gen_ids))
+                           if data.gen_type[i].upper() == "WIND"]
+        _npz_ids = provider.get_wind_gen_ids()
+        _perm = [_npz_ids.index(wid) for wid in _daruc_wind_ids]
+        mu_val = horizon.mu[:, _perm]  # (horizon_hours, K) in model wind order
+
         # Reshape if using variable intervals
         if data.period_duration is not None:
             Sigma, rho_arr, sqrt_Sigma = reshape_uncertainty_for_variable_intervals(
                 Sigma, rho_arr, data.period_duration, sqrt_Sigma
             )
+            mu_val = _reshape_mu_for_variable_intervals(mu_val, data.period_duration)
             print(f"  Reshaped uncertainty to {T} variable-interval periods")
 
         print(f"  Sigma shape: {Sigma.shape}")
@@ -385,6 +418,7 @@ def run_rts_daruc(
         model_name = "DARUC_TimeVarying"
         rho_val = rho_arr
     else:
+        mu_val = None
         print("\nConstructing static uncertainty set...")
         Sigma, rho_val = build_uncertainty_set(
             data, rho=rho, wind_std_fraction=wind_std_fraction
@@ -414,6 +448,9 @@ def run_rts_daruc(
         time_limit=time_limit,
         threads=threads,
         bar_qcp_conv_tol=bar_qcp_conv_tol,
+        mip_focus=mip_focus,
+        node_file_start=node_file_start,
+        cuts=cuts,
         line_mask=line_mask,
         flow_direction=flow_direction,
     )
@@ -433,9 +470,9 @@ def run_rts_daruc(
     timings["daruc_build"] = time.time() - t0
 
     print("  Model built. Starting optimization...")
-    t0 = time.time()
+    t_solve_start = time.time()
     model.optimize()
-    timings["daruc_solve"] = time.time() - t0
+    timings["daruc_solve"] = time.time() - t_solve_start
 
     if model.Status not in [gp.GRB.OPTIMAL, gp.GRB.SUBOPTIMAL]:
         print(f"WARNING: DARUC did not terminate optimally. Status: {model.Status}")
@@ -452,8 +489,16 @@ def run_rts_daruc(
             model, vars_dict, data, data_full,
             _rmask, sqrt_Sigma, rho_val,
             rho_lines_frac, time_varying,
+            time_limit=time_limit,
+            solve_start=t_solve_start,
         )
         timings["line_iterations_solve"] = time.time() - t0
+
+    if fix_and_resolve:
+        from aruc_model import fix_and_resolve_continuous
+        t0 = time.time()
+        fix_and_resolve_continuous(model, vars_dict)
+        timings["fix_and_resolve"] = time.time() - t0
 
     timings["total_wall"] = time.time() - t_wall_start
 
@@ -486,6 +531,7 @@ def run_rts_daruc(
         "vars": vars_dict,
         "Sigma": Sigma,
         "rho": rho_val,
+        "mu": mu_val,
         "rho_lines_frac": rho_lines_frac,
         "time_varying": time_varying,
         "line_mask": line_mask,

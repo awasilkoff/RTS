@@ -33,7 +33,7 @@ import pandas as pd
 from io_rts import build_damdata_from_rts
 from dam_model import build_dam_model
 from aruc_model import build_aruc_ldr_model, align_uncertainty_to_aruc
-from aruc_warm_start import warm_start_aruc_from_dam
+from aruc_warm_start import warm_start_aruc_from_dam, warm_start_aruc_from_prev_solution, load_prev_solution_from_dir
 from run_rts_dam import extract_solution as extract_dam_solution
 from run_rts_aruc import (
     build_uncertainty_set,
@@ -84,7 +84,11 @@ def run_reserve_then_daruc(
     time_limit: float | None = 600.0,
     threads: int | None = None,
     bar_qcp_conv_tol: float | None = 1e-4,
+    mip_focus: int | None = None,
+    node_file_start: float | None = None,
+    cuts: int | None = None,
     reserve_ramp_multiplier: float | None = 1.0,
+    warm_start_dir: str | Path | None = None,
     out_dir: Path | None = None,
 ) -> dict:
     """
@@ -240,20 +244,26 @@ def run_reserve_then_daruc(
         time_limit=time_limit,
         threads=threads,
         bar_qcp_conv_tol=bar_qcp_conv_tol,
+        mip_focus=mip_focus,
+        node_file_start=node_file_start,
+        cuts=cuts,
         line_mask=line_mask,
         flow_direction=flow_direction,
     )
 
-    # Warm start from reserve solution
-    if reserve_vars is not None:
+    # Warm start: prefer previous DARUC solution over DAM+Reserve
+    if warm_start_dir is not None:
+        prev_solution = load_prev_solution_from_dir(warm_start_dir)
+        warm_start_aruc_from_prev_solution(model, vars_dict, prev_solution, data)
+    elif reserve_vars is not None:
         warm_start_aruc_from_dam(model, vars_dict, reserve_vars, data)
 
     timings["daruc_build"] = time.time() - t0
 
     print("  Solving DARUC...")
-    t0 = time.time()
+    t_solve_start = time.time()
     model.optimize()
-    timings["daruc_solve"] = time.time() - t0
+    timings["daruc_solve"] = time.time() - t_solve_start
 
     import gurobipy as gp
     if model.Status not in [gp.GRB.OPTIMAL, gp.GRB.SUBOPTIMAL]:
@@ -271,6 +281,8 @@ def run_reserve_then_daruc(
             model, vars_dict, data, data_full,
             _rmask, sqrt_Sigma, rho_val,
             rho_lines_frac, time_varying,
+            time_limit=time_limit,
+            solve_start=t_solve_start,
         )
         timings["line_iterations_solve"] = time.time() - t0
 
@@ -486,6 +498,14 @@ def main():
     parser.add_argument("--time-limit", type=float, default=60000)
     parser.add_argument("--threads", type=int, default=None)
     parser.add_argument("--bar-qcp-conv-tol", type=float, default=1e-4)
+    parser.add_argument("--mip-focus", type=int, default=None,
+                        help="Gurobi MIPFocus (1=feasibility, 2=optimality, 3=bound)")
+    parser.add_argument("--node-file-start", type=float, default=None,
+                        help="Gurobi NodefileStart in GB (default 2.0)")
+    parser.add_argument("--cuts", type=int, default=None,
+                        help="Gurobi Cuts aggressiveness (-1 to 3)")
+    parser.add_argument("--warm-start-dir", type=str, default=None,
+                        help="Path to a previous DARUC output dir (with commitment_u.csv, dispatch_p0.csv, Z_coefficients.csv) to warm-start from")
     parser.add_argument("--out-dir", type=str, default=None)
     args = parser.parse_args()
 
@@ -496,7 +516,7 @@ def main():
     if args.out_dir:
         out_dir = Path(args.out_dir)
     else:
-        tag = f"rho{args.rho}_{args.hours}h_m{args.start_month:02d}d{args.start_day:02d}_costscaled{args.dispatch_cost_scale}{'_linefrac'+str(args.rho_lines_frac) if args.rho_lines_frac else ''}"
+        tag = f"rho{args.rho}_{args.hours}h_m{args.start_month:02d}d{args.start_day:02d}_costscaled{args.dispatch_cost_scale}{'_linefrac'+str(args.rho_lines_frac) if args.rho_lines_frac else ''}_v2"
         out_dir = Path("reserve_then_daruc_outputs") / tag
 
     run_reserve_then_daruc(
@@ -520,7 +540,11 @@ def main():
         time_limit=args.time_limit,
         threads=args.threads,
         bar_qcp_conv_tol=args.bar_qcp_conv_tol,
+        mip_focus=args.mip_focus,
+        node_file_start=args.node_file_start,
+        cuts=args.cuts,
         reserve_ramp_multiplier=args.reserve_ramp_multiplier if args.reserve_ramp_multiplier > 0 else None,
+        warm_start_dir=args.warm_start_dir,
         out_dir=out_dir,
     )
 

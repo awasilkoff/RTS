@@ -1,0 +1,54 @@
+{
+  "aruc_cost": {
+    "no_load": 360164.29401671997,
+    "startup": 150628.44061,
+    "shutdown": 0.0,
+    "energy": 2345184.3557830607,
+    "slack": 0.0,
+    "commitment": 510792.73462671996,
+    "total": 2855977.090409781
+  },
+  "daruc_cost": {
+    "no_load": 372004.31071188,
+    "startup": 116445.66301,
+    "shutdown": 0.0,
+    "energy": 2391527.317778691,
+    "slack": 4.633875505533069e-06,
+    "commitment": 488449.97372188,
+    "total": 2879977.291505205
+  },
+  "dam_cost": {
+    "no_load": 304464.06013392,
+    "startup": 102579.24466000003,
+    "shutdown": 0.0,
+    "energy": 2182591.3745985236,
+    "slack": 1.3642420526593924e-07,
+    "commitment": 407043.30479392,
+    "total": 2589634.67939258
+  },
+  "reserve_cost": {
+    "no_load": 334118.84254127997,
+    "startup": 133640.54581,
+    "shutdown": 0.0,
+    "energy": 2185604.6209296677,
+    "slack": 1.1823431123048067e-07,
+    "commitment": 467759.38835128,
+    "total": 2653364.0092810662
+  },
+  "aruc_metrics": {
+    "unit_hours": 763.0,
+    "wind_curtailment_mwh": 6078.852942458907
+  },
+  "daruc_metrics": {
+    "unit_hours": 832.0,
+    "wind_curtailment_mwh": 6416.356042376523
+  },
+  "dam_metrics": {
+    "unit_hours": 675.0,
+    "wind_curtailment_mwh": 1492.6852021427042
+  },
+  "reserve_metrics": {
+    "unit_hours": 735.0,
+    "wind_curtailment_mwh": 1526.723386311629
+  }
+}

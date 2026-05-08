@@ -15,6 +15,55 @@ from compute_branch_flows import compute_branch_flows
 
 
 # ---------------------------------------------------------------------------
+# Generator metadata from gen.csv
+# ---------------------------------------------------------------------------
+
+_GEN_CSV_PATH = Path(__file__).parent / "RTS_Data" / "SourceData" / "gen.csv"
+
+_GEN_META_COLS = ["Fuel", "Category", "PMax MW", "PMin MW"]
+
+
+def load_gen_metadata(gen_csv=None):
+    """Load generator metadata from gen.csv, indexed by GEN UID.
+
+    Returns a DataFrame with columns: Fuel, Category, PMax MW, PMin MW.
+    Returns None if the file cannot be read.
+    """
+    path = Path(gen_csv) if gen_csv else _GEN_CSV_PATH
+    try:
+        df = pd.read_csv(path)
+        df = df.set_index("GEN UID")[_GEN_META_COLS]
+        return df
+    except Exception:
+        return None
+
+
+def _enrich_deviation_df(dev_df, gen_meta):
+    """Add fuel, category, pmax_mw, pmin_mw columns to a deviation DataFrame.
+
+    Merges on gen_id.  If gen_meta is None, adds empty columns.
+    """
+    if gen_meta is not None and not dev_df.empty:
+        merged = dev_df.merge(
+            gen_meta.rename(columns={
+                "Fuel": "fuel",
+                "Category": "category",
+                "PMax MW": "pmax_mw",
+                "PMin MW": "pmin_mw",
+            }),
+            left_on="gen_id",
+            right_index=True,
+            how="left",
+        )
+        return merged
+    else:
+        for col in ("fuel", "category", "pmax_mw", "pmin_mw"):
+            if col not in dev_df.columns:
+                dev_df[col] = ""
+        return dev_df
+
+
+# ---------------------------------------------------------------------------
 # Reserve requirement from uncertainty set
 # ---------------------------------------------------------------------------
 
@@ -222,27 +271,248 @@ def compute_reserve_equivalent(results, data, Sigma, rho):
 
 
 # ---------------------------------------------------------------------------
+# Worst-case total-shortfall line flows
+# ---------------------------------------------------------------------------
+
+def compute_worst_case_total_shortfall_flows(
+    data, p0_arr, Sigma, rho, Z_arr=None, r_arr=None,
+):
+    """Compute line flows under the worst-case total wind shortfall scenario.
+
+    Given the worst-case deviation vector:
+        r_wc[t] = rho[t] * Sigma[t] @ e / sqrt(e^T Sigma[t] e)
+
+    For DARUC/ARUC (Z_arr provided):
+        p_wc[i,t] = p0[i,t] + Z[i,t,:] @ r_wc[t,:]
+        (LDR adjusts all generators — thermals ramp up, wind curtails)
+
+    For DAM+Reserve (r_arr provided, no Z):
+        Wind loses: p_wc[wind_k,t] = p0[wind_k,t] - r_wc[t,k]
+        Thermals deploy: p_wc[i,t] = p0[i,t] + r[i,t] * R[t] / sum_j(r[j,t])
+        (Reserves deployed proportionally; may exceed sum -> capped to r[i,t])
+
+    Parameters
+    ----------
+    data : DAMData — must have PTDF, gen_to_bus, d, gen_type, Fmax
+    p0_arr : (I, T) array — nominal dispatch
+    Sigma : (K, K) or (T, K, K) — covariance
+    rho : scalar or (T,) — ellipsoid radii
+    Z_arr : (I, T, K) array or None — LDR coefficients (DARUC/ARUC)
+    r_arr : (I, T) array or None — explicit reserves (DAM+Reserve, thermal-only)
+
+    Returns
+    -------
+    dict with keys:
+        flow_nominal : (L, T) array — PTDF @ (p0 - load)
+        flow_wc : (L, T) array — PTDF @ (p_wc - load)
+        p_wc : (I, T) array — worst-case dispatch per generator
+        r_wc : (T, K) array — worst-case deviation vector
+        violations : list of (line_idx, period, excess_mw, flow_mw)
+    """
+    I, T = p0_arr.shape
+    is_wind = np.array([gt.upper() == "WIND" for gt in data.gen_type])
+    wind_idx = np.where(is_wind)[0]
+    K = len(wind_idx)
+
+    # Normalize Sigma/rho
+    if Sigma.ndim == 2:
+        Sigma_3d = np.broadcast_to(Sigma[None, :, :], (T, K, K))
+    else:
+        Sigma_3d = Sigma
+    rho_arr = np.atleast_1d(rho).astype(float)
+    if rho_arr.shape[0] == 1:
+        rho_arr = np.full(T, rho_arr[0])
+
+    # Compute worst-case deviation: r_wc[t] = rho[t] * Sigma[t] @ e / sqrt(e^T Sigma[t] e)
+    ones = np.ones(K)
+    r_wc = np.zeros((T, K))
+    R_total = np.zeros(T)
+    for t in range(T):
+        Se = Sigma_3d[t] @ ones
+        denom = np.sqrt(ones @ Se)
+        if denom > 1e-12:
+            r_wc[t] = rho_arr[t] * Se / denom
+            R_total[t] = rho_arr[t] * denom
+
+    # Compute worst-case dispatch
+    p_wc = p0_arr.copy()
+
+    # Pmax for clamping (handle both (I,) and (I,T) shapes)
+    Pmax = np.array(data.Pmax, dtype=float)
+    if Pmax.ndim == 1:
+        Pmax_2d = np.broadcast_to(Pmax[:, None], (I, T))
+    else:
+        Pmax_2d = Pmax
+
+    if Z_arr is not None:
+        # DARUC/ARUC: p_wc = p0 - Z @ r_wc
+        # The LDR is p(r) = p0 + Z @ r.  The worst-case total shortfall
+        # direction is r = -r_wc (wind produces less), so:
+        #   p_adjusted = p0 + Z @ (-r_wc) = p0 - Z @ r_wc
+        # Thermals go UP (Z negative -> -Z positive), wind goes DOWN
+        # (Z ~identity -> -Z ~negative).
+        #
+        # The ARUC model's SOC constraints ensure p_wc ∈ [Pmin, Pmax]
+        # for the solved Z.  Do NOT clip here -- even tiny adjustments
+        # break sum_i Z[i,t,k] = 0 (power balance response) and create
+        # spurious line-flow violations.
+        for t in range(T):
+            p_wc[:, t] = p0_arr[:, t] - Z_arr[:, t, :] @ r_wc[t, :]
+
+    elif r_arr is not None:
+        # DAM+Reserve: no adaptive policy.
+        #
+        # Wind curtailment matters: if wind is already dispatched below
+        # forecast (p0 < Pmax), the effective shortfall from dispatched
+        # level is less than r_wc.  Actual wind under worst case:
+        #   p_wc[wind_k] = max(0, Pmax[wind_k] - r_wc[k])
+        # but can't exceed what was dispatched (curtailed):
+        #   p_wc[wind_k] = min(p0[wind_k], max(0, Pmax[wind_k] - r_wc[k]))
+        # Effective reduction from dispatch:
+        #   delta_wind[k] = p0[wind_k] - p_wc[wind_k]
+        actual_net_shortfall = np.zeros(T)
+        for k, i in enumerate(wind_idx):
+            for t in range(T):
+                available_wc = max(0.0, Pmax_2d[i, t] - r_wc[t, k])
+                p_wc[i, t] = min(p0_arr[i, t], available_wc)
+                actual_net_shortfall[t] += p0_arr[i, t] - p_wc[i, t]
+
+        # Thermals deploy reserves proportionally to cover the actual
+        # net shortfall (which may be < R_total due to wind curtailment)
+        is_thermal = np.array([gt == "THERMAL" for gt in data.gen_type])
+        for t in range(T):
+            if actual_net_shortfall[t] < 1e-6:
+                continue
+            thermal_reserve_total = r_arr[is_thermal, t].sum()
+            if thermal_reserve_total < 1e-6:
+                continue
+            # Deploy just enough to cover actual shortfall
+            scale = min(actual_net_shortfall[t] / thermal_reserve_total, 1.0)
+            for i in np.where(is_thermal)[0]:
+                deployed = r_arr[i, t] * scale
+                p_wc[i, t] = min(p0_arr[i, t] + deployed, Pmax_2d[i, t])
+    else:
+        raise ValueError("Must provide either Z_arr (DARUC) or r_arr (DAM+Reserve)")
+
+    # Compute flows via PTDF
+    from compute_branch_flows import compute_branch_flows
+    flow_nom_df = compute_branch_flows(data, p0_arr)
+    flow_wc_df = compute_branch_flows(data, p_wc)
+
+    flow_nom = flow_nom_df.values
+    flow_wc = flow_wc_df.values
+    Fmax = data.Fmax
+
+    # Detect violations
+    violations = []
+    for l in range(len(Fmax)):
+        for t in range(T):
+            excess = abs(flow_wc[l, t]) - Fmax[l]
+            if excess > 1.0:
+                violations.append((l, t, excess, flow_wc[l, t]))
+
+    return {
+        "flow_nominal": flow_nom,
+        "flow_wc": flow_wc,
+        "p_wc": p_wc,
+        "r_wc": r_wc,
+        "R_total": R_total,
+        "violations": violations,
+    }
+
+
+def save_worst_case_flow_analysis(data, wc_result, label, out_dir):
+    """Save worst-case total-shortfall flow analysis CSV.
+
+    Columns: line, period, flow_nominal, flow_wc, Fmax,
+             loading_nominal_pct, loading_wc_pct, violation, excess_mw
+    """
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    flow_nom = wc_result["flow_nominal"]
+    flow_wc = wc_result["flow_wc"]
+    Fmax = data.Fmax
+    L, T = flow_nom.shape
+
+    rows = []
+    for l in range(L):
+        for t in range(T):
+            f_nom = flow_nom[l, t]
+            f_wc = flow_wc[l, t]
+            fmax = Fmax[l]
+            excess = max(abs(f_wc) - fmax, 0.0)
+            rows.append({
+                "line": data.line_ids[l],
+                "period": data.time[t],
+                "flow_nominal": round(f_nom, 2),
+                "flow_wc": round(f_wc, 2),
+                "Fmax": round(fmax, 2),
+                "loading_nominal_pct": round(abs(f_nom) / fmax * 100, 1) if fmax > 0 else 0.0,
+                "loading_wc_pct": round(abs(f_wc) / fmax * 100, 1) if fmax > 0 else 0.0,
+                "violation": abs(f_wc) > fmax + 1.0,
+                "excess_mw": round(excess, 2),
+            })
+
+    df = pd.DataFrame(rows)
+    fname = out_dir / f"worst_case_flow_analysis_{label}.csv"
+    df.to_csv(fname, index=False)
+
+    # Summary
+    viols = df[df["violation"]]
+    n_lines = viols["line"].nunique()
+    n_pairs = len(viols)
+    if n_pairs > 0:
+        print(f"  [{label}] {n_lines} lines violated ({n_pairs} line-period pairs), "
+              f"max excess {viols['excess_mw'].max():.1f} MW")
+    else:
+        print(f"  [{label}] No line violations under worst-case total shortfall")
+
+    return df
+
+
+# ---------------------------------------------------------------------------
 # Output saving helpers
 # ---------------------------------------------------------------------------
 
 def rebuild_deviation_summary(case_dir):
-    """Rebuild deviation_summary.csv from dam_reserve and daruc commitment CSVs.
+    """Rebuild deviation_summary.csv from DAM and DARUC commitment CSVs.
 
     This avoids re-running the full pipeline when only the summary is needed.
-    Reads commitment_u.csv from both dam_reserve/ and daruc/ subdirectories,
-    computes extra commitments and extra startups, and writes the result.
+    Looks for the DAM baseline commitment in this order:
+      1. daruc/dam_commitment_u.csv  (saved alongside DARUC output)
+      2. dam_reserve/commitment_u.csv (reserve baseline layout)
+      3. dam/commitment_u.csv (plain DAM layout)
 
     Parameters
     ----------
-    case_dir : Path — root directory containing dam_reserve/ and daruc/ subdirs
+    case_dir : Path — root directory containing daruc/ subdir (and DAM baseline)
 
     Returns
     -------
     pd.DataFrame — the deviation summary (also saved to daruc/deviation_summary.csv)
     """
     case_dir = Path(case_dir)
-    dam_u = pd.read_csv(case_dir / "dam_reserve" / "commitment_u.csv", index_col=0)
     daruc_u = pd.read_csv(case_dir / "daruc" / "commitment_u.csv", index_col=0)
+
+    # Find DAM baseline commitment
+    dam_candidates = [
+        case_dir / "daruc" / "dam_commitment_u.csv",
+        case_dir / "dam_reserve" / "commitment_u.csv",
+        case_dir / "dam" / "commitment_u.csv",
+    ]
+    dam_path = None
+    for candidate in dam_candidates:
+        if candidate.exists():
+            dam_path = candidate
+            break
+    if dam_path is None:
+        raise FileNotFoundError(
+            f"No DAM baseline commitment found in {case_dir}. "
+            f"Searched: {[str(c) for c in dam_candidates]}"
+        )
+    dam_u = pd.read_csv(dam_path, index_col=0)
+    print(f"  DAM baseline: {dam_path.relative_to(case_dir)}")
 
     # Binarize (handle -0.0 and float noise)
     dam_arr = (dam_u.values > 0.5).astype(int)
@@ -290,6 +560,10 @@ def rebuild_deviation_summary(case_dir):
             "dam_committed_hours", "daruc_committed_hours", "periods_added",
         ])
 
+    # Enrich with fuel type and capacity from gen.csv
+    gen_meta = load_gen_metadata()
+    dev_df = _enrich_deviation_df(dev_df, gen_meta)
+
     dev_df.to_csv(case_dir / "daruc" / "deviation_summary.csv", index=False)
     print(f"Rebuilt deviation_summary.csv: {len(dev_df)} generators with extra commitments")
     return dev_df
@@ -297,7 +571,7 @@ def rebuild_deviation_summary(case_dir):
 
 def save_robust_outputs(results, data, out_dir, Sigma, rho,
                         deviation_df=None, margin_df=None,
-                        summary_dict=None, analyze_z_fn=None):
+                        summary_dict=None, analyze_z_fn=None, mu=None):
     """Save standard robust model (ARUC/DARUC) outputs to a directory.
 
     Saves: commitment_u.csv, dispatch_p0.csv, Z_coefficients.csv,
@@ -323,6 +597,8 @@ def save_robust_outputs(results, data, out_dir, Sigma, rho,
         deviation_df.to_csv(out_dir / "deviation_summary.csv", index=False)
     np.save(out_dir / "Sigma.npy", Sigma)
     np.save(out_dir / "rho.npy", np.atleast_1d(rho))
+    if mu is not None:
+        np.save(out_dir / "mu.npy", mu)
     if analyze_z_fn is not None:
         analyze_z_fn(results["Z"], data, out_dir, rho=rho)
     if margin_df is not None:
@@ -421,3 +697,45 @@ def compute_day1_metrics(data, results_dict):
     curt = float(((wind_pmax_d1 - dispatch[is_wind, :]) * dt).sum())
 
     return {"unit_hours": uh, "wind_curtailment_mwh": curt}
+
+
+def committed_units_day1(directory, day1_hours=24):
+    """Count unique generators committed during day 1 across commitment_u.csv files.
+
+    Searches *directory* recursively for files named ``commitment_u.csv``,
+    reads each one, and counts the number of generators (rows) with u >= 0.5
+    in at least one day-1 period.
+
+    Day-1 periods are identified by taking the first *day1_hours* worth of
+    columns.  For hourly schedules this is simply the first 24 columns; for
+    variable-interval horizons the column timestamps are parsed and all
+    columns within 24 hours of the first timestamp are included.
+
+    Parameters
+    ----------
+    directory : str or Path
+        Root directory to search (recursively) for commitment_u.csv files.
+    day1_hours : int, optional
+        Number of hours in day 1 (default 24).
+
+    Returns
+    -------
+    dict[str, int]
+        Mapping from the relative path of each commitment_u.csv (relative to
+        *directory*) to the number of unique committed units in day 1.
+    """
+    directory = Path(directory)
+    results = {}
+    for csv_path in sorted(directory.rglob("commitment_u.csv")):
+        u = pd.read_csv(csv_path, index_col=0)
+        # Determine day-1 columns
+        try:
+            timestamps = pd.to_datetime(u.columns)
+            t0 = timestamps[0]
+            day1_cols = [c for c, ts in zip(u.columns, timestamps)
+                         if ts < t0 + pd.Timedelta(hours=day1_hours)]
+        except Exception:
+            day1_cols = list(u.columns[:day1_hours])
+        committed = (u[day1_cols].values >= 0.5).any(axis=1).sum()
+        results[str(csv_path.relative_to(directory))] = int(committed)
+    return results

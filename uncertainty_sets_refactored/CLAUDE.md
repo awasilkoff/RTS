@@ -160,39 +160,19 @@ FitConfig(max_iters=250, step_size=0.1, grad_clip=10.0, tol=1e-7,
 ```
 **Important:** `k_fit=None` during training (softmax over all N-1 neighbors). Prediction uses `k=128` top-k. This train/predict mismatch is intentional and beneficial.
 
-## One-Off / Legacy Scripts (do not modify unless asked)
+## One-Off / Legacy Scripts
 
-These scripts were created for specific experiments and are NOT part of the active pipeline. Do not modify, refactor, or extend them:
+All one-off experiment scripts, legacy sweeps, test files, and superseded runners have been moved to `archive/`. Do not move them back or import from them. The archive exists for reference only — if you need to recover a technique, read the archived file but re-implement it cleanly in the active pipeline.
 
-| Script | Purpose |
-|--------|---------|
-| `compare_covariance_methods.py` | Early comparison (global/k-NN/learned) |
-| `compare_nn_vs_gbm.py` | NN vs GBM experiment |
-| `compare_weighted_vs_binned.py` | Weighted vs binned conformal comparison |
-| `create_comprehensive_comparison.py` | Four-baseline comprehensive comparison |
-| `diagnose_kernel_equal_outliers.py` | One-off kernel diagnosis |
-| `diagnose_tau_omega_seeds.py` | Tau/omega seed sensitivity (superseded by `sweep_and_viz_feature_set.py --n-seeds`) |
-| `example_weighted_conformal.py` | Tutorial example |
-| `experiment_absolute_vs_scaled_scores.py` | Absolute vs scaled score experiment |
-| `experiment_weighting_schemes.py` | Weighting scheme comparison |
-| `generate_multiple_kernel_comparisons.py` | Multi-kernel comparison figures |
-| `improve_conformal_coverage.py` | Coverage improvement experiment |
-| `quick_test_absolute_scores.py` | Quick diagnostic |
-| `run_minmax_experiments.py` | MinMax normalization experiments |
-| `run_paper_figures.py` | Old paper figure generation (superseded by `generate_paper_figures.py`) |
-| `run_paper_figures_dayahead_valid.py` | Day-ahead validation figures |
-| `run_paper_figures_improved.py` | Improved paper figures (superseded) |
-| `run_thorough_overnight.py` | Overnight grid search launcher |
-| `run_all_feature_sets.py` | All feature set experiments |
-| `sweep_conformal_config.py` | Conformal config sweep |
-| `sweep_conformal_quick.py` | Quick conformal sweep |
-| `sweep_cov_fit.py` | Covariance fitting sweep |
-| `sweep_regularization.py` | Regularization sweep |
-| `sweep_time_exponential_params.py` | Time-exponential parameter sweep |
-| `sweep_weighted_conformal_tau.py` | Weighted conformal tau sweep |
-| `test_*.py` | Various one-off test scripts |
-| `validate_*.py`, `verify_*.py` | Validation scripts |
-| `viz_*.py` (except `viz_kernel_distance.py`) | Legacy visualization scripts |
+Notable archived scripts and what superseded them:
+
+| Archived script | Superseded by |
+|-----------------|---------------|
+| `run_paper_figures.py`, `run_paper_figures_improved.py` | `generate_paper_figures.py` |
+| `diagnose_tau_omega_seeds.py` | `sweep_and_viz_feature_set.py --n-seeds` |
+| `sweep_conformal_quick.py` | `sweep_and_viz_feature_set.py` |
+| `compare_covariance_methods.py`, `create_comprehensive_comparison.py` | `generate_paper_figures.py` figures |
+| `test_*.py`, `validate_*.py`, `verify_*.py` | superseded; no active test suite |
 
 ## Active Scripts (the ones that matter)
 

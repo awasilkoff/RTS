@@ -290,12 +290,44 @@ def warm_start_aruc_from_prev_solution(
     for key in aruc_Z:
         K = max(K, key[2] + 1)
 
-    for key in aruc_Z:
-        i, t, k = key
-        col_idx = t * K + k
-        if col_idx < Z_prev.shape[1]:
-            aruc_Z[key].Start = Z_prev[i, col_idx]
-            n_set += 1
+    # Check for shape mismatch (different generator count in prev solution)
+    if Z_prev.shape[0] != I:
+        print(f"  WARNING: Z shape mismatch: prev has {Z_prev.shape[0]} rows, "
+              f"model has {I} gens. Skipping Z warm start.")
+    else:
+        z_start_vals = {}  # (i, t, k) -> value for verification
+        for key in aruc_Z:
+            i, t, k = key
+            col_idx = t * K + k
+            if col_idx < Z_prev.shape[1]:
+                val = Z_prev[i, col_idx]
+                aruc_Z[key].Start = val
+                z_start_vals[key] = val
+                n_set += 1
+
+        # Verify and repair bal_Z: sum_i Z[i,t,k] == 0 for all (t,k)
+        tk_pairs = set()
+        for (i, t, k) in z_start_vals:
+            tk_pairs.add((t, k))
+        n_repaired = 0
+        for (t, k) in sorted(tk_pairs):
+            z_sum = sum(
+                z_start_vals[(i, t, k)]
+                for i in range(I)
+                if (i, t, k) in z_start_vals
+            )
+            if abs(z_sum) > 1e-6:
+                # Repair: distribute the residual across all generators at (t,k)
+                gens_tk = [i for i in range(I) if (i, t, k) in z_start_vals]
+                correction = z_sum / len(gens_tk)
+                for i in gens_tk:
+                    new_val = z_start_vals[(i, t, k)] - correction
+                    aruc_Z[i, t, k].Start = new_val
+                    z_start_vals[(i, t, k)] = new_val
+                n_repaired += 1
+        if n_repaired > 0:
+            print(f"  Repaired {n_repaired}/{len(tk_pairs)} bal_Z constraints "
+                  f"in sweep warm start")
 
     # Set slack to 0
     aruc_s_p = aruc_vars.get("s_p")
@@ -315,6 +347,33 @@ def warm_start_aruc_from_prev_solution(
         f"Sweep warm start: set {n_set} Start values from previous solution"
     )
     aruc_model.update()
+
+
+def load_prev_solution_from_dir(out_dir) -> Dict[str, Any]:
+    """Load a previous ARUC/DARUC solution from saved CSVs.
+
+    Reads commitment_u.csv, dispatch_p0.csv, and Z_coefficients.csv
+    as written by ``save_robust_outputs``.  Returns a dict compatible
+    with ``warm_start_aruc_from_prev_solution``.
+
+    Parameters
+    ----------
+    out_dir : str or Path
+        Directory containing the saved CSVs.
+
+    Returns
+    -------
+    dict with keys "u", "p0", "Z" (DataFrames).
+    """
+    from pathlib import Path
+    import pandas as pd
+
+    d = Path(out_dir)
+    u = pd.read_csv(d / "commitment_u.csv", index_col=0)
+    p0 = pd.read_csv(d / "dispatch_p0.csv", index_col=0)
+    Z = pd.read_csv(d / "Z_coefficients.csv", index_col=0)
+    print(f"Loaded previous solution from {d}  (u: {u.shape}, p0: {p0.shape}, Z: {Z.shape})")
+    return {"u": u, "p0": p0, "Z": Z}
 
 
 def _init_soc_auxiliaries(

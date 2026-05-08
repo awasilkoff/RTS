@@ -674,9 +674,9 @@ def run_rts_aruc(
     timings["model_build"] = time.time() - t0
 
     print("  Model built. Starting optimization...")
-    t0 = time.time()
+    t_solve_start = time.time()
     model.optimize()
-    timings["solve"] = time.time() - t0
+    timings["solve"] = time.time() - t_solve_start
 
     if model.Status not in [gp.GRB.OPTIMAL, gp.GRB.SUBOPTIMAL]:
         print(f"WARNING: Model did not terminate optimally. Status: {model.Status}")
@@ -693,6 +693,8 @@ def run_rts_aruc(
             model, vars_dict, data, data_full,
             _rmask, sqrt_Sigma, rho,
             rho_lines_frac, time_varying,
+            time_limit=time_limit,
+            solve_start=t_solve_start,
         )
         timings["line_iterations_solve"] = time.time() - t0
 

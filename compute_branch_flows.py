@@ -325,6 +325,8 @@ def iterative_line_resolve(
     time_varying: bool,
     max_iter: int = 5,
     viol_tol: float = 1.0,
+    time_limit: float | None = None,
+    solve_start: float | None = None,
 ) -> int:
     """Iteratively add violated line constraints and re-solve.
 
@@ -355,6 +357,13 @@ def iterative_line_resolve(
     max_iter : int
     viol_tol : float
         MW threshold for violations.
+    time_limit : float or None
+        Total wall-clock budget in seconds shared between the initial solve
+        and all re-solve iterations.  Each re-solve gets only the remaining
+        time (``time_limit - elapsed``).  None = no limit.
+    solve_start : float or None
+        ``time.time()`` timestamp taken just before the initial
+        ``model.optimize()`` call.  Required when *time_limit* is set.
 
     Returns
     -------
@@ -501,6 +510,16 @@ def iterative_line_resolve(
                 var.Start = var.X
             except AttributeError:
                 pass  # new variables without .X yet
+
+        if time_limit is not None and solve_start is not None:
+            import time as _time
+            elapsed = _time.time() - solve_start
+            remaining = time_limit - elapsed
+            if remaining <= 0:
+                print(f"  [Line iter {iteration}] Global time budget exhausted ({elapsed:.0f}s >= {time_limit:.0f}s) — stopping.")
+                return iteration
+            model.Params.TimeLimit = remaining
+            print(f"  [Line iter {iteration}] Remaining budget: {remaining:.0f}s of {time_limit:.0f}s")
 
         model.optimize()
 

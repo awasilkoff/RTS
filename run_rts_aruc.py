@@ -65,6 +65,22 @@ SPP_START_IDX = 0
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _reshape_mu_for_variable_intervals(mu_hourly: np.ndarray, period_duration) -> np.ndarray:
+    """Average hourly mu rows into variable-length periods (same logic as rho reshaping)."""
+    K = mu_hourly.shape[1]
+    mu_out = np.zeros((len(period_duration), K))
+    hour = 0
+    for t, dur in enumerate(period_duration):
+        n = max(1, int(round(float(dur))))
+        mu_out[t] = mu_hourly[hour:hour + n].mean(axis=0)
+        hour += n
+    return mu_out
+
+
+# ---------------------------------------------------------------------------
 # Uncertainty set construction
 # ---------------------------------------------------------------------------
 
@@ -475,6 +491,7 @@ def run_rts_aruc(
     node_file_start: Optional[float] = None,
     cuts: Optional[int] = None,
     prev_aruc_solution: Optional[Dict[str, Any]] = None,
+    fix_and_resolve: bool = False,
 ) -> Dict[str, Any]:
     """
     Full pipeline for ARUC-LDR:
@@ -583,11 +600,19 @@ def run_rts_aruc(
         )
         time_varying = True
 
+        # Align mu to ARUC wind ordering (same permutation as Sigma)
+        _aruc_wind_ids = [data.gen_ids[i] for i in range(len(data.gen_ids))
+                          if data.gen_type[i].upper() == "WIND"]
+        _npz_ids = provider.get_wind_gen_ids()
+        _perm = [_npz_ids.index(wid) for wid in _aruc_wind_ids]
+        mu_val = horizon.mu[:, _perm]  # (horizon_hours, K) in model wind order
+
         # Reshape if using variable intervals
         if data.period_duration is not None:
             Sigma, rho, sqrt_Sigma = reshape_uncertainty_for_variable_intervals(
                 Sigma, rho, data.period_duration, sqrt_Sigma
             )
+            mu_val = _reshape_mu_for_variable_intervals(mu_val, data.period_duration)
             print(f"  Reshaped uncertainty to {T} variable-interval periods")
 
         print(f"  Wind IDs from provider: {provider.get_wind_gen_ids()}")
@@ -595,6 +620,7 @@ def run_rts_aruc(
         print(f"  rho range: [{rho.min():.3f}, {rho.max():.3f}]")
         model_name = "ARUC_LDR_TimeVarying"
     else:
+        mu_val = None
         # Static uncertainty (original behavior)
         print("\nConstructing static uncertainty set...")
         Sigma, rho = build_uncertainty_set(
@@ -648,9 +674,9 @@ def run_rts_aruc(
     timings["model_build"] = time.time() - t0
 
     print("  Model built. Starting optimization...")
-    t0 = time.time()
+    t_solve_start = time.time()
     model.optimize()
-    timings["solve"] = time.time() - t0
+    timings["solve"] = time.time() - t_solve_start
 
     if model.Status not in [gp.GRB.OPTIMAL, gp.GRB.SUBOPTIMAL]:
         print(f"WARNING: Model did not terminate optimally. Status: {model.Status}")
@@ -667,8 +693,16 @@ def run_rts_aruc(
             model, vars_dict, data, data_full,
             _rmask, sqrt_Sigma, rho,
             rho_lines_frac, time_varying,
+            time_limit=time_limit,
+            solve_start=t_solve_start,
         )
         timings["line_iterations_solve"] = time.time() - t0
+
+    if fix_and_resolve:
+        from aruc_model import fix_and_resolve_continuous
+        t0 = time.time()
+        fix_and_resolve_continuous(model, vars_dict)
+        timings["fix_and_resolve"] = time.time() - t0
 
     results = extract_solution(data, model, vars_dict)
     print_brief_summary(results, data)
@@ -689,6 +723,7 @@ def run_rts_aruc(
         "results": results,
         "Sigma": Sigma,
         "rho": rho,
+        "mu": mu_val,
         "rho_lines_frac": rho_lines_frac,
         "time_varying": time_varying,
         "timings": timings,

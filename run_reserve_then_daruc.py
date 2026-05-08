@@ -261,9 +261,9 @@ def run_reserve_then_daruc(
     timings["daruc_build"] = time.time() - t0
 
     print("  Solving DARUC...")
-    t0 = time.time()
+    t_solve_start = time.time()
     model.optimize()
-    timings["daruc_solve"] = time.time() - t0
+    timings["daruc_solve"] = time.time() - t_solve_start
 
     import gurobipy as gp
     if model.Status not in [gp.GRB.OPTIMAL, gp.GRB.SUBOPTIMAL]:
@@ -281,6 +281,8 @@ def run_reserve_then_daruc(
             model, vars_dict, data, data_full,
             _rmask, sqrt_Sigma, rho_val,
             rho_lines_frac, time_varying,
+            time_limit=time_limit,
+            solve_start=t_solve_start,
         )
         timings["line_iterations_solve"] = time.time() - t0
 

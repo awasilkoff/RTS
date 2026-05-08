@@ -133,6 +133,10 @@ def load_results(result_dir: Path, label: str) -> dict:
     else:
         out["rho"] = None
 
+    # Mu (NPZ mean forecast, aligned to model wind order)
+    mu_path = result_dir / "mu.npy"
+    out["mu"] = np.load(mu_path) if mu_path.exists() else None
+
     # Z coefficients (MultiIndex: index=gen_ids, columns=(time, k))
     z_path = result_dir / "Z_coefficients.csv"
     if z_path.exists():
@@ -815,6 +819,9 @@ def compute_worst_case_wind(res: dict, data, common_times: list[str]) -> dict | 
 
     T = len(common_times)
 
+    # mu (T_full, K) aligned to model wind order — use as forecast when available
+    mu_arr = res.get("mu")  # None for static / old runs
+
     # Normalize Sigma to (T, K, K)
     if Sigma.ndim == 2:
         Sigma = np.tile(Sigma[np.newaxis, :, :], (T, 1, 1))
@@ -854,14 +861,18 @@ def compute_worst_case_wind(res: dict, data, common_times: list[str]) -> dict | 
     worst_case_ts = np.zeros(T)
     per_farm = {}  # gid -> {forecast, nominal, worst_case, deviation}
 
-    for wi, gid in zip(wind_idx, wind_ids):
+    for k_wind, (wi, gid) in enumerate(zip(wind_idx, wind_ids)):
         farm_forecast = np.zeros(T)
         farm_nominal = np.zeros(T)
         farm_worst = np.zeros(T)
 
-        # Forecast (Pmax)
+        # Forecast: use NPZ mu when available (correct time alignment);
+        # fall back to Pmax_2d (SPP parquet) for backward compatibility.
         for t_idx, tp in enumerate(time_pos):
-            farm_forecast[t_idx] = pmax_2d[wi, tp]
+            if mu_arr is not None:
+                farm_forecast[t_idx] = mu_arr[tp, k_wind]
+            else:
+                farm_forecast[t_idx] = pmax_2d[wi, tp]
         forecast_ts += farm_forecast
 
         # Nominal dispatch
@@ -926,6 +937,132 @@ def compute_worst_case_wind(res: dict, data, common_times: list[str]) -> dict | 
     }
 
 
+def compute_worst_case_dispatch_cost(
+    res: dict, data, common_times: list[str]
+) -> dict | None:
+    """Compute the energy dispatch cost at the worst-case (wind-minimizing) r.
+
+    Uses the same adversarial direction as the wind figures:
+        r_wc[t] = rho[t] * Sigma[t] @ 1 / sqrt(1^T Sigma[t] 1)
+
+    Worst-case dispatch for each generator:
+        p_wc[i,t] = p0[i,t] - Z[i,t,:] @ r_wc[t]
+
+    Only the energy cost changes; commitment/startup/shutdown are identical.
+
+    Returns None for formulations without Z (DAM, DAM+Reserve).
+
+    Returns dict:
+        nom_energy  : float  nominal energy cost (day-1 common_times)
+        wc_energy   : float  worst-case energy cost
+        premium     : float  wc_energy - nom_energy (always >= 0)
+        pct         : float  premium as % of nom_energy
+    """
+    Z_df = res.get("Z")
+    Sigma = res.get("Sigma")
+    rho = res.get("rho")
+    if Z_df is None or Sigma is None or rho is None:
+        return None
+
+    p0_df = res["p0"]
+    T = len(common_times)
+    common_str = [str(t) for t in common_times]
+
+    # Map common_times -> positions in the full data.time axis (for Sigma/rho indexing)
+    time_list = [str(t) for t in data.time]
+    time_pos = []
+    for t_str in common_str:
+        try:
+            time_pos.append(time_list.index(t_str))
+        except ValueError:
+            time_pos.append(0)
+
+    # Number of wind generators (= K, uncertainty dimension)
+    is_wind = np.array([gt.upper() == "WIND" for gt in data.gen_type])
+    K = int(is_wind.sum())
+
+    # Normalize Sigma -> (T, K, K)
+    if Sigma.ndim == 2:
+        Sigma_3d = np.broadcast_to(Sigma[np.newaxis, :, :], (len(time_pos), K, K))
+    else:
+        Sigma_3d = Sigma
+
+    rho_arr = np.atleast_1d(rho).astype(float)
+    if rho_arr.shape[0] == 1:
+        rho_full = np.full(max(time_pos) + 1, rho_arr[0])
+    else:
+        rho_full = rho_arr
+
+    # Compute r_wc[t] = rho[t] * Sigma[t] @ 1 / sqrt(1^T Sigma[t] 1)
+    ones = np.ones(K)
+    r_wc = np.zeros((T, K))
+    for t_idx, tp in enumerate(time_pos):
+        S = Sigma_3d[tp] if Sigma.ndim == 3 else Sigma_3d[0]
+        Se = S @ ones
+        denom = np.sqrt(ones @ Se)
+        rho_t = rho_full[tp] if tp < len(rho_full) else rho_full[-1]
+        if denom > 1e-12:
+            r_wc[t_idx] = rho_t * Se / denom
+
+    # Build delta_p (I, T) = -Z[i,t,:] @ r_wc[t] for generators with Z rows
+    gen_ids = list(p0_df.index)
+    I = len(gen_ids)
+    delta_p = np.zeros((I, T))
+    z_time_labels = set(Z_df.columns.get_level_values(0).unique())
+    z_gen_ids = set(Z_df.index)
+
+    for t_idx, t_str in enumerate(common_str):
+        if t_str not in z_time_labels:
+            continue
+        Z_t = Z_df[t_str]  # DataFrame: index=gen_ids, columns=k (shape I_z × K)
+        for i_idx, gid in enumerate(gen_ids):
+            if gid not in z_gen_ids:
+                continue
+            z_row = Z_t.loc[gid].values.astype(float)  # (K,)
+            delta_p[i_idx, t_idx] = -float(z_row @ r_wc[t_idx])
+
+    # Get p0 matrix aligned to common_times
+    p0_vals = np.zeros((I, T))
+    for i_idx, gid in enumerate(gen_ids):
+        if gid in p0_df.index:
+            p0_vals[i_idx] = p0_df.loc[gid, common_str].values.astype(float)
+
+    p_wc_vals = p0_vals + delta_p
+
+    # Compute energy cost for both nominal and worst-case dispatch
+    block_cap = data.block_cap    # (I, B)
+    block_cost = data.block_cost  # (I, B)
+    B = block_cap.shape[1]
+    dt = data.dt[:T]
+
+    nom_energy = 0.0
+    wc_energy = 0.0
+    for i in range(I):
+        for t in range(T):
+            for p_val, is_wc in [(p0_vals[i, t], False), (p_wc_vals[i, t], True)]:
+                remaining = max(0.0, float(p_val))
+                cost = 0.0
+                for b in range(B):
+                    alloc = min(remaining, float(block_cap[i, b]))
+                    cost += alloc * float(block_cost[i, b]) * float(dt[t])
+                    remaining -= alloc
+                    if remaining <= 1e-9:
+                        break
+                if is_wc:
+                    wc_energy += cost
+                else:
+                    nom_energy += cost
+
+    premium = wc_energy - nom_energy
+    pct = 100.0 * premium / nom_energy if nom_energy > 0 else 0.0
+    return {
+        "nom_energy": nom_energy,
+        "wc_energy": wc_energy,
+        "premium": premium,
+        "pct": pct,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Figure: Worst-case wind dispatch
 # ---------------------------------------------------------------------------
@@ -968,80 +1105,111 @@ def fig_worst_case_wind(
                   f"  |  Max: {fd.max():.1f} MW (h{np.argmax(fd)})"
                   f"  |  Mean%: {fpct.mean():.1f}%")
 
-    # DAM nominal wind dispatch (reference line)
-    dam_nominal = None
+    from matplotlib.colors import to_rgba
+
+    # DAM nominal wind dispatch (reference line, system total + per-farm)
+    wind_mask = [gt.upper() == "WIND" for gt in data.gen_type]
+    wind_ids_all = [data.gen_ids[i] for i, m in enumerate(wind_mask) if m]
+    dam_nominal_ts = None
+    dam_nominal_farm = {}
     if dam is not None:
-        wind_mask = [gt.upper() == "WIND" for gt in data.gen_type]
-        wind_ids = [data.gen_ids[i] for i, m in enumerate(wind_mask) if m]
-        dam_nominal = np.zeros(len(common_times))
-        for gid in wind_ids:
+        dam_nominal_ts = np.zeros(len(common_times))
+        for gid in wind_ids_all:
             if gid in dam["p0"].index:
-                dam_nominal += dam["p0"].loc[gid, common_times].values.astype(float)
+                farm_vals = dam["p0"].loc[gid, common_times].values.astype(float)
+                dam_nominal_ts += farm_vals
+                dam_nominal_farm[gid] = farm_vals
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5), sharey=True)
+    # Determine per-farm rows from whichever wc dict is available
+    ref_wc = daruc_wc if daruc_wc is not None else aruc_wc
+    farm_ids = list(ref_wc["per_farm"].keys()) if ref_wc is not None else []
+    K = len(farm_ids)
+    n_rows = 1 + K  # row 0 = system total, rows 1..K = per farm
+
     x = np.arange(len(common_times))
-
-    panels = [
-        (0, "DARUC", daruc_wc, "#ff7f0e"),
-        (1, "ARUC", aruc_wc, "#1f77b4"),
+    T_plot = len(common_times)
+    tick_step = max(1, T_plot // 8)
+    tick_pos = list(range(0, T_plot, tick_step))
+    tick_labels = [
+        common_times[i].split(" ")[1][:5] if " " in common_times[i] else str(i)
+        for i in tick_pos
     ]
 
-    for idx, label, wc, color in panels:
-        ax = axes[idx]
+    fig, axes = plt.subplots(
+        n_rows, 2,
+        figsize=(14, 4 + 3 * K),
+        sharex=True,
+        gridspec_kw={"hspace": 0.45},
+    )
+    if n_rows == 1:
+        axes = axes[np.newaxis, :]  # ensure 2-D indexing
+
+    panels = [("DARUC", daruc_wc, "#ff7f0e"), ("ARUC", aruc_wc, "#1f77b4")]
+
+    def _draw_wind_panel(ax, label, wc, color, farm_gid=None, is_system=True):
+        """Draw forecast / nominal / worst-case on a single axis."""
         if wc is None:
             ax.text(0.5, 0.5, f"No Z data\nfor {label}", ha="center", va="center",
-                    transform=ax.transAxes, fontsize=12)
-            ax.set_title(f"{label}: Worst-Case Wind Dispatch", fontsize=10)
-            continue
+                    transform=ax.transAxes, fontsize=9)
+            return
+        if is_system:
+            fc = wc["forecast_ts"]
+            nom = wc["nominal_ts"]
+            wc_ = wc["worst_case_ts"]
+        else:
+            farm = wc["per_farm"].get(farm_gid)
+            if farm is None:
+                ax.text(0.5, 0.5, "no data", ha="center", va="center",
+                        transform=ax.transAxes, fontsize=8)
+                return
+            fc = farm["forecast"]
+            nom = farm["nominal"]
+            wc_ = farm["worst_case"]
 
-        # Forecast line (dashed gray)
-        ax.plot(x, wc["forecast_ts"], color="gray", linestyle="--", linewidth=1.2,
-                label="Forecast (Pmax)")
-
-        # Nominal dispatch line (solid)
-        ax.plot(x, wc["nominal_ts"], color=color, linestyle="-", linewidth=1.5,
-                label="Nominal dispatch")
-
-        # Worst-case dispatch line (dotted, darker shade)
-        from matplotlib.colors import to_rgba
-        darker = to_rgba(color, alpha=1.0)
-        darker_rgb = tuple(max(0, c * 0.7) for c in darker[:3])
-        ax.plot(x, wc["worst_case_ts"], color=darker_rgb, linestyle=":", linewidth=1.5,
-                label="Worst-case dispatch")
-
-        # Shaded band between nominal and worst-case
-        ax.fill_between(x, wc["worst_case_ts"], wc["nominal_ts"],
-                        color=color, alpha=0.2, label="Uncertain band")
-
-        # DAM reference line
-        if dam_nominal is not None:
-            ax.plot(x, dam_nominal, color="#2ca02c", linestyle="-", linewidth=0.8,
-                    alpha=0.7, label="DAM dispatch")
-
-        ax.legend(fontsize=7, loc="upper right")
+        darker_rgb = tuple(max(0, c * 0.7) for c in to_rgba(color)[:3])
+        ax.plot(x, fc,  color="gray",       linestyle="--", linewidth=1.2, label="Forecast (mu)")
+        ax.plot(x, nom, color=color,         linestyle="-",  linewidth=1.5, label="Nominal p0")
+        ax.plot(x, wc_, color=darker_rgb,    linestyle=":",  linewidth=1.5, label="Worst-case")
+        ax.fill_between(x, wc_, nom, color=color, alpha=0.2, label="Uncertain band")
+        if is_system and dam_nominal_ts is not None:
+            ax.plot(x, dam_nominal_ts, color="#2ca02c", linestyle="-",
+                    linewidth=0.8, alpha=0.7, label="DAM dispatch")
+        elif not is_system and farm_gid in dam_nominal_farm:
+            ax.plot(x, dam_nominal_farm[farm_gid], color="#2ca02c", linestyle="-",
+                    linewidth=0.8, alpha=0.7, label="DAM dispatch")
         ax.grid(True, alpha=0.3)
-        ax.set_title(f"{label}: Worst-Case Wind Dispatch", fontsize=10)
-        ax.set_xlabel("Hour", fontsize=9)
 
-        # X-axis tick labels
-        T = len(common_times)
-        tick_step = max(1, T // 8)
-        ax.set_xticks(range(0, T, tick_step))
-        ax.set_xticklabels(
-            [common_times[i].split(" ")[1][:5] if " " in common_times[i]
-             else str(i) for i in range(0, T, tick_step)],
-            fontsize=7, rotation=45,
-        )
+    # --- Row 0: system total ---
+    for col, (label, wc, color) in enumerate(panels):
+        ax = axes[0, col]
+        _draw_wind_panel(ax, label, wc, color, is_system=True)
+        ax.set_title(f"{label}: System Wind  (forecast / nominal / worst-case)", fontsize=9)
+        ax.set_ylabel("Total wind (MW)", fontsize=8)
+        if col == 0:
+            ax.legend(fontsize=6, loc="upper right", ncol=2)
 
-    axes[0].set_ylabel("Wind Power (MW)", fontsize=9)
+    # --- Rows 1..K: per farm ---
+    for k_idx, gid in enumerate(farm_ids):
+        for col, (label, wc, color) in enumerate(panels):
+            ax = axes[1 + k_idx, col]
+            _draw_wind_panel(ax, label, wc, color, farm_gid=gid, is_system=False)
+            ax.set_title(f"{label}: {gid}", fontsize=8)
+            ax.set_ylabel("MW", fontsize=8)
 
-    fig.suptitle("Worst-Case Wind Dispatch Under Uncertainty", fontsize=12, y=0.98)
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    # X-axis ticks on the bottom row only (sharex=True)
+    for col in range(2):
+        axes[-1, col].set_xticks(tick_pos)
+        axes[-1, col].set_xticklabels(tick_labels, fontsize=7, rotation=45)
+        axes[-1, col].set_xlabel("Hour", fontsize=8)
+
+    fig.suptitle("Wind Dispatch: Forecast (mu)  |  Nominal (p0)  |  Worst-case (p0 + Z@r)",
+                 fontsize=11, y=1.01)
+    fig.tight_layout()
 
     for ext in ["pdf", "png"]:
         fig.savefig(out_dir / f"fig_worst_case_wind.{ext}", dpi=300, bbox_inches="tight")
     plt.close(fig)
-    print(f"  Saved fig_worst_case_wind.pdf/.png")
+    print(f"  Saved fig_worst_case_wind.pdf/.png  ({n_rows} rows × 2 cols, {K} farms)")
 
 
 # ---------------------------------------------------------------------------
@@ -1135,7 +1303,7 @@ def write_summary(
     data=None,
     reserve: dict | None = None,
     cost_reserve: dict | None = None,
-):
+) -> dict:
     """Write comparison summary to console and file."""
     lines = []
     lines.append("=" * 70)
@@ -1253,6 +1421,38 @@ def write_summary(
             lines.append(f"    {row['gen_id']} ({row['gen_type']}): "
                          f"+{row['extra_committed_hours']}h (DAM={row['dam_committed_hours']}h)")
 
+    # Worst-case dispatch cost
+    wc_costs = {}
+    if data is not None:
+        for name, res in [("DARUC", daruc), ("ARUC", aruc)]:
+            wc_costs[name] = compute_worst_case_dispatch_cost(res, data, common_times)
+
+        lines.append("\n--- Worst-Case Dispatch Cost (wind-minimizing r_wc) ---")
+        lines.append("  Commitment/startup costs are fixed; only energy changes.")
+        lines.append("  DAM/DAM+Reserve have no Z response so worst-case = nominal.")
+
+        nom_header  = f"  {'':20s}  {'Nom energy':>14s}  {'WC energy':>14s}  {'Premium ($)':>12s}  {'Premium (%)':>11s}"
+        lines.append(nom_header)
+        for name, cost, wc in [
+            ("DAM",        cost_dam,     None),
+            ("DAM+Reserve",cost_reserve, None),
+            ("DARUC",      cost_daruc,   wc_costs.get("DARUC")),
+            ("ARUC-LDR",   cost_aruc,    wc_costs.get("ARUC")),
+        ]:
+            if cost is None:
+                continue
+            nom_e = cost.get("energy", 0.0)
+            if wc is not None:
+                lines.append(
+                    f"  {name:20s}  {nom_e:>14,.2f}  {wc['wc_energy']:>14,.2f}"
+                    f"  {wc['premium']:>+12,.2f}  {wc['pct']:>+10.2f}%"
+                )
+            else:
+                lines.append(
+                    f"  {name:20s}  {nom_e:>14,.2f}  {'(=nominal)':>14s}"
+                    f"  {'N/A':>12s}  {'N/A':>11s}"
+                )
+
     # Wind curtailment
     if data is not None:
         lines.append("\n--- Wind Curtailment ---")
@@ -1277,6 +1477,8 @@ def write_summary(
     with open(out_dir / "comparison_summary.txt", "w", encoding="utf-8") as f:
         f.write(text)
     print(f"\n  Saved comparison_summary.txt")
+
+    return wc_costs  # {"DARUC": {...}, "ARUC": {...}} — for summary.json
 
 
 # ---------------------------------------------------------------------------

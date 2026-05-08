@@ -139,7 +139,7 @@ def main():
         "--fix-wind-z",
         action=argparse.BooleanOptionalAction,
         help="Fix wind Z diagonal to 1 (wind fully tracks own realization, no curtailment)",
-        default=True,
+        default=False,
     )
     parser.add_argument(
         "--three-blocks",
@@ -204,7 +204,7 @@ def main():
     parser.add_argument(
         "--line-monitor-threshold",
         type=float,
-        default=0.9,
+        default=0.95,
         help="DAM loading threshold for line filtering (e.g. 0.5 = keep lines loaded >=50%%)",
     )
     parser.add_argument(
@@ -233,7 +233,7 @@ def main():
         help="Barrier QCP convergence tolerance (default: Gurobi default 1e-8; try 1e-4 for speed)",
     )
     parser.add_argument(
-        "--mip-focus", type=int, default=None,
+        "--mip-focus", type=int, default=3,
         help="Gurobi MIPFocus (1=feasibility, 2=optimality, 3=bound). Default: 1",
     )
     parser.add_argument(
@@ -243,6 +243,13 @@ def main():
     parser.add_argument(
         "--cuts", type=int, default=None,
         help="Gurobi Cuts aggressiveness (-1=auto, 0=off, 1=moderate, 2=aggressive, 3=very aggressive)",
+    )
+    parser.add_argument(
+        "--fix-and-resolve",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="After MIP solve, fix binary commitments and re-solve SOCP exactly for optimal Z/p0. "
+             "Useful when MIP gap is large: commitment is likely correct but Z may be suboptimal.",
     )
     parser.add_argument(
         "--fast",
@@ -263,9 +270,9 @@ def main():
         if args.bar_qcp_conv_tol is None:
             args.bar_qcp_conv_tol = 1e-4
         if args.time_limit is None:
-            args.time_limit = 60000.0
+            args.time_limit = 600000.0
         if args.line_monitor_threshold is None and args.enforce_lines:
-            args.line_monitor_threshold = 0.5
+            args.line_monitor_threshold = 0.9
 
     start_time = pd.Timestamp(
         year=2020, month=args.start_month, day=args.start_day, hour=args.start_hour
@@ -288,6 +295,7 @@ def main():
             f"comparison_outputs/"
             f"m{args.start_month:02d}d{args.start_day:02d}_"
             f"{args.hours}h_{rho_tag}_{net}{ramp_tag}{pmin_tag}"
+            f"{'fixedZmatrix' if args.fix_wind_z else 'freeZmatrix'}"
         )
     out_dir.mkdir(parents=True, exist_ok=True)
     aruc_dir = out_dir / "aruc"
@@ -370,6 +378,7 @@ def main():
         mip_focus=args.mip_focus,
         node_file_start=args.node_file_start,
         cuts=args.cuts,
+        fix_and_resolve=args.fix_and_resolve,
     )
 
     daruc_results = daruc_outputs["daruc_results"]
@@ -401,6 +410,7 @@ def main():
         daruc_results, data, daruc_dir, daruc_outputs["Sigma"], daruc_outputs["rho"],
         deviation_df=dev_df, margin_df=daruc_margin,
         summary_dict=daruc_summary, analyze_z_fn=analyze_Z,
+        mu=daruc_outputs.get("mu"),
     )
 
     # Save DAM results (DAM uses "p" not "p0")
@@ -458,6 +468,7 @@ def main():
         mip_focus=args.mip_focus,
         node_file_start=args.node_file_start,
         cuts=args.cuts,
+        fix_and_resolve=args.fix_and_resolve,
     )
 
     aruc_results = aruc_outputs["results"]
@@ -480,6 +491,7 @@ def main():
     save_robust_outputs(
         aruc_results, data, aruc_dir, aruc_outputs["Sigma"], aruc_outputs["rho"],
         margin_df=aruc_margin, summary_dict=aruc_summary, analyze_z_fn=analyze_Z,
+        mu=aruc_outputs.get("mu"),
     )
     save_line_flows_if_enabled(args.enforce_lines, data_full, aruc_results["p0"].values, aruc_margin, "ARUC", aruc_dir, "aruc_line_flows")
 
@@ -631,9 +643,9 @@ def main():
         out_dir,
     )
 
-    # Text summary (day-1 metrics)
+    # Text summary (day-1 metrics) — also computes worst-case dispatch costs
     print()
-    write_summary(
+    wc_costs = write_summary(
         aruc_loaded,
         daruc_loaded,
         dam_loaded,
@@ -700,6 +712,8 @@ def main():
         "daruc_cost": cost_daruc,
         "dam_cost": cost_dam,
         "reserve_cost": cost_reserve,
+        "aruc_wc_dispatch_cost": wc_costs.get("ARUC") if wc_costs else None,
+        "daruc_wc_dispatch_cost": wc_costs.get("DARUC") if wc_costs else None,
         "aruc_metrics": metrics_aruc,
         "daruc_metrics": metrics_daruc,
         "dam_metrics": compute_day1_metrics(data, dam_results) if dam_loaded is not None else None,

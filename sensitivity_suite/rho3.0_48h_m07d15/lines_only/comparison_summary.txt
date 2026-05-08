@@ -1,0 +1,68 @@
+======================================================================
+ARUC vs DARUC COMPARISON SUMMARY (day-1 metrics)
+======================================================================
+
+--- Day-1 Costs ---
+  DAM (deterministic):    2,589,634.68
+  DARUC (two-step):       2,714,343.81
+  ARUC-LDR (one-shot):    2,719,338.44
+  ARUC − DARUC:               4,994.64  (+0.18%)
+  DARUC − DAM:              124,709.13  (+4.82%)
+  ARUC − DAM:               129,703.76  (+5.01%)
+
+--- Cost Breakdown ---
+                              Commit       No-Load       Startup      Shutdown        Energy         Slack         Total
+  DAM                     407,043.30    304,464.06    102,579.24          0.00  2,182,591.37          0.00  2,589,634.68
+  DARUC                   427,378.47    324,385.25    102,993.22          0.00  2,286,965.34          0.00  2,714,343.81
+  ARUC-LDR                433,192.55    313,056.20    120,136.36          0.00  2,286,145.89          0.00  2,719,338.44
+
+--- Commitment Summary ---
+  ARUC  total unit-hours: 701
+  DARUC total unit-hours: 727
+  DAM   total unit-hours: 675
+  Generators committed only in ARUC:  2
+    322_CT_5, 322_CT_6
+  Generators committed only in DARUC: 5
+    102_CT_1, 201_CT_1, 202_CT_1, 301_CT_2, 302_CT_2
+
+--- Dispatch Totals (MWh over common horizon) ---
+  ARUC  : THERMAL=101,608.8, WIND=31,570.5
+  DARUC : THERMAL=101,510.7, WIND=31,668.5
+
+--- Z Matrix Summary ---
+  ARUC: 39 generators with active Z, mean wind ||Z||=1.0000
+  DARUC: 42 generators with active Z, mean wind ||Z||=1.0000
+
+--- DARUC Extra Commitments (beyond DAM) ---
+  Generators with extra hours: 14
+  Total extra unit-hours:      52
+    102_CT_1 (THERMAL): +1h (DAM=0h)
+    102_CT_2 (THERMAL): +1h (DAM=0h)
+    118_CC_1 (THERMAL): +1h (DAM=20h)
+    201_CT_1 (THERMAL): +1h (DAM=0h)
+    201_CT_2 (THERMAL): +1h (DAM=0h)
+    202_CT_1 (THERMAL): +2h (DAM=1h)
+    202_CT_2 (THERMAL): +1h (DAM=0h)
+    213_CC_3 (THERMAL): +2h (DAM=13h)
+    301_CT_2 (THERMAL): +1h (DAM=0h)
+    302_CT_2 (THERMAL): +1h (DAM=0h)
+
+--- Wind Curtailment ---
+               Total (MWh)   % Available
+  DAM              1,492.7          4.2%
+    122_WIND_1: 0.0 MW avg
+    303_WIND_1: 62.2 MW avg
+    309_WIND_1: 0.0 MW avg
+    317_WIND_1: 0.0 MW avg
+  ARUC             4,068.3         11.4%
+    122_WIND_1: 0.0 MW avg
+    303_WIND_1: 161.2 MW avg
+    309_WIND_1: 0.0 MW avg
+    317_WIND_1: 8.4 MW avg
+  DARUC            3,970.3         11.1%
+    122_WIND_1: 0.0 MW avg
+    303_WIND_1: 145.7 MW avg
+    309_WIND_1: 0.0 MW avg
+    317_WIND_1: 19.7 MW avg
+
+======================================================================

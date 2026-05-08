@@ -1,0 +1,78 @@
+{
+  "aruc_cost": {
+    "no_load": 361879.48913916,
+    "startup": 111102.892876,
+    "shutdown": 0.0,
+    "energy": 2401596.2827189644,
+    "slack": 10215.508162309561,
+    "commitment": 472982.38201516005,
+    "total": 2884794.1728964336
+  },
+  "daruc_cost": {
+    "no_load": 354880.37697888,
+    "startup": 120498.58546,
+    "shutdown": 0.0,
+    "energy": 2465122.345241367,
+    "slack": 2.955857780762017e-07,
+    "commitment": 475378.96243888,
+    "total": 2940501.3076805426
+  },
+  "dam_cost": {
+    "no_load": 304464.06013392,
+    "startup": 102579.24466000003,
+    "shutdown": 0.0,
+    "energy": 2182591.3745985236,
+    "slack": 1.3642420526593924e-07,
+    "commitment": 407043.30479392,
+    "total": 2589634.67939258
+  },
+  "reserve_cost": {
+    "no_load": 343998.90463751997,
+    "startup": 116318.20916800002,
+    "shutdown": 0.0,
+    "energy": 2201487.017271732,
+    "slack": 1.5006662579253316e-07,
+    "commitment": 460317.11380552,
+    "total": 2661804.131077402
+  },
+  "aruc_metrics": {
+    "unit_hours": 761.0,
+    "wind_curtailment_mwh": 8891.31937654264
+  },
+  "daruc_metrics": {
+    "unit_hours": 799.0,
+    "wind_curtailment_mwh": 10747.834002290583
+  },
+  "dam_metrics": {
+    "unit_hours": 675.0,
+    "wind_curtailment_mwh": 1492.6852021427042
+  },
+  "reserve_metrics": {
+    "unit_hours": 748.0,
+    "wind_curtailment_mwh": 1794.363232905519
+  },
+  "timings_seconds": {
+    "daruc_total": 723.29,
+    "aruc_total": 4500.34,
+    "reserve_solve": 4.79,
+    "total_wall": 5250.25
+  },
+  "daruc_timings_seconds": {
+    "dam_solve": 12.68,
+    "daruc_build": 1.21,
+    "daruc_solve": 264.89,
+    "line_iterations_solve": 441.98,
+    "fix_and_resolve": 0.88,
+    "total_wall": 721.66
+  },
+  "aruc_timings_seconds": {
+    "data_build": 0.3,
+    "model_build": 9.25,
+    "solve": 2564.94,
+    "line_iterations_solve": 1917.17,
+    "fix_and_resolve": 6.84,
+    "total_wall": 4498.62
+  },
+  "daruc_line_iterations": 2,
+  "aruc_line_iterations": 3
+}

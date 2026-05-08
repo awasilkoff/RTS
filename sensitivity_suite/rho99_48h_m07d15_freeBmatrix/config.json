@@ -1,0 +1,17 @@
+{
+  "rho": 2.0,
+  "start_month": 7,
+  "start_day": 15,
+  "start_hour": 0,
+  "hours": 48,
+  "uncertainty_npz": "uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha99.npz",
+  "provider_start": 2448,
+  "rho_lines_frac": null,
+  "mip_gap": 0.005,
+  "day2_interval": 2,
+  "time_limit": 12000,
+  "bar_qcp_conv_tol": 0.0001,
+  "out_dir": null,
+  "scenarios": null,
+  "resume": false
+}

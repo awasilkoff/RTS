@@ -1,0 +1,10 @@
+{
+  "objective": 5366849.181769711,
+  "hours": 48,
+  "reserve_min_mw": 237.46748826360832,
+  "reserve_max_mw": 933.3886454570586,
+  "reserve_mean_mw": 508.73248813202474,
+  "reserve_ramp_multiplier": 1.0,
+  "enforce_lines": true,
+  "start_time": "2020-07-15 00:00:00"
+}

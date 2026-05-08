@@ -1,0 +1,26 @@
+======================================================================
+RESERVE-THEN-DARUC ROBUSTNESS GAP (day-1 metrics)
+======================================================================
+
+                                  DAM+Reserve          DARUC          Delta
+---------------------------------------------------------------------------
+Total cost ($)                   2,654,787.79   2,875,340.71    +220,552.92
+  Commitment (NL+SU)               469,138.61     482,224.21     +13,085.60
+  No-load                          334,990.95     356,982.55     +21,991.61
+  Startup                          134,147.67     125,241.66      -8,906.01
+  Energy                         2,185,649.18   2,393,116.50    +207,467.32
+
+Unit-hours committed                      739            770            +31
+Wind curtailment (MWh)                1,511.3        7,910.2       +6,398.9
+
+Generators with additional commitments: 6
+Total extra unit-hours (full horizon): 31
+
+--- Timing ---
+Data build                          0.7 s
+DAM+Reserve solve                   6.0 s
+DARUC model build                   1.4 s
+DARUC solve (initial)             124.1 s
+Line iterations (1 re-solves)     234.8 s
+Total wall time                   370.9 s
+======================================================================

@@ -1,0 +1,13 @@
+case,committed_units,binding_lines,binding_line_hours,top_binding_line,top_binding_hours,line_A1_hours,line_A11_hours,line_A3_hours,line_C29_hours,line_C6_hours,line_CB-1_hours
+full_robust/aruc,45,4,53,A1,20,20,0,14,6,13,0
+full_robust/dam,33,4,37,A1,12,12,0,10,3,12,0
+full_robust/dam_reserve,50,4,39,C6,13,12,0,11,3,13,0
+full_robust/daruc,50,5,54,A1,17,17,3,13,8,13,0
+lines_only/aruc,47,6,55,A1,20,20,1,14,2,13,5
+lines_only/daruc,50,5,62,A1,19,19,3,19,8,13,0
+reserve_then_daruc/dam_reserve,51,4,41,C6,14,13,0,11,3,14,0
+reserve_then_daruc/daruc,55,5,65,A1,19,19,3,17,7,19,0
+stripped/aruc,44,5,51,A1,22,22,0,8,5,15,1
+stripped/daruc,50,6,53,A1,22,22,3,8,4,14,2
+stripped_free_z/aruc,45,5,33,A1,11,11,1,11,0,7,3
+stripped_free_z/daruc,50,4,37,A3,13,12,2,13,0,10,0

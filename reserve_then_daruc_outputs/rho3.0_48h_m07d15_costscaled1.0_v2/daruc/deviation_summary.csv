@@ -1,0 +1,7 @@
+gen_id,gen_type,extra_committed_hours,extra_startups,dam_committed_hours,daruc_committed_hours,periods_added,fuel,category,pmax_mw,pmin_mw
+113_CT_2,THERMAL,9,1,0,9,"[9, 10, 11, 12, 13, 14, 15, 16, 17]",NG,Gas CT,55.0,22
+213_CT_1,THERMAL,7,1,0,7,"[9, 10, 11, 12, 13, 14, 15]",NG,Gas CT,55.0,22
+218_CC_1,THERMAL,1,0,13,14,[18],NG,Gas CC,355.0,170
+315_CT_8,THERMAL,1,0,14,15,[19],NG,Gas CT,55.0,22
+318_CC_1,THERMAL,12,0,14,26,"[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20]",NG,Gas CC,355.0,170
+321_CC_1,THERMAL,1,0,17,18,[21],NG,Gas CC,355.0,170

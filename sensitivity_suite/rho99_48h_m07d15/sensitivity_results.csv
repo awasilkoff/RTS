@@ -1,0 +1,2 @@
+scenario,description,daruc_obj,dam_obj,reserve_obj
+reserve_then_daruc,"DAM+Reserve -> DARUC (lines + robust ramps, incremental obj)",541893.2635221528,,5366849.181769711

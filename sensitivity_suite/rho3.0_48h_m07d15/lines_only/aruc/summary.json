@@ -1,0 +1,10 @@
+{
+  "objective": 5483842.081230775,
+  "hours": 48,
+  "rho_input": 3.0,
+  "rho_lines_frac": null,
+  "mip_gap": 0.005,
+  "time_varying": true,
+  "enforce_lines": true,
+  "start_time": "2020-07-15 00:00:00"
+}

@@ -1,0 +1,76 @@
+{
+  "aruc_cost": {
+    "no_load": 352855.19593284,
+    "startup": 132995.62196800002,
+    "shutdown": 0.0,
+    "energy": 2407826.5593312047,
+    "slack": 0.0,
+    "commitment": 485850.81790084,
+    "total": 2893677.377232045
+  },
+  "daruc_cost": {
+    "no_load": 354799.47615624,
+    "startup": 120498.58546,
+    "shutdown": 0.0,
+    "energy": 2394497.2418953553,
+    "slack": 2.091837814077735e-07,
+    "commitment": 475298.06161623995,
+    "total": 2869795.3035118044
+  },
+  "dam_cost": {
+    "no_load": 304464.06013392,
+    "startup": 102579.24466000003,
+    "shutdown": 0.0,
+    "energy": 2182591.3745985236,
+    "slack": 1.3642420526593924e-07,
+    "commitment": 407043.30479392,
+    "total": 2589634.67939258
+  },
+  "reserve_cost": {
+    "no_load": 334118.84254127997,
+    "startup": 133640.54581,
+    "shutdown": 0.0,
+    "energy": 2185604.6209296677,
+    "slack": 1.1823431123048067e-07,
+    "commitment": 467759.38835128,
+    "total": 2653364.0092810662
+  },
+  "aruc_metrics": {
+    "unit_hours": 747.0,
+    "wind_curtailment_mwh": 9466.362983751344
+  },
+  "daruc_metrics": {
+    "unit_hours": 799.0,
+    "wind_curtailment_mwh": 7346.85666969959
+  },
+  "dam_metrics": {
+    "unit_hours": 675.0,
+    "wind_curtailment_mwh": 1492.6852021427042
+  },
+  "reserve_metrics": {
+    "unit_hours": 735.0,
+    "wind_curtailment_mwh": 1526.723386311629
+  },
+  "timings_seconds": {
+    "daruc_total": 24019.46,
+    "aruc_total": 7047.16,
+    "reserve_solve": 7.11,
+    "total_wall": 31082.52
+  },
+  "daruc_timings_seconds": {
+    "dam_solve": 13.73,
+    "daruc_build": 1.41,
+    "daruc_solve": 12000.49,
+    "line_iterations_solve": 12002.26,
+    "total_wall": 24017.94
+  },
+  "aruc_timings_seconds": {
+    "data_build": 0.28,
+    "model_build": 10.11,
+    "solve": 1191.21,
+    "line_iterations_solve": 5844.57,
+    "total_wall": 7046.21
+  },
+  "daruc_line_iterations": 1,
+  "aruc_line_iterations": 4
+}

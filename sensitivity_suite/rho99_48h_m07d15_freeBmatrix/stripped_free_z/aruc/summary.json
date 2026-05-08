@@ -1,0 +1,19 @@
+{
+  "objective": 5628544.372241827,
+  "hours": 48,
+  "rho_input": 2.0,
+  "rho_lines_frac": null,
+  "mip_gap": 0.005,
+  "time_varying": true,
+  "enforce_lines": true,
+  "start_time": "2020-07-15 00:00:00",
+  "reserve_equivalent": {
+    "thermal_total_min_mw": -3.25,
+    "thermal_total_max_mw": 386.35,
+    "thermal_total_mean_mw": 111.75,
+    "wind_total_min_mw": -386.35,
+    "wind_total_max_mw": 3.25,
+    "wind_total_mean_mw": -111.75,
+    "system_balance_max_abs_mw": 0.0
+  }
+}

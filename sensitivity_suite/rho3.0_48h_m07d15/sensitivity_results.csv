@@ -1,0 +1,8 @@
+scenario,description,aruc_obj,daruc_obj,dam_obj,reserve_obj
+full_robust,Full model: lines + robust ramps,5488014.518931059,488881.46778163983,5247423.826632414,5290317.893423217
+lines_only,"Lines enabled, nominal ramps",5488014.518931059,488881.46778163983,5247423.826632414,
+ramps_only,"Copperplate, robust ramps",5488014.518931059,488881.46778163983,5247423.826632414,
+stripped,"Copperplate, nominal ramps (per-gen hedging only)",5488014.518931059,488881.46778163983,5247423.826632414,
+dam_reserve,DAM + spinning reserve baseline,5488014.518931059,488881.46778163983,5247423.826632414,5290317.893423217
+stripped_no_wcc,Stripped + no worst-case cost epigraph,5491929.991557669,489571.2626362629,5247423.826632414,
+stripped_free_z,Stripped + wind Z free (not fixed to identity),7790824.865168527,488881.46778163983,5247423.826632414,

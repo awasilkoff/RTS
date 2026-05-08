@@ -1,0 +1,22 @@
+{
+  "daruc_objective": 116018.60769966393,
+  "dam_objective": 5247423.826632414,
+  "hours": 48,
+  "rho_input": 2.0,
+  "rho_lines_frac": null,
+  "mip_gap": 0.005,
+  "incremental_obj": true,
+  "dispatch_cost_scale": 0.01,
+  "time_varying": true,
+  "enforce_lines": true,
+  "start_time": "2020-07-15 00:00:00",
+  "reserve_equivalent": {
+    "thermal_total_min_mw": 0.0,
+    "thermal_total_max_mw": 476.77,
+    "thermal_total_mean_mw": 174.83,
+    "wind_total_min_mw": -476.77,
+    "wind_total_max_mw": 0.0,
+    "wind_total_mean_mw": -174.83,
+    "system_balance_max_abs_mw": 0.0
+  }
+}

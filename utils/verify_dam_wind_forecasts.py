@@ -5,10 +5,14 @@ Verify wind forecasts being used in DAM model.
 This loads DAMData exactly as the runner scripts do and visualizes
 the wind Pmax values to confirm they're using scaled SPP forecasts.
 """
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from pathlib import Path
 
 from io_rts import build_damdata_from_rts
 

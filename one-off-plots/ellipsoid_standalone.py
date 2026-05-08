@@ -2,6 +2,10 @@
 Standalone ellipsoid figure for the uncertainty set introduction slide.
 No box — just the ellipse with rho_h and Sigma_h annotations.
 """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import numpy as np
 import matplotlib.pyplot as plt
 import pathlib

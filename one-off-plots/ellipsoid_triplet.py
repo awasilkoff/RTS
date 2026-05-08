@@ -5,6 +5,10 @@ correlation, each showing the worst-case tangent hyperplane (45-degree line).
 The tangent point minimizes W1 + W2 subject to lying on the ellipsoid boundary
 — this is exactly the worst-case aggregate wind realization.
 """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec

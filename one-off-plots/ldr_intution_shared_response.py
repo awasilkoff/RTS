@@ -2,6 +2,10 @@
 LDR intuition figure — shared response variant.
 W1 drives uncertainty; G1 and G2 share the balancing response.
 """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import numpy as np
 import matplotlib.pyplot as plt
 import pathlib

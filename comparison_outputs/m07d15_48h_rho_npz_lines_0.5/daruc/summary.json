@@ -1,0 +1,13 @@
+{
+  "daruc_objective": 489774.02107678924,
+  "dam_objective": 5247423.826632414,
+  "hours": 48,
+  "rho_input": 3.0,
+  "rho_lines_frac": null,
+  "mip_gap": 0.005,
+  "incremental_obj": true,
+  "dispatch_cost_scale": 0.1,
+  "time_varying": true,
+  "enforce_lines": true,
+  "start_time": "2020-07-15 00:00:00"
+}

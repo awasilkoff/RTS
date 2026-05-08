@@ -13,12 +13,6 @@ build/
 .DS_Store
 
 # Generated outputs — excluded because they are large, reproducible, and scenario-specific
-dam_outputs/
-aruc_outputs/
-daruc_outputs/
-comparison_outputs/
-price_of_robustness/
-aruc_debug/
 ruc/ruc_outputs/
 
 # Intentionally tracked output directories — these contain results from long-running

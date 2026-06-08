@@ -90,16 +90,27 @@ SCENARIOS = [
     #     "desc": "Stripped + no worst-case cost epigraph",
     #     "extra": ["--no-robust-ramp", "--no-worst-case-cost","--enforce-lines"],
     # },
+    # --- Active 3-case framing (freeZ rerun) ---
+    # Fixed-Z dropped (wrong approach); all cases use free Z.
+    #
+    # Case 1 (DARUC-from-DAM) + Case 3 (ARUC free-Z) + DAM / DAM+Reserve
+    # baselines all come from this single run_comparison.py invocation.
+    # DARUC uses incremental_obj by default (True), so DARUC-from-DAM reports
+    # the incremental commitment on top of the deterministic DAM.
     {
         "name": "full_free_z",
-        "desc": "Full robust + wind Z free (not fixed to identity)",
+        "desc": "Full robust: ARUC free-Z + DARUC-from-DAM + DAM/DAM+Reserve baselines",
         "extra": ["--enforce-lines", "--robust-ramp", "--with-reserve", "--no-fix-wind-z"],
     },
 
+    # Case 2 (DARUC-from-Reserve). run_reserve_then_daruc.py hardcodes
+    # enforce_lines / robust_ramp / incremental_obj ON, so only free-Z needs
+    # a flag here.
     {
-        "name": "full_robust_fixed",
-        "desc": "Full model: lines + robust ramps, fixed Z",
-        "extra": ["--enforce-lines", "--robust-ramp", "--with-reserve"],
+        "name": "reserve_then_daruc",
+        "desc": "DAM+Reserve -> DARUC (free Z, lines + robust ramps, incremental obj)",
+        "script": "run_reserve_then_daruc.py",
+        "extra": ["--no-fix-wind-z"],
     },
 ]
 

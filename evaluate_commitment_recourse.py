@@ -52,6 +52,7 @@ def parse_args():
     p.add_argument("--provider-start",type=int, default=2448, help="SPP time-series start index")
     p.add_argument("--spp-parquet",   type=Path, default=DEFAULT_SPP)
     p.add_argument("--no-spp",        action="store_true",    help="Use DAY_AHEAD_wind.csv instead of SPP")
+    p.add_argument("--three-blocks",  action="store_true", default=False, help="Use 3-block piecewise cost (must match original run setting; default: single block)")
     p.add_argument("--day1-hours",    type=int, default=24)
     p.add_argument("--out-csv",       type=Path, default=None)
     return p.parse_args()
@@ -349,6 +350,7 @@ def main():
         day2_interval_hours=args.day2_interval,
         spp_forecasts_parquet=spp,
         spp_start_idx=args.provider_start,
+        single_block=not args.three_blocks,
     )
 
     I, T      = len(data.gen_ids), len(data.time)

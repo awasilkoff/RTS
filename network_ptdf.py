@@ -6,6 +6,8 @@ from typing import Tuple, List, Optional
 
 import numpy as np
 import pandas as pd
+import scipy.sparse as _sp
+import scipy.sparse.linalg as _spla
 
 
 def build_dc_ptdf(
@@ -117,9 +119,6 @@ def build_dc_ptdf(
     keep = [n for n in range(N) if n != slack]
     B_red = Bbus[np.ix_(keep, keep)]
 
-    # Invert reduced B
-    B_red_inv = np.linalg.inv(B_red)
-
     # ---------- 6. Compute PTDF ----------
     # We want PTDF for injections at each non-slack bus with withdrawal at slack.
     # A_red is A with the slack column removed
@@ -128,8 +127,14 @@ def build_dc_ptdf(
     # diag(b) * A_red
     BA = b[:, None] * A_red  # shape (L, N-1)
 
-    # PTDF on non-slack buses: (L x (N-1))
-    PTDF_red = BA @ B_red_inv
+    # PTDF_red = BA @ B_red_inv  ↔  B_red @ PTDF_red.T = BA.T
+    # Use sparse LU (SuperLU, no BLAS) to avoid MKL crashes on some Windows envs.
+    B_red_sp = _sp.csc_matrix(B_red)
+    lu = _spla.splu(B_red_sp)
+    PTDF_red_T = np.empty((N - 1, L), dtype=float)
+    for col in range(L):
+        PTDF_red_T[:, col] = lu.solve(BA[col, :])
+    PTDF_red = PTDF_red_T.T  # shape (L, N-1)
 
     # Assemble full PTDF (L x N)
     PTDF = np.zeros((L, N), dtype=float)

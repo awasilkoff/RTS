@@ -54,6 +54,8 @@ def build_base_args(args, script: str = "run_comparison.py") -> list[str]:
                  "--provider-start", str(args.provider_start)]
     if args.rho_lines_frac is not None:
         base += ["--rho-lines-frac", str(args.rho_lines_frac)]
+    if not args.incremental_obj:
+        base += ["--no-incremental-obj"]
     return base
 
 
@@ -290,8 +292,14 @@ def main():
     parser.add_argument("--rho-lines-frac", type=float, default=None)
     parser.add_argument("--mip-gap", type=float, default=0.005)
     parser.add_argument("--day2-interval", type=int, default=2)
-    parser.add_argument("--time-limit", type=float, default=1200000)
+    parser.add_argument("--time-limit", type=float, default=1800)
     parser.add_argument("--bar-qcp-conv-tol", type=float, default=1e-4)
+    parser.add_argument(
+        "--incremental-obj",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="DARUC: only charge commitment costs for additional units (default: True)",
+    )
     parser.add_argument("--out-dir", type=str, default=None,
                         help="Root output directory (default: auto-generated)")
     parser.add_argument("--scenarios", type=str, nargs="+", default=None,
@@ -329,10 +337,15 @@ def main():
             print(f"\nSkipping {sc['name']} (already exists, --resume)")
             continue
 
-        # Scenarios with a different script get their own base args
+        # Scenarios with a different script get their own base args.
+        # reserve_then_daruc hardcodes incremental_obj=True and doesn't
+        # accept --no-incremental-obj, so we pass a clean args copy.
         alt_base = None
         if "script" in sc:
-            alt_base = build_base_args(args, script=sc["script"])
+            import copy
+            args_for_script = copy.copy(args)
+            args_for_script.incremental_obj = True  # restore default so flag is not emitted
+            alt_base = build_base_args(args_for_script, script=sc["script"])
 
         run_scenario(
             sc["name"], sc["desc"], base_args, sc["extra"],

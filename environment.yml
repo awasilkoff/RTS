@@ -1,7 +1,6 @@
 name: RTS
 channels:
   - conda-forge
-  - pytorch
   - defaults
 dependencies:
   - python=3.11
@@ -15,8 +14,10 @@ dependencies:
   - pydantic
   - plotly
   - tqdm
-  - cpuonly
-  - pytorch
+  # pytorch is only needed for uncertainty_sets_refactored/covariance_optimization.py
+  # (omega learning). The UC model pipeline (run_comparison.py etc.) does NOT need it.
+  # Install separately if needed: conda install pytorch cpuonly -c pytorch
+  # Do NOT install pytorch from conda-forge — it pulls in MKL 2026 which breaks numpy BLAS.
   - pip
   - pip:
     - gurobipy>=12.0,<14

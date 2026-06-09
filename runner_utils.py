@@ -739,3 +739,92 @@ def committed_units_day1(directory, day1_hours=24):
         committed = (u[day1_cols].values >= 0.5).any(axis=1).sum()
         results[str(csv_path.relative_to(directory))] = int(committed)
     return results
+
+
+def analyze_Z(Z_df: "pd.DataFrame", data, out_dir: Path, rho=None):
+    """Analyze Z matrix structure: row sums, wind vs non-wind, per-period.
+
+    Saves Z_analysis_full.csv and Z_analysis_per_gen.csv to out_dir.
+    """
+    gen_ids = list(Z_df.index)
+    gen_type = data.gen_type
+    time_labels = Z_df.columns.get_level_values("time").unique()
+    K = Z_df.columns.get_level_values("k").unique().size
+
+    rho_arr = np.atleast_1d(rho) if rho is not None else None
+    time_varying_rho = rho_arr is not None and rho_arr.shape[0] > 1
+
+    rows = []
+    for t in time_labels:
+        Z_t = Z_df[t].values
+        for i, gid in enumerate(gen_ids):
+            z_row = Z_t[i, :]
+            rows.append({
+                "gen_id": gid,
+                "gen_type": gen_type[i],
+                "time": t,
+                "Z_row_sum": z_row.sum(),
+                "Z_row_abs_sum": np.abs(z_row).sum(),
+                "Z_row_norm": np.linalg.norm(z_row),
+                **{f"Z_k{k}": z_row[k] for k in range(K)},
+            })
+
+    df = pd.DataFrame(rows)
+    df.to_csv(out_dir / "Z_analysis_full.csv", index=False)
+
+    agg = (
+        df.groupby(["gen_id", "gen_type"])
+        .agg({
+            "Z_row_sum": ["mean", "std", "min", "max"],
+            "Z_row_abs_sum": ["mean", "max"],
+            "Z_row_norm": ["mean", "max"],
+        })
+        .reset_index()
+    )
+    agg.columns = ["_".join(c).strip("_") for c in agg.columns]
+    agg.to_csv(out_dir / "Z_analysis_per_gen.csv", index=False)
+
+    print("\n" + "=" * 70)
+    print("Z MATRIX ANALYSIS")
+    print("=" * 70)
+
+    for t_idx, t in enumerate(time_labels):
+        Z_t = Z_df[t].values
+        col_sums = Z_t.sum(axis=0)
+        wind_mask = np.array([gt.upper() == "WIND" for gt in gen_type])
+        wind_col_sums = Z_t[wind_mask].sum(axis=0)
+        nonwind_col_sums = Z_t[~wind_mask].sum(axis=0)
+
+        if time_varying_rho:
+            rho_t = rho_arr[t_idx]
+        elif rho_arr is not None:
+            rho_t = float(rho_arr[0])
+        else:
+            rho_t = None
+        rho_str = f"  rho={rho_t:.4f}" if rho_t is not None else ""
+
+        print(f"\n  Period {t}:{rho_str}")
+        print(f"    Column sums (all gens):  {col_sums}")
+        print(f"    Column sums (wind only): {wind_col_sums}")
+        print(f"    Column sums (non-wind):  {nonwind_col_sums}")
+
+        wind_idx = np.where(wind_mask)[0]
+        for wi in wind_idx:
+            z_row = Z_t[wi, :]
+            print(f"    {gen_ids[wi]:20s}  Z=[{', '.join(f'{v:+.4f}' for v in z_row)}]  sum={z_row.sum():+.4f}")
+
+    nonwind_active = df[(df["gen_type"] != "WIND") & (df["Z_row_abs_sum"] > 1e-6)]
+    if not nonwind_active.empty:
+        print(f"\n  Non-wind generators with non-zero Z ({len(nonwind_active)} entries):")
+        summary = (
+            nonwind_active.groupby("gen_id")
+            .agg({"Z_row_sum": "mean", "Z_row_abs_sum": "mean"})
+            .sort_values("Z_row_abs_sum", ascending=False)
+            .head(20)
+        )
+        print(summary.to_string())
+    else:
+        print("\n  No non-wind generators have non-zero Z.")
+
+    print("=" * 70)
+    return df

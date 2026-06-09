@@ -292,7 +292,7 @@ def main():
     parser.add_argument("--rho-lines-frac", type=float, default=None)
     parser.add_argument("--mip-gap", type=float, default=0.005)
     parser.add_argument("--day2-interval", type=int, default=2)
-    parser.add_argument("--time-limit", type=float, default=1800)
+    parser.add_argument("--time-limit", type=float, default=7200)
     parser.add_argument("--bar-qcp-conv-tol", type=float, default=1e-4)
     parser.add_argument(
         "--incremental-obj",

@@ -28,7 +28,7 @@ sys.path.insert(0, str(ROOT))
 
 from io_rts import build_damdata_from_rts
 
-M_SHED = 10_000.0   # $/MWh penalty for unserved load in recourse LP
+M_SHED = 5_000.0    # $/MWh Value of Lost Load (VoLL) penalty for unserved load in recourse LP
 
 SOURCE_DIR = ROOT / "RTS_Data" / "SourceData"
 TS_DIR     = ROOT / "RTS_Data" / "timeseries_data_files"
@@ -262,7 +262,9 @@ def solve_recourse_lp(data, u_arr, p0_arr, Pmax_wc, name="model"):
                 name=f"rd_{i}_{t}",
             )
 
-    # Objective: energy + load shed penalty (commitment costs are fixed, excluded here)
+    # Objective: energy (single-block approx for LP; post-processed with piecewise)
+    # + load shed at VoLL. Using block_cost[:,0] for optimization is fine — the
+    # ranking of generators by marginal cost is approximately correct for dispatch.
     m.setObjective(
         gp.quicksum(float(mc[i] * dt[t]) * p[i, t] for i in range(I) for t in range(T))
         + M_SHED * gp.quicksum(float(dt[t]) * shed[t] for t in range(T)),
@@ -285,10 +287,24 @@ def solve_recourse_lp(data, u_arr, p0_arr, Pmax_wc, name="model"):
 # ---------------------------------------------------------------------------
 
 def energy_cost_d1(data, p_arr, day1_mask):
-    """Day-1 energy cost from dispatch array."""
-    mc = data.block_cost[:, 0]
-    dt = data.dt
-    return float(np.sum(mc[:, None] * p_arr[:, day1_mask] * dt[None, day1_mask]))
+    """Day-1 energy cost using piecewise-linear block allocation (matches comparison summary)."""
+    dt         = data.dt
+    block_cap  = data.block_cap   # (I, B)
+    block_cost = data.block_cost  # (I, B)
+    B          = block_cap.shape[1]
+    cost       = 0.0
+    for i in range(len(data.gen_ids)):
+        for t in range(len(data.time)):
+            if not day1_mask[t]:
+                continue
+            remaining = float(max(0.0, p_arr[i, t]))
+            for b in range(B):
+                allocated  = min(remaining, float(block_cap[i, b]))
+                cost      += allocated * float(block_cost[i, b]) * float(dt[t])
+                remaining -= allocated
+                if remaining <= 1e-9:
+                    break
+    return cost
 
 
 def commitment_cost_d1(data, u_arr, day1_mask):

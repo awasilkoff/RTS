@@ -118,21 +118,33 @@ Note that **DAM w/Res is taken from `reserve_then_daruc/`**, not from
 compared against the first stage it actually amends, and the two solves differ
 slightly within the MIP gap.
 
-Run both scenarios:
+**The suite defaults are the canonical paper configuration**, so running both
+scenarios needs no flags:
 
 ```
-python run_sensitivity_suite.py --start-month 7 --start-day 15 --hours 48 --day2-interval 2 --uncertainty-npz uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha99.npz --provider-start 2448 --line-monitor-threshold 0.9 --mip-gap 0.005 --out-dir sensitivity_suite/<tag>
+python run_sensitivity_suite.py
 ```
+
+That is equivalent to `--start-month 7 --start-day 15 --hours 48
+--day2-interval 2 --provider-start 2448 --line-monitor-threshold 0.9 --mip-gap
+0.005` with the α=0.99 uncertainty NPZ, writing to `sensitivity_suite/freeZ/`.
+The resolved configuration is printed at startup and recorded in `config.json`.
 
 Then backfill worst-case line flows (reserve deployment vs LDR re-dispatch at
 worst-case wind), which produces `worst_case_flow_analysis_*.csv` per case:
 
 ```
-python utils/backfill_worst_case_flows.py --scan-dir sensitivity_suite/<tag>
+python utils/backfill_worst_case_flows.py --scan-dir sensitivity_suite/freeZ
 ```
 
 A single scenario can be run alone with `--scenarios reserve_then_daruc`, and an
 interrupted suite resumed with `--resume`.
+
+Because the default output directory is a fixed path, a run with non-default
+parameters would otherwise overwrite the canonical results silently. The suite
+compares against the previous run's `config.json` and prints a loud warning if
+they disagree. Use `--out-dir <path>` for variants, or `--out-dir auto` for a
+name generated from rho, horizon and start date.
 
 ### Checking a run is trustworthy
 

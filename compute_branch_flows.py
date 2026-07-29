@@ -313,6 +313,12 @@ def find_worst_case_line_violations(
     return violations
 
 
+#: Default cap on worst-case line-violation re-solves.  Hitting this cap means
+#: the returned solution may still violate worst-case line limits, so callers
+#: should compare their reported iteration count against it.
+LINE_RESOLVE_MAX_ITER = 5
+
+
 def iterative_line_resolve(
     model,
     vars_dict: dict,
@@ -323,7 +329,7 @@ def iterative_line_resolve(
     rho,
     rho_lines_frac: float | None,
     time_varying: bool,
-    max_iter: int = 5,
+    max_iter: int = LINE_RESOLVE_MAX_ITER,
     viol_tol: float = 1.0,
     time_limit: float | None = None,
     solve_start: float | None = None,

@@ -22,7 +22,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
+
+# Windows consoles and pipes default to cp1252, which cannot encode the U+2212
+# minus signs and em dashes in the summary text.  When stdout is redirected or
+# tee'd, the reporting step then raises UnicodeEncodeError *after* the solves
+# have finished but *before* summary.json is written -- losing the entire run's
+# results.  Force UTF-8 with replacement so a logged run can never die on output.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
 from pathlib import Path
 
 import numpy as np
@@ -30,6 +42,7 @@ import pandas as pd
 
 from dam_model import build_dam_model
 from run_rts_daruc import run_rts_daruc
+from compute_branch_flows import LINE_RESOLVE_MAX_ITER
 from run_rts_aruc import run_rts_aruc, extract_line_margins
 from run_rts_dam import extract_solution as extract_dam_solution
 from runner_utils import (
@@ -39,6 +52,7 @@ from runner_utils import (
     save_dam_outputs,
     save_line_flows_if_enabled,
     compute_day1_metrics,
+    solve_diagnostics,
 )
 from compare_aruc_vs_daruc import (
     load_results,
@@ -200,6 +214,14 @@ def main():
         type=float,
         default=1.0,
         help="Multiplier on reserve ramp-rate cap (RU*dt*mult). 0 to disable ramp cap entirely. Default: 1.0",
+    )
+    parser.add_argument(
+        "--skip-aruc",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Skip the one-shot ARUC solve (the dominant cost). DAM / DAM+Reserve / "
+             "DARUC still run. ARUC-only figures are skipped; ARUC entries in "
+             "summary.json are null. Default: False",
     )
     parser.add_argument(
         "--line-monitor-threshold",
@@ -435,71 +457,82 @@ def main():
     # ==================================================================
     # Step 2: Run ARUC (one-shot) with same parameters
     # ==================================================================
-    print("\n" + "=" * 70)
-    print("RUNNING ARUC-LDR (one-shot robust)")
-    print("=" * 70)
+    aruc_outputs = None
+    aruc_results = None
+    aruc_timings = {}
+    aruc_line_iters = 0
 
-    t0 = time.time()
-    aruc_outputs = run_rts_aruc(
-        start_time=start_time,
-        horizon_hours=args.hours,
-        rho=args.rho,
-        enforce_lines=args.enforce_lines,
-        uncertainty_provider_path=args.uncertainty_npz,
-        provider_start_idx=args.provider_start,
-        rho_lines_frac=args.rho_lines_frac,
-        mip_gap=args.mip_gap,
-        day2_interval_hours=args.day2_interval,
-        day1_only_robust=args.day1_only_robust,
-        fix_wind_z=args.fix_wind_z,
-        single_block=not args.three_blocks,
-        worst_case_cost=args.worst_case_cost,
-        include_renewables=args.include_renewables,
-        include_nuclear=args.include_nuclear,
-        include_zero_marginal=args.include_zero_marginal,
-        ramp_scale=args.ramp_scale,
-        pmin_scale=args.pmin_scale,
-        robust_ramp=args.robust_ramp,
-        monitored_lines_threshold=args.line_monitor_threshold,
-        dam_dispatch_for_screening=dam_results["p"].values if args.line_monitor_threshold is not None else None,
-        time_limit=args.time_limit,
-        threads=args.threads,
-        bar_qcp_conv_tol=args.bar_qcp_conv_tol,
-        mip_focus=args.mip_focus,
-        node_file_start=args.node_file_start,
-        cuts=args.cuts,
-        fix_and_resolve=args.fix_and_resolve,
-    )
+    if args.skip_aruc:
+        print("\n" + "=" * 70)
+        print("SKIPPING ARUC-LDR (--skip-aruc)")
+        print("=" * 70)
+        print("  ARUC-only figures and summary entries will be omitted.")
+    else:
+        print("\n" + "=" * 70)
+        print("RUNNING ARUC-LDR (one-shot robust)")
+        print("=" * 70)
 
-    aruc_results = aruc_outputs["results"]
+        t0 = time.time()
+        aruc_outputs = run_rts_aruc(
+            start_time=start_time,
+            horizon_hours=args.hours,
+            rho=args.rho,
+            enforce_lines=args.enforce_lines,
+            uncertainty_provider_path=args.uncertainty_npz,
+            provider_start_idx=args.provider_start,
+            rho_lines_frac=args.rho_lines_frac,
+            mip_gap=args.mip_gap,
+            day2_interval_hours=args.day2_interval,
+            day1_only_robust=args.day1_only_robust,
+            fix_wind_z=args.fix_wind_z,
+            single_block=not args.three_blocks,
+            worst_case_cost=args.worst_case_cost,
+            include_renewables=args.include_renewables,
+            include_nuclear=args.include_nuclear,
+            include_zero_marginal=args.include_zero_marginal,
+            ramp_scale=args.ramp_scale,
+            pmin_scale=args.pmin_scale,
+            robust_ramp=args.robust_ramp,
+            monitored_lines_threshold=args.line_monitor_threshold,
+            dam_dispatch_for_screening=dam_results["p"].values if args.line_monitor_threshold is not None else None,
+            time_limit=args.time_limit,
+            threads=args.threads,
+            bar_qcp_conv_tol=args.bar_qcp_conv_tol,
+            mip_focus=args.mip_focus,
+            node_file_start=args.node_file_start,
+            cuts=args.cuts,
+            fix_and_resolve=args.fix_and_resolve,
+        )
 
-    # Save ARUC outputs
-    aruc_margin = extract_line_margins(
-        aruc_outputs["vars"], data, aruc_outputs["rho"],
-        aruc_outputs.get("rho_lines_frac"), aruc_outputs["time_varying"],
-    )
-    aruc_summary = {
-        "objective": aruc_results["obj"],
-        "hours": args.hours,
-        "rho_input": args.rho,
-        "rho_lines_frac": args.rho_lines_frac,
-        "mip_gap": args.mip_gap,
-        "time_varying": aruc_outputs["time_varying"],
-        "enforce_lines": args.enforce_lines,
-        "start_time": str(start_time),
-    }
-    save_robust_outputs(
-        aruc_results, data, aruc_dir, aruc_outputs["Sigma"], aruc_outputs["rho"],
-        margin_df=aruc_margin, summary_dict=aruc_summary, analyze_z_fn=analyze_Z,
-        mu=aruc_outputs.get("mu"),
-    )
-    save_line_flows_if_enabled(args.enforce_lines, data_full, aruc_results["p0"].values, aruc_margin, "ARUC", aruc_dir, "aruc_line_flows")
+        aruc_results = aruc_outputs["results"]
 
-    timings["aruc_total"] = time.time() - t0
-    aruc_timings = aruc_outputs.get("timings", {})
-    aruc_line_iters = aruc_outputs.get("line_iterations", 0)
+        # Save ARUC outputs
+        aruc_margin = extract_line_margins(
+            aruc_outputs["vars"], data, aruc_outputs["rho"],
+            aruc_outputs.get("rho_lines_frac"), aruc_outputs["time_varying"],
+        )
+        aruc_summary = {
+            "objective": aruc_results["obj"],
+            "hours": args.hours,
+            "rho_input": args.rho,
+            "rho_lines_frac": args.rho_lines_frac,
+            "mip_gap": args.mip_gap,
+            "time_varying": aruc_outputs["time_varying"],
+            "enforce_lines": args.enforce_lines,
+            "start_time": str(start_time),
+        }
+        save_robust_outputs(
+            aruc_results, data, aruc_dir, aruc_outputs["Sigma"], aruc_outputs["rho"],
+            margin_df=aruc_margin, summary_dict=aruc_summary, analyze_z_fn=analyze_Z,
+            mu=aruc_outputs.get("mu"),
+        )
+        save_line_flows_if_enabled(args.enforce_lines, data_full, aruc_results["p0"].values, aruc_margin, "ARUC", aruc_dir, "aruc_line_flows")
 
-    print(f"\nARUC-LDR objective: {aruc_results['obj']:,.2f}")
+        timings["aruc_total"] = time.time() - t0
+        aruc_timings = aruc_outputs.get("timings", {})
+        aruc_line_iters = aruc_outputs.get("line_iterations", 0)
+
+        print(f"\nARUC-LDR objective: {aruc_results['obj']:,.2f}")
 
     # ==================================================================
     # Step 2b (optional): DAM + Spinning Reserve
@@ -567,7 +600,7 @@ def main():
     print("=" * 70)
 
     # Load from saved files (same path the standalone compare script uses)
-    aruc_loaded = load_results(aruc_dir, "ARUC-LDR")
+    aruc_loaded = None if args.skip_aruc else load_results(aruc_dir, "ARUC-LDR")
     daruc_loaded = load_results(daruc_dir, "DARUC")
     dam_loaded = load_dam_results(daruc_dir)
     reserve_loaded = load_reserve_results(reserve_dir) if args.with_reserve else None
@@ -583,9 +616,11 @@ def main():
     print(f"  Day-1 periods for metrics: {len(d1_common)}")
 
     # Cost breakdown using day-1 times only
-    cost_aruc = compute_cost_breakdown(
-        aruc_loaded["u"][d1_common], aruc_loaded["p0"][d1_common], data
-    )
+    cost_aruc = None
+    if aruc_loaded is not None:
+        cost_aruc = compute_cost_breakdown(
+            aruc_loaded["u"][d1_common], aruc_loaded["p0"][d1_common], data
+        )
     cost_daruc = compute_cost_breakdown(
         daruc_loaded["u"][d1_common], daruc_loaded["p0"][d1_common], data
     )
@@ -602,20 +637,28 @@ def main():
 
     # Figures
     print("\nGenerating figures...")
-    fig_commitment_and_cost(
-        aruc_loaded,
-        daruc_loaded,
-        dam_loaded,
-        common_times,
-        cost_aruc,
-        cost_daruc,
-        cost_dam,
-        out_dir,
-        data=data,
-        reserve=reserve_loaded,
-        cost_reserve=cost_reserve,
-    )
-    fig_z_heatmaps(aruc_loaded, daruc_loaded, common_times, out_dir)
+    if aruc_loaded is not None:
+        fig_commitment_and_cost(
+            aruc_loaded,
+            daruc_loaded,
+            dam_loaded,
+            common_times,
+            cost_aruc,
+            cost_daruc,
+            cost_dam,
+            out_dir,
+            data=data,
+            reserve=reserve_loaded,
+            cost_reserve=cost_reserve,
+        )
+    else:
+        # Panel (a) is a DARUC−ARUC commitment diff, so this figure has no
+        # meaning without ARUC. The paper's cost chart spans two scenarios
+        # (DAM / DAM w/Res / DAM+RUC / DAM w/Res+RUC) and is built separately.
+        print("  Skipping fig_commitment_cost (requires ARUC).")
+    if aruc_loaded is not None:
+        # ARUC-vs-DARUC Z comparison — meaningless without the ARUC solve
+        fig_z_heatmaps(aruc_loaded, daruc_loaded, common_times, out_dir)
     fig_wind_curtailment(
         aruc_loaded,
         daruc_loaded,
@@ -673,15 +716,17 @@ def main():
         f"  DARUC cost:      {cost_daruc['total']:>14,.2f}  "
         f"(+{cost_daruc['total'] - (cost_dam['total'] if cost_dam else 0):,.2f} vs DAM)"
     )
-    print(
-        f"  ARUC cost:       {cost_aruc['total']:>14,.2f}  "
-        f"(+{cost_aruc['total'] - (cost_dam['total'] if cost_dam else 0):,.2f} vs DAM)"
-    )
+    if cost_aruc is not None:
+        print(
+            f"  ARUC cost:       {cost_aruc['total']:>14,.2f}  "
+            f"(+{cost_aruc['total'] - (cost_dam['total'] if cost_dam else 0):,.2f} vs DAM)"
+        )
 
-    u_aruc = _round_commitment(aruc_loaded["u"][d1_common])
-    u_daruc = _round_commitment(daruc_loaded["u"][d1_common])
-    diff_count = (u_aruc.values != u_daruc.values).sum()
-    print(f"\n  Commitment differences (day 1): {diff_count} (gen,hour) entries differ")
+    if aruc_loaded is not None:
+        u_aruc = _round_commitment(aruc_loaded["u"][d1_common])
+        u_daruc = _round_commitment(daruc_loaded["u"][d1_common])
+        diff_count = (u_aruc.values != u_daruc.values).sum()
+        print(f"\n  Commitment differences (day 1): {diff_count} (gen,hour) entries differ")
 
     timings["total_wall"] = time.time() - t_wall_start
 
@@ -694,7 +739,8 @@ def main():
         print(f"    {'DARUC solve':28s} {daruc_timings.get('daruc_solve', 0):>8.1f} s")
         if daruc_line_iters > 0:
             print(f"    {'Line iters (' + str(daruc_line_iters) + ' re-solves)':28s} {daruc_timings.get('line_iterations_solve', 0):>8.1f} s")
-    print(f"  {'ARUC (build + solve)':30s} {timings.get('aruc_total', 0):>8.1f} s")
+    if not args.skip_aruc:
+        print(f"  {'ARUC (build + solve)':30s} {timings.get('aruc_total', 0):>8.1f} s")
     if aruc_timings:
         print(f"    {'Model build':28s} {aruc_timings.get('model_build', 0):>8.1f} s")
         print(f"    {'Solve':28s} {aruc_timings.get('solve', 0):>8.1f} s")
@@ -705,7 +751,7 @@ def main():
     print(f"  {'Total wall time':30s} {timings['total_wall']:>8.1f} s")
 
     # Top-level summary.json (uniform interface for run_sensitivity_suite.py)
-    metrics_aruc = compute_day1_metrics(data, aruc_results)
+    metrics_aruc = compute_day1_metrics(data, aruc_results) if aruc_results is not None else None
     metrics_daruc = compute_day1_metrics(data, daruc_results)
     top_summary = {
         "aruc_cost": cost_aruc,
@@ -723,6 +769,20 @@ def main():
         "aruc_timings_seconds": {k: round(v, 2) for k, v in aruc_timings.items()} if aruc_timings else None,
         "daruc_line_iterations": daruc_line_iters,
         "aruc_line_iterations": aruc_line_iters,
+        # Solve provenance: distinguishes a converged 0.5%-gap solution from one
+        # truncated at --time-limit, and records the line-resolve iteration cap.
+        "solve_diagnostics": {
+            "dam": solve_diagnostics(daruc_outputs.get("dam_outputs", {}).get("model"), "DAM"),
+            "daruc": solve_diagnostics(daruc_outputs.get("model"), "DARUC"),
+            "aruc": solve_diagnostics(aruc_outputs.get("model"), "ARUC") if aruc_outputs else None,
+            "reserve": solve_diagnostics(reserve_model, "DAM+Reserve") if args.with_reserve and reserve_results is not None else None,
+        },
+        "requested_mip_gap": args.mip_gap,
+        "requested_time_limit": args.time_limit,
+        "line_resolve_max_iter_hit": {
+            "daruc": daruc_line_iters >= LINE_RESOLVE_MAX_ITER,
+            "aruc": (aruc_line_iters >= LINE_RESOLVE_MAX_ITER) if aruc_outputs else None,
+        },
     }
     with open(out_dir / "summary.json", "w") as f:
         json.dump(top_summary, f, indent=2)

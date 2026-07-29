@@ -32,6 +32,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+# The suite's own progress lines use em dashes, which cp1252 stdout cannot
+# encode -- a tee'd run would die before launching anything.  Children get the
+# same treatment in their own module headers.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 
 def build_base_args(args, script: str = "run_comparison.py") -> list[str]:
     """Common args shared across all scenarios."""
@@ -92,17 +101,24 @@ SCENARIOS = [
     #     "desc": "Stripped + no worst-case cost epigraph",
     #     "extra": ["--no-robust-ramp", "--no-worst-case-cost","--enforce-lines"],
     # },
-    # --- Active 3-case framing (freeZ rerun) ---
+    # --- Active 4-case framing (freeZ rerun, ARUC dropped) ---
     # Fixed-Z dropped (wrong approach); all cases use free Z.
     #
-    # Case 1 (DARUC-from-DAM) + Case 3 (ARUC free-Z) + DAM / DAM+Reserve
-    # baselines all come from this single run_comparison.py invocation.
-    # DARUC uses incremental_obj by default (True), so DARUC-from-DAM reports
-    # the incremental commitment on top of the deterministic DAM.
+    # DAM / DAM+Reserve baselines + DARUC-from-DAM all come from this single
+    # run_comparison.py invocation.  DARUC uses incremental_obj by default
+    # (True), so DARUC-from-DAM reports the incremental commitment on top of
+    # the deterministic DAM.
+    #
+    # --skip-aruc: the one-shot ARUC is no longer reported in the paper (its
+    # cost difference vs DARUC sits inside the combined MIP gap), and it
+    # dominated the runtime -- 8,235 s of an 8,788 s run, 94%, having also
+    # exhausted the line-resolve iteration cap.  Skipping it drops this
+    # scenario from ~2h26m to ~10m.
     {
         "name": "full_free_z",
-        "desc": "Full robust: ARUC free-Z + DARUC-from-DAM + DAM/DAM+Reserve baselines",
-        "extra": ["--enforce-lines", "--robust-ramp", "--with-reserve", "--no-fix-wind-z"],
+        "desc": "Full robust: DARUC-from-DAM + DAM/DAM+Reserve baselines (ARUC skipped)",
+        "extra": ["--enforce-lines", "--robust-ramp", "--with-reserve", "--no-fix-wind-z",
+                  "--skip-aruc"],
     },
 
     # Case 2 (DARUC-from-Reserve). run_reserve_then_daruc.py hardcodes

@@ -35,6 +35,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import scipy.sparse as _sp
+import scipy.sparse.linalg as _spla
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -68,7 +70,11 @@ def angle_based_flows(buses_df, branches_df, inj, slack_idx):
 
     keep = [k for k in range(n) if k != slack_idx]
     theta = np.zeros(n)
-    theta[keep] = np.linalg.solve(Bbus[np.ix_(keep, keep)], inj[keep])
+    # Sparse LU (SuperLU), not np.linalg.solve: network_ptdf.py avoids BLAS
+    # here deliberately ("to avoid MKL crashes on some Windows envs"), and a
+    # verifier that cannot run on those environments is useless.
+    B_red = _sp.csc_matrix(Bbus[np.ix_(keep, keep)])
+    theta[keep] = _spla.splu(B_red).solve(inj[keep])
     return b * (theta[f] - theta[t])
 
 

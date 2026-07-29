@@ -996,13 +996,22 @@ def build_aruc_ldr_model(
 
     # Heuristics / MIP focus.
     #
-    # These were Heuristics=0.2 and MIPFocus=1, both aimed at finding good
-    # incumbents fast.  Observed behaviour on the 48 h free-Z case is the
-    # opposite problem: the incumbent is found early and never improves, while
-    # the *bound* crawls -- e.g. a run pinned at 59071.3217 from 2,515 s to
-    # 4,466 s while the bound moved 58042 -> 58454, so the entire remaining gap
-    # was bound-side.  MIPFocus=3 directs effort at the bound, and the extra
-    # heuristic time was being spent re-finding a solution already in hand.
+    # Was Heuristics=0.2 with the MIPFocus fallback at 1, both aimed at finding
+    # incumbents fast.  On the 48 h reserve_then_daruc case the problem is the
+    # opposite: the incumbent is found early and never improves while the *bound*
+    # crawls -- pinned at 59071.3217 from 2,515 s to 4,466 s while the bound
+    # moved 58042 -> 58454, so the whole remaining gap was bound-side.
+    #
+    # Scope of the MIPFocus change, which is narrower than it looks:
+    # run_comparison.py already defaults --mip-focus to 3 and passes it
+    # explicitly, so this fallback is unreachable from there and from the whole
+    # sensitivity suite, which shells out to it.  The fallback governs callers
+    # that pass mip_focus=None -- run_reserve_then_daruc.py and
+    # ruc/run_ruc_monolithic.py.  That is exactly the path the bound-side
+    # evidence above came from, so the change is aimed correctly, but it is NOT
+    # covered by the 8 h A/B recorded in git history (that A/B exercised
+    # run_comparison.py, where MIPFocus was already 3; its -14% time / -29% node
+    # improvement is attributable to Heuristics and NodefileStart only).
     m.Params.Heuristics = 0.05      # Gurobi default; was 0.2
     m.Params.MIPFocus = mip_focus if mip_focus is not None else 3
 
@@ -1011,10 +1020,13 @@ def build_aruc_ldr_model(
     m.Params.PreSparsify = 1
 
     # Memory: GB of B&B tree held in RAM before spilling to disk.  Was 2.0,
-    # which a 48 h run exceeded while sitting at only ~2.2 GB resident on a
-    # 64 GB machine -- so it was paying disk I/O for no reason.  Callers on
-    # smaller machines should pass node_file_start explicitly.
-    m.Params.NodefileStart = node_file_start if node_file_start is not None else 16.0
+    # which a 48 h run crossed at only ~2.2 GB resident, paying disk I/O for
+    # nothing on a 64 GB box.  Kept deliberately modest rather than raised to
+    # 16.0: no caller in this repo ever passes node_file_start (every runner
+    # defaults it to None), so this value applies unchanged on the 32 GB laptop,
+    # where a 16 GB in-memory tree risks an OOM kill -- trading a slowdown for a
+    # lost run.  Raise it explicitly via --node-file-start on large-memory hosts.
+    m.Params.NodefileStart = node_file_start if node_file_start is not None else 4.0
 
     # Optional MISOCP tuning knobs (exposed to callers)
     if time_limit is not None:

@@ -402,8 +402,10 @@ Individual overrides still work (e.g. `--fast --time-limit 300`).
 
 Additional Gurobi params always applied in `aruc_model.py`:
 - `Presolve=2`, `PreSparsify=1` — aggressive presolve helps SOC-heavy models
-- `NodefileStart=16.0` — GB of B&B tree held in RAM before spilling to disk. Was 2.0 (documented here as 0.5, which was wrong), and a 48 h run crossed it at ~2.2 GB resident on a 64 GB box, paying disk I/O for nothing. Pass `node_file_start` explicitly on smaller machines.
-- `Heuristics=0.05`, `MIPFocus=3` — was `0.2`/`1` (chasing incumbents). On the 48 h free-Z case the incumbent is found early and never improves while the bound crawls, so the gap is entirely bound-side; `MIPFocus=3` targets the bound. Measured on an 8 h case: −14% solve time, −29% nodes, identical solution.
+- `NodefileStart=4.0` — GB of B&B tree held in RAM before spilling to disk. Was 2.0 (documented here as 0.5, which was wrong). Kept modest on purpose: **no runner in this repo ever passes `node_file_start`**, so the value applies unchanged on the 32 GB laptop, where a large in-memory tree risks an OOM kill. Raise via `--node-file-start` on large-memory hosts.
+- `Heuristics=0.05` — was `0.2` (chasing incumbents). On the 48 h reserve_then_daruc case the incumbent is found early and never improves while the bound crawls, so the gap is entirely bound-side.
+- `MIPFocus` fallback `1` → `3`. **Narrower than it looks:** `run_comparison.py` already defaults `--mip-focus` to 3 and passes it explicitly, so this fallback is unreachable from it *and from the whole sensitivity suite*, which shells out to it. It governs only callers passing `mip_focus=None` — `run_reserve_then_daruc.py` and `ruc/run_ruc_monolithic.py`.
+- The measured 8 h A/B (−14% solve time, −29% nodes, identical solution) ran through `run_comparison.py`, where MIPFocus was **already** 3 — so that gain is attributable to `Heuristics` and `NodefileStart` only. The MIPFocus change itself is unvalidated on the path it actually affects.
 
 Warm start (`aruc_warm_start.py`) initializes binary u/v/w from DAM, p0 from DAM dispatch, and Z with constraint-consistent values. Z satisfies `sum_i Z[i,t,k] = 0` (power balance response): wind diagonal = identity, thermals distribute `-1` proportional to committed Pmax. SOC auxiliaries (z_gen) are also hinted. This avoids the previous infeasibility where Z[thermal]=0 + Z[wind]=identity violated power balance.
 

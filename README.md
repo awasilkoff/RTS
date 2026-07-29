@@ -20,21 +20,29 @@ Detailed documentation lives in `CLAUDE.md` (root) and
 
 ## Setup
 
-Requires Python 3.11+, **Gurobi with a valid licence** (developed against
+Requires Python 3.11+, **Gurobi with a full licence** (developed against
 13.0.2), pandas, numpy, pydantic, matplotlib, and torch for the covariance
 learning step.
 
 ```
 conda env create -f environment.yml
-conda activate rts
+conda activate RTS
 ```
+
+The environment is named `RTS` (see `environment.yml`); conda environment names
+are case-sensitive on Linux.
+
+**Gurobi licence:** the size-limited licence bundled with `pip install gurobipy`
+is **not** sufficient. A 48 h robust solve on RTS-GMLC has tens of thousands of
+variables and roughly 1,850 second-order cones, well past the restricted limits.
+An academic named-user or WLS licence is needed.
 
 **Non-interactive contexts** (scheduled tasks, SSH one-liners, detached
 processes) do not get the conda hook, so bare `python` will not resolve. Use the
-absolute interpreter path:
+absolute interpreter path, e.g.
 
 ```
-C:\Users\alexw\miniforge3\envs\rts\python.exe run_comparison.py ...
+C:\Users\alexw\miniforge3\envs\RTS\python.exe run_comparison.py ...
 ```
 
 ---

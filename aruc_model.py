@@ -994,16 +994,27 @@ def build_aruc_ldr_model(
     m.Params.ScaleFlag = _nmode["ScaleFlag"]
     m.Params.MIPGap = mip_gap       # Default 0.5% — UC doesn't need 0.01% precision
 
-    # Heuristic tuning for MISOCP
-    m.Params.Heuristics = 0.2       # 20% of node time on heuristics (default 5%)
-    m.Params.MIPFocus = mip_focus if mip_focus is not None else 1
+    # Heuristics / MIP focus.
+    #
+    # These were Heuristics=0.2 and MIPFocus=1, both aimed at finding good
+    # incumbents fast.  Observed behaviour on the 48 h free-Z case is the
+    # opposite problem: the incumbent is found early and never improves, while
+    # the *bound* crawls -- e.g. a run pinned at 59071.3217 from 2,515 s to
+    # 4,466 s while the bound moved 58042 -> 58454, so the entire remaining gap
+    # was bound-side.  MIPFocus=3 directs effort at the bound, and the extra
+    # heuristic time was being spent re-finding a solution already in hand.
+    m.Params.Heuristics = 0.05      # Gurobi default; was 0.2
+    m.Params.MIPFocus = mip_focus if mip_focus is not None else 3
 
     # Presolve: aggressive + sparsify helps SOC-heavy models
     m.Params.Presolve = 2
     m.Params.PreSparsify = 1
 
-    # Memory: spill B&B tree to disk (default 2 GB before swap to disk)
-    m.Params.NodefileStart = node_file_start if node_file_start is not None else 2.0
+    # Memory: GB of B&B tree held in RAM before spilling to disk.  Was 2.0,
+    # which a 48 h run exceeded while sitting at only ~2.2 GB resident on a
+    # 64 GB machine -- so it was paying disk I/O for no reason.  Callers on
+    # smaller machines should pass node_file_start explicitly.
+    m.Params.NodefileStart = node_file_start if node_file_start is not None else 16.0
 
     # Optional MISOCP tuning knobs (exposed to callers)
     if time_limit is not None:

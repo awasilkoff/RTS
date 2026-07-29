@@ -402,8 +402,8 @@ Individual overrides still work (e.g. `--fast --time-limit 300`).
 
 Additional Gurobi params always applied in `aruc_model.py`:
 - `Presolve=2`, `PreSparsify=1` — aggressive presolve helps SOC-heavy models
-- `NodefileStart=0.5` — spill B&B tree to disk after 0.5 GB
-- `Heuristics=0.2`, `MIPFocus=1` — better incumbents for MISOCP
+- `NodefileStart=16.0` — GB of B&B tree held in RAM before spilling to disk. Was 2.0 (documented here as 0.5, which was wrong), and a 48 h run crossed it at ~2.2 GB resident on a 64 GB box, paying disk I/O for nothing. Pass `node_file_start` explicitly on smaller machines.
+- `Heuristics=0.05`, `MIPFocus=3` — was `0.2`/`1` (chasing incumbents). On the 48 h free-Z case the incumbent is found early and never improves while the bound crawls, so the gap is entirely bound-side; `MIPFocus=3` targets the bound. Measured on an 8 h case: −14% solve time, −29% nodes, identical solution.
 
 Warm start (`aruc_warm_start.py`) initializes binary u/v/w from DAM, p0 from DAM dispatch, and Z with constraint-consistent values. Z satisfies `sum_i Z[i,t,k] = 0` (power balance response): wind diagonal = identity, thermals distribute `-1` proportional to committed Pmax. SOC auxiliaries (z_gen) are also hinted. This avoids the previous infeasibility where Z[thermal]=0 + Z[wind]=identity violated power balance.
 

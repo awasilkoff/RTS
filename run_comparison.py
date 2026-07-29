@@ -256,7 +256,7 @@ def main():
     )
     parser.add_argument(
         "--mip-focus", type=int, default=3,
-        help="Gurobi MIPFocus (1=feasibility, 2=optimality, 3=bound). Default: 1",
+        help="Gurobi MIPFocus (1=feasibility, 2=optimality, 3=bound). Default: 3",
     )
     parser.add_argument(
         "--node-file-start", type=float, default=None,

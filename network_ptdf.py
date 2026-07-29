@@ -9,6 +9,11 @@ import pandas as pd
 import scipy.sparse as _sp
 import scipy.sparse.linalg as _spla
 
+#: Magnitude above which a single-slack PTDF entry is treated as a data or
+#: conditioning problem rather than a real transfer factor.  RTS-GMLC peaks at
+#: exactly 1.0; meshed networks can legitimately exceed 1, so this is loose.
+_PTDF_SANITY_BOUND = 5.0
+
 
 def build_dc_ptdf(
     buses_df: pd.DataFrame,
@@ -141,8 +146,38 @@ def build_dc_ptdf(
     # Fill non-slack columns
     for col_pos, bus in enumerate(keep):
         PTDF[:, bus] = PTDF_red[:, col_pos]
-    # Slack column = -sum of others (1 MW injection at slack with equal withdrawals)
-    PTDF[:, slack] = -PTDF_red.sum(axis=1)
+
+    # Slack column is identically ZERO under the single-slack convention used by
+    # every other column: injecting 1 MW at the slack and withdrawing 1 MW at
+    # the slack moves no power.  It is already zero from np.zeros above; the
+    # assignment below is kept explicit so the convention is unmistakable.
+    #
+    # This previously read `PTDF[:, slack] = -PTDF_red.sum(axis=1)`, which is the
+    # flow pattern for a *distributed*-slack convention.  Mixing the two put
+    # entries up to 31.3 in the slack column of the RTS-GMLC network (a genuine
+    # single-slack PTDF is bounded by 1.0 here), so any net injection or
+    # withdrawal at the slack bus produced flows wrong by thousands of MW.
+    # Callers compute flow as PTDF @ (gen - load) over a power-balanced
+    # injection vector, so the slack's own imbalance is implicit and must not
+    # be given a coefficient.
+    PTDF[:, slack] = 0.0
+
+    # Guard against the class of error above, and against near-singular B_red
+    # from islanded buses or degenerate reactances.  Single-slack PTDF entries
+    # are bounded by 1 for RTS-GMLC; allow generous headroom for meshed networks
+    # where magnitudes above 1 are legitimate, but flag anything wild.
+    max_abs = float(np.abs(PTDF).max()) if PTDF.size else 0.0
+    if max_abs > _PTDF_SANITY_BOUND:
+        import warnings
+        worst = int(np.unravel_index(np.abs(PTDF).argmax(), PTDF.shape)[0])
+        warnings.warn(
+            f"build_dc_ptdf: max|PTDF| = {max_abs:.3f} exceeds {_PTDF_SANITY_BOUND} "
+            f"(worst line {line_ids[worst]!r}). This usually means a near-singular "
+            f"reduced susceptance matrix -- islanded buses, a disconnected network, "
+            f"or a degenerate reactance -- not a valid power transfer factor.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
 
     # ---------- 7. Line limits Fmax ----------
     if "Cont Rating" in branches_df.columns:

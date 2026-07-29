@@ -185,14 +185,21 @@ def _round_commitment(u_df: pd.DataFrame) -> pd.DataFrame:
     return u_df.round().clip(0, 1).astype(int)
 
 
-def _align_time(aruc: dict, daruc: dict, dam: dict | None) -> list[str]:
-    """Find common time columns, warn on mismatch, return common list."""
-    aruc_cols = list(aruc["u"].columns)
+def _align_time(aruc: dict | None, daruc: dict, dam: dict | None) -> list[str]:
+    """Find common time columns, warn on mismatch, return common list.
+
+    *aruc* may be None when the ARUC solve was skipped (--skip-aruc); alignment
+    then starts from DARUC alone.
+    """
     daruc_cols = list(daruc["u"].columns)
-    common = [c for c in aruc_cols if c in daruc_cols]
-    if len(common) < len(aruc_cols) or len(common) < len(daruc_cols):
-        print(f"WARNING: Time horizon mismatch — ARUC has {len(aruc_cols)} periods, "
-              f"DARUC has {len(daruc_cols)} periods. Using common {len(common)} periods.")
+    if aruc is None:
+        common = list(daruc_cols)
+    else:
+        aruc_cols = list(aruc["u"].columns)
+        common = [c for c in aruc_cols if c in daruc_cols]
+        if len(common) < len(aruc_cols) or len(common) < len(daruc_cols):
+            print(f"WARNING: Time horizon mismatch — ARUC has {len(aruc_cols)} periods, "
+                  f"DARUC has {len(daruc_cols)} periods. Using common {len(common)} periods.")
     if dam is not None:
         dam_cols = list(dam["u"].columns)
         common = [c for c in common if c in dam_cols]
@@ -629,7 +636,7 @@ def fig_z_heatmaps(aruc: dict, daruc: dict, common_times: list[str], out_dir: Pa
 
 
 def fig_pmin_vs_dispatch(
-    aruc: dict, daruc: dict, dam: dict | None,
+    aruc: dict | None, daruc: dict, dam: dict | None,
     common_times: list[str], data, out_dir: Path,
     reserve: dict | None = None,
 ):
@@ -641,7 +648,8 @@ def fig_pmin_vs_dispatch(
         print("  Skipping Pmin vs dispatch — no fuel map (data.gens_df missing).")
         return
 
-    categories = [f for f in FUEL_ORDER if any(fuel_map.get(g) == f for g in aruc["p0"].index)]
+    _cat_src = (aruc if aruc is not None else daruc)["p0"].index
+    categories = [f for f in FUEL_ORDER if any(fuel_map.get(g) == f for g in _cat_src)]
     T = len(common_times)
     x = np.arange(T)
 
@@ -651,7 +659,8 @@ def fig_pmin_vs_dispatch(
     if reserve is not None:
         formulations.append(("DAM+Res", reserve))
     formulations.append(("DARUC", daruc))
-    formulations.append(("ARUC", aruc))
+    if aruc is not None:
+        formulations.append(("ARUC", aruc))
 
     n_panels = len(formulations)
     fig, axes = plt.subplots(1, n_panels, figsize=(5 * n_panels, 5), sharey=True)
@@ -1069,12 +1078,12 @@ def compute_worst_case_dispatch_cost(
 
 
 def fig_worst_case_wind(
-    aruc: dict, daruc: dict, dam: dict | None,
+    aruc: dict | None, daruc: dict, dam: dict | None,
     common_times: list[str], data, out_dir: Path,
 ):
     """1x2 panel figure showing nominal vs worst-case wind dispatch for DARUC and ARUC."""
     daruc_wc = compute_worst_case_wind(daruc, data, common_times)
-    aruc_wc = compute_worst_case_wind(aruc, data, common_times)
+    aruc_wc = compute_worst_case_wind(aruc, data, common_times) if aruc is not None else None
 
     if daruc_wc is None and aruc_wc is None:
         print("  Skipping worst-case wind — no Z/Sigma/rho data in either formulation.")
@@ -1218,7 +1227,7 @@ def fig_worst_case_wind(
 
 
 def fig_wind_curtailment(
-    aruc: dict, daruc: dict, dam: dict | None,
+    aruc: dict | None, daruc: dict, dam: dict | None,
     common_times: list[str], data, out_dir: Path,
     reserve: dict | None = None,
 ):
@@ -1233,8 +1242,9 @@ def fig_wind_curtailment(
         colors["DAM+Res"] = "#9467bd"
     formulations.append(("DARUC", daruc))
     colors["DARUC"] = "#ff7f0e"
-    formulations.append(("ARUC", aruc))
-    colors["ARUC"] = "#1f77b4"
+    if aruc is not None:
+        formulations.append(("ARUC", aruc))
+        colors["ARUC"] = "#1f77b4"
 
     curtail = {}
     for name, res in formulations:
@@ -1297,7 +1307,7 @@ def fig_wind_curtailment(
 
 
 def write_summary(
-    aruc: dict, daruc: dict, dam: dict | None, common_times: list[str],
+    aruc: dict | None, daruc: dict, dam: dict | None, common_times: list[str],
     cost_aruc: dict | None, cost_daruc: dict | None, cost_dam: dict | None,
     out_dir: Path,
     data=None,
@@ -1358,9 +1368,10 @@ def write_summary(
 
     # Commitment counts
     lines.append("\n--- Commitment Summary ---")
-    u_aruc = _round_commitment(aruc["u"][common_times])
+    u_aruc = _round_commitment(aruc["u"][common_times]) if aruc is not None else None
     u_daruc = _round_commitment(daruc["u"][common_times])
-    lines.append(f"  ARUC  total unit-hours: {u_aruc.values.sum()}")
+    if u_aruc is not None:
+        lines.append(f"  ARUC  total unit-hours: {u_aruc.values.sum()}")
     lines.append(f"  DARUC total unit-hours: {u_daruc.values.sum()}")
     if dam is not None:
         u_dam = _round_commitment(dam["u"][common_times])
@@ -1370,26 +1381,28 @@ def write_summary(
         lines.append(f"  DAM+Res total unit-hrs: {u_res.values.sum()}")
 
     # Generators unique to each
-    aruc_ever = set(u_aruc.index[u_aruc.sum(axis=1) > 0])
-    daruc_ever = set(u_daruc.index[u_daruc.sum(axis=1) > 0])
-    only_aruc = aruc_ever - daruc_ever
-    only_daruc = daruc_ever - aruc_ever
-    lines.append(f"  Generators committed only in ARUC:  {len(only_aruc)}")
-    if only_aruc:
-        lines.append(f"    {', '.join(sorted(only_aruc)[:15])}")
-    lines.append(f"  Generators committed only in DARUC: {len(only_daruc)}")
-    if only_daruc:
-        lines.append(f"    {', '.join(sorted(only_daruc)[:15])}")
+    if u_aruc is not None:
+        aruc_ever = set(u_aruc.index[u_aruc.sum(axis=1) > 0])
+        daruc_ever = set(u_daruc.index[u_daruc.sum(axis=1) > 0])
+        only_aruc = aruc_ever - daruc_ever
+        only_daruc = daruc_ever - aruc_ever
+        lines.append(f"  Generators committed only in ARUC:  {len(only_aruc)}")
+        if only_aruc:
+            lines.append(f"    {', '.join(sorted(only_aruc)[:15])}")
+        lines.append(f"  Generators committed only in DARUC: {len(only_daruc)}")
+        if only_daruc:
+            lines.append(f"    {', '.join(sorted(only_daruc)[:15])}")
 
     # Dispatch totals by gen type
     lines.append("\n--- Dispatch Totals (MWh over common horizon) ---")
     gen_type_map = {}
-    for res in [aruc, daruc]:
+    for res in [r for r in (aruc, daruc) if r is not None]:
         if res.get("z_full") is not None:
             for _, row in res["z_full"][["gen_id", "gen_type"]].drop_duplicates().iterrows():
                 gen_type_map[row["gen_id"]] = row["gen_type"]
 
-    for name, p0_df in [("ARUC", aruc["p0"]), ("DARUC", daruc["p0"])]:
+    _dispatch_srcs = ([("ARUC", aruc["p0"])] if aruc is not None else []) + [("DARUC", daruc["p0"])]
+    for name, p0_df in _dispatch_srcs:
         total_by_type = {}
         for gen_id in p0_df.index:
             gt = gen_type_map.get(gen_id, "THERMAL")
@@ -1399,7 +1412,7 @@ def write_summary(
 
     # Z matrix summary
     lines.append("\n--- Z Matrix Summary ---")
-    for name, res in [("ARUC", aruc), ("DARUC", daruc)]:
+    for name, res in [(n, r) for n, r in (("ARUC", aruc), ("DARUC", daruc)) if r is not None]:
         if res.get("z_full") is None:
             continue
         zf = res["z_full"]
@@ -1424,7 +1437,7 @@ def write_summary(
     # Worst-case dispatch cost
     wc_costs = {}
     if data is not None:
-        for name, res in [("DARUC", daruc), ("ARUC", aruc)]:
+        for name, res in [(n, r) for n, r in (("DARUC", daruc), ("ARUC", aruc)) if r is not None]:
             wc_costs[name] = compute_worst_case_dispatch_cost(res, data, common_times)
 
         lines.append("\n--- Worst-Case Dispatch Cost (wind-minimizing r_wc) ---")
@@ -1458,7 +1471,7 @@ def write_summary(
         lines.append("\n--- Wind Curtailment ---")
         header = f"  {'':10s}  {'Total (MWh)':>12s}  {'% Available':>12s}"
         lines.append(header)
-        formulations = [("ARUC", aruc), ("DARUC", daruc)]
+        formulations = ([("ARUC", aruc)] if aruc is not None else []) + [("DARUC", daruc)]
         if reserve is not None:
             formulations.insert(0, ("DAM+Res", reserve))
         if dam is not None:

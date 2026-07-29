@@ -828,3 +828,51 @@ def analyze_Z(Z_df: "pd.DataFrame", data, out_dir: Path, rho=None):
 
     print("=" * 70)
     return df
+
+
+# ---------------------------------------------------------------------------
+# Solve provenance
+# ---------------------------------------------------------------------------
+
+#: Gurobi status codes worth distinguishing in the saved artifacts.
+_GRB_STATUS_NAMES = {
+    2: "OPTIMAL", 3: "INFEASIBLE", 4: "INF_OR_UNBD", 5: "UNBOUNDED",
+    6: "CUTOFF", 7: "ITERATION_LIMIT", 8: "NODE_LIMIT", 9: "TIME_LIMIT",
+    10: "SOLUTION_LIMIT", 11: "INTERRUPTED", 12: "NUMERIC", 13: "SUBOPTIMAL",
+    14: "INPROGRESS", 15: "USER_OBJ_LIMIT", 16: "WORK_LIMIT", 17: "MEM_LIMIT",
+}
+
+
+def solve_diagnostics(model, label: str = ""):
+    """Capture solve status and the *achieved* MIP gap from a Gurobi model.
+
+    Without this, a solve truncated at ``time_limit`` is indistinguishable in
+    the saved artifacts from one that converged to ``mip_gap`` -- both leave
+    behind nothing but a cost number.
+
+    Returns None when the model is unavailable.  Never raises: attribute access
+    on a model that never solved would otherwise abort an already-complete run
+    at reporting time.
+    """
+    if model is None:
+        return None
+    try:
+        status = int(model.Status)
+    except Exception:
+        return None
+    diag = {
+        "status": status,
+        "status_name": _GRB_STATUS_NAMES.get(status, f"UNKNOWN_{status}"),
+        "converged": status == 2,
+    }
+    for attr, key in (("MIPGap", "mip_gap_achieved"), ("Runtime", "runtime_seconds"),
+                      ("ObjVal", "obj_val"), ("ObjBound", "obj_bound"),
+                      ("NodeCount", "node_count")):
+        try:
+            diag[key] = float(getattr(model, attr))
+        except Exception:
+            diag[key] = None
+    if label and not diag["converged"]:
+        print(f"  NOTE: {label} finished with status={diag['status_name']}, "
+              f"achieved MIP gap={diag.get('mip_gap_achieved')}")
+    return diag

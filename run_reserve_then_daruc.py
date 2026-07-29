@@ -24,8 +24,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 from pathlib import Path
+
+# cp1252 stdout (Windows pipes/redirects) cannot encode the non-ASCII dashes in
+# the summary text; without this a tee'd run dies at reporting time, after the
+# solves but before summary.json is written.  See run_comparison.py.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
 
 import numpy as np
 import pandas as pd
@@ -44,12 +54,14 @@ from run_rts_aruc import (
     extract_line_margins,
 )
 from run_rts_daruc import extract_dam_commitment, analyze_deviations, print_deviation_summary
+from compute_branch_flows import LINE_RESOLVE_MAX_ITER
 from runner_utils import (
     compute_reserve_from_uncertainty,
     save_robust_outputs,
     save_dam_outputs,
     save_line_flows_if_enabled,
     compute_day1_metrics,
+    solve_diagnostics,
 )
 from compare_aruc_vs_daruc import compute_cost_breakdown
 from uncertainty_set_provider import UncertaintySetProvider
@@ -447,6 +459,15 @@ def run_reserve_then_daruc(
             },
             "line_iterations": line_iterations,
             "timings_seconds": {k: round(v, 2) for k, v in timings.items()},
+            # Solve provenance: distinguishes a converged solution from one
+            # truncated at time_limit, and flags an exhausted line-resolve cap.
+            "solve_diagnostics": {
+                "reserve": solve_diagnostics(reserve_model, "DAM+Reserve"),
+                "daruc": solve_diagnostics(model, "DARUC"),
+            },
+            "requested_mip_gap": mip_gap,
+            "requested_time_limit": time_limit,
+            "line_resolve_max_iter_hit": line_iterations >= LINE_RESOLVE_MAX_ITER,
         }
         with open(out_dir / "summary.json", "w") as f:
             json.dump(combined, f, indent=2)

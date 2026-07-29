@@ -226,8 +226,8 @@ python run_comparison.py --uncertainty-npz path/to/uncertainty.npz --enforce-lin
 | `--hours` | 48 | Horizon hours |
 | `--rho` | 3.0 | Ellipsoid radius (ignored if `--uncertainty-npz`) |
 | `--start-month` / `--start-day` / `--start-hour` | 7 / 15 / 0 | Simulation start |
-| `--enforce-lines` | off | Enable line flow limits (default: copperplate) |
-| `--uncertainty-npz` | None | Path to time-varying uncertainty NPZ (overrides `--rho`) |
+| `--enforce-lines` | **on** | Line flow limits (`--no-enforce-lines` for copperplate) |
+| `--uncertainty-npz` | **`.../uncertainty_sets_rts4_v2_16d/sigma_rho_alpha99.npz`** | Time-varying uncertainty NPZ; overrides `--rho`, so `--rho` is ignored unless this is cleared |
 | `--provider-start` | 2448 | Start index into NPZ time series |
 | `--rho-lines-frac` | None | Fraction of rho for line constraints (e.g. 0.25) |
 | `--mip-gap` | 0.005 | MIP optimality gap (0.5%) |
@@ -238,14 +238,14 @@ python run_comparison.py --uncertainty-npz path/to/uncertainty.npz --enforce-lin
 | `--no-worst-case-cost` | off | Disable worst-case cost epigraph |
 | `--incremental-obj` / `--no-incremental-obj` | True | DARUC: charge only incremental commitment costs |
 | `--dispatch-cost-scale` | 0.01 | DARUC dispatch cost scale (with incremental obj) |
-| `--robust-ramp` | off | SOC-based robust ramp constraints |
-| `--with-reserve` | off | DAM+Reserve baseline (works with `--uncertainty-npz` or scalar `--rho`) |
+| `--robust-ramp` | **on** | SOC-based robust ramp constraints |
+| `--with-reserve` | **on** | DAM+Reserve baseline. Declared `store_true` with `default=True`, so there is no way to turn it off |
 | `--ramp-scale` | 1.0 | Multiply all ramp rates by this factor |
 | `--pmin-scale` | 1.0 | Multiply all Pmin by this factor |
-| `--line-monitor-threshold` | None (0.5 with `--fast`) | Per-hour line filtering threshold |
+| `--line-monitor-threshold` | **0.95** | Per-hour line filtering threshold (the paper suite uses 0.9) |
 | `--include-renewables` / `--include-nuclear` / `--include-zero-marginal` | off | Generator filtering (see section) |
-| `--fast` / `--no-fast` | True | Performance defaults bundle (see Solver Tuning) |
-| `--time-limit` | None (600 with `--fast`) | Gurobi time limit (seconds) |
+| `--fast` / `--no-fast` | **False** | Performance defaults bundle (see Solver Tuning) |
+| `--time-limit` | None (60000 with `--fast`) | Gurobi time limit (seconds) |
 | `--threads` | None | Gurobi thread count |
 | `--bar-qcp-conv-tol` | None (1e-4 with `--fast`) | Barrier QCP convergence tolerance |
 | `--out-dir` | auto | Override output directory |
@@ -386,7 +386,7 @@ Expected cost ordering: DAM < DAM+Reserve < DARUC/ARUC.
 
 ### Solver Performance Tuning
 
-The `--fast` flag is **ON by default** on `run_comparison.py`, `run_alpha_sweep.py`, and `run_price_of_robustness.py`. Use `--no-fast` to disable. It applies these performance defaults:
+The `--fast` flag is **OFF by default** on `run_comparison.py` (`default=False`); pass `--fast` to enable it. Note that several of the defaults it would set are already the standalone defaults (`day1_only_robust=True`), while others are not (`fix_wind_z`, `bar_qcp_conv_tol`, `time_limit`). It applies these performance defaults:
 
 | Default | Value | Effect |
 |---------|-------|--------|

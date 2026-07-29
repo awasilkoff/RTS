@@ -277,9 +277,9 @@ def main():
         "--fast",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="Performance defaults ON by default: fix-wind-z, day1-only-robust, "
-             "bar-qcp-conv-tol=1e-4, time-limit=60000, line-monitor-threshold=0.5 (when --enforce-lines). "
-             "Use --no-fast to disable.",
+        help="OFF by default. When passed, applies: fix-wind-z, day1-only-robust, "
+             "bar-qcp-conv-tol=1e-4, time-limit=60000, line-monitor-threshold=0.5 "
+             "(when --enforce-lines). Some of these are already the standalone defaults.",
     )
     args = parser.parse_args()
 

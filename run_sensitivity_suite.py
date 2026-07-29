@@ -293,9 +293,71 @@ def print_comparison(rows: list[dict]):
     print("  reserve_then_daruc           = robustness gap: extra commitments to make reserve fully robust")
 
 
+#: Parameters that define what a run *is*.  A change to any of these makes the
+#: results incomparable with a previous run in the same output directory.
+_RUN_DEFINING_ARGS = (
+    "rho", "start_month", "start_day", "start_hour", "hours", "uncertainty_npz",
+    "provider_start", "line_monitor_threshold", "rho_lines_frac", "mip_gap",
+    "day2_interval", "bar_qcp_conv_tol", "incremental_obj",
+)
+
+
+def print_resolved_config(out_root: Path, args) -> None:
+    """Print the parameters this run will actually use.
+
+    Most defaults now match the canonical paper configuration, so a bare
+    invocation reproduces it.  That makes the resolved values worth stating
+    explicitly -- otherwise the log gives no record of what was run.
+    """
+    print("=" * 70)
+    print("RESOLVED CONFIGURATION")
+    print("=" * 70)
+    print(f"  {'output':24s} {out_root}")
+    for name in _RUN_DEFINING_ARGS:
+        print(f"  {name:24s} {getattr(args, name)}")
+    print(f"  {'time_limit':24s} {args.time_limit}")
+    print("=" * 70)
+
+
+def warn_on_config_drift(out_root: Path, args) -> None:
+    """Warn if *out_root* holds results from a differently-configured run.
+
+    The suite writes config.json at the end of every run.  If one exists and
+    disagrees with this run on any run-defining parameter, the directory is
+    about to hold a mix of two configurations -- which looks identical to a
+    clean run once the files are on disk.
+    """
+    cfg_path = out_root / "config.json"
+    if not cfg_path.exists():
+        return
+    try:
+        with open(cfg_path) as f:
+            prev = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return
+    drift = [
+        (name, prev.get(name), getattr(args, name))
+        for name in _RUN_DEFINING_ARGS
+        if name in prev and prev.get(name) != getattr(args, name)
+    ]
+    if not drift:
+        return
+    print("!" * 70)
+    print(f"WARNING: {out_root} holds results from a different configuration.")
+    print("Scenario outputs not re-run will be left as they are, so this")
+    print("directory would end up mixing two configurations:")
+    for name, old, new in drift:
+        print(f"  {name:24s} previous={old!r}  now={new!r}")
+    print("Use --out-dir to write somewhere else, or delete the directory.")
+    print("!" * 70)
+    print()
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Run sensitivity suite: decompose robustness feature contributions"
+        description="Run sensitivity suite: decompose robustness feature contributions. "
+                    "Defaults reproduce the canonical NewRAMP paper configuration, so a "
+                    "bare invocation runs the four-case comparison."
     )
     parser.add_argument("--rho", type=float, default=2.0)
     parser.add_argument("--start-month", type=int, default=7)
@@ -316,8 +378,9 @@ def main():
         default=True,
         help="DARUC: only charge commitment costs for additional units (default: True)",
     )
-    parser.add_argument("--out-dir", type=str, default=None,
-                        help="Root output directory (default: auto-generated)")
+    parser.add_argument("--out-dir", type=str, default="sensitivity_suite/freeZ",
+                        help="Root output directory. Pass 'auto' for a name generated "
+                             "from rho/horizon/start-date (default: sensitivity_suite/freeZ)")
     parser.add_argument("--scenarios", type=str, nargs="+", default=None,
                         help="Run only these scenarios (default: all). "
                              "Names: full_robust, lines_only, ramps_only, stripped, "
@@ -325,15 +388,26 @@ def main():
     parser.add_argument("--resume", action="store_true",
                         help="Skip scenarios that already have output directories")
     args = parser.parse_args()
-    if args.uncertainty_npz:
-        rho_tag = str(args.uncertainty_npz)[-6:-4]
-    elif args.rho_lines_frac is not None:
-        rho_tag = f"rho{args.rho}_linesfrac{args.rho_lines_frac}"
+    if args.out_dir in (None, "auto"):
+        if args.uncertainty_npz:
+            rho_tag = str(args.uncertainty_npz)[-6:-4]
+        elif args.rho_lines_frac is not None:
+            rho_tag = f"rho{args.rho}_linesfrac{args.rho_lines_frac}"
+        else:
+            rho_tag = f"rho{args.rho}"
+        tag = f"rho{rho_tag}_{args.hours}h_m{args.start_month:02d}d{args.start_day:02d}_freeZmatrix"
+        out_root = Path("sensitivity_suite") / tag
     else:
-        rho_tag = f"rho{args.rho}"
-    tag = f"rho{rho_tag}_{args.hours}h_m{args.start_month:02d}d{args.start_day:02d}_freeZmatrix"
-    out_root = Path(args.out_dir) if args.out_dir else Path("sensitivity_suite") / tag
+        out_root = Path(args.out_dir)
+
+    # The default output directory is a fixed path, so a run with non-default
+    # parameters would otherwise land on top of the canonical results without
+    # any indication.  Compare against the previous run's recorded config and
+    # say so.
+    warn_on_config_drift(out_root, args)
+
     out_root.mkdir(parents=True, exist_ok=True)
+    print_resolved_config(out_root, args)
 
     base_args = build_base_args(args)
 

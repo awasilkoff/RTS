@@ -20,21 +20,29 @@ Detailed documentation lives in `CLAUDE.md` (root) and
 
 ## Setup
 
-Requires Python 3.11+, **Gurobi with a valid licence** (developed against
+Requires Python 3.11+, **Gurobi with a full licence** (developed against
 13.0.2), pandas, numpy, pydantic, matplotlib, and torch for the covariance
 learning step.
 
 ```
 conda env create -f environment.yml
-conda activate rts
+conda activate RTS
 ```
+
+The environment is named `RTS` (see `environment.yml`); conda environment names
+are case-sensitive on Linux.
+
+**Gurobi licence:** the size-limited licence bundled with `pip install gurobipy`
+is **not** sufficient. A 48 h robust solve on RTS-GMLC has tens of thousands of
+variables and roughly 1,850 second-order cones, well past the restricted limits.
+An academic named-user or WLS licence is needed.
 
 **Non-interactive contexts** (scheduled tasks, SSH one-liners, detached
 processes) do not get the conda hook, so bare `python` will not resolve. Use the
-absolute interpreter path:
+absolute interpreter path, e.g.
 
 ```
-C:\Users\alexw\miniforge3\envs\rts\python.exe run_comparison.py ...
+C:\Users\alexw\miniforge3\envs\RTS\python.exe run_comparison.py ...
 ```
 
 ---
@@ -44,16 +52,28 @@ C:\Users\alexw\miniforge3\envs\rts\python.exe run_comparison.py ...
 Runs DARUC (two-step: DAM → robust reliability) and optionally ARUC (one-shot)
 with identical parameters, then writes comparison figures and a text summary.
 
-```
-python run_comparison.py --rho 2.0 --start-month 7 --start-day 15
-```
-
-With time-varying uncertainty from a calibrated NPZ, network limits, and the
-DAM+Reserve baseline:
+**Start with this.** The defaults are already close to the paper
+configuration — α=0.99 uncertainty NPZ, network limits on, free Z, robust ramps,
+day-1-only robustness, 48 h with 2 h day-2 blocks, incremental objective — so
+the only things worth adding are skipping ARUC and capping the solve:
 
 ```
-python run_comparison.py --uncertainty-npz uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha99.npz --provider-start 2448 --enforce-lines --with-reserve
+python run_comparison.py --skip-aruc --time-limit 7200 --line-monitor-threshold 0.9
 ```
+
+Roughly 10 minutes. Without `--skip-aruc` expect over two hours, since the
+one-shot ARUC solve dominates (see below). The `0.9` threshold matches what the
+paper suite uses; the standalone default is `0.95`.
+
+To confirm the environment works before committing to a real run, an 8 h horizon
+finishes in about a minute:
+
+```
+python run_comparison.py --hours 8 --day2-interval 1 --skip-aruc --mip-gap 0.02 --time-limit 120
+```
+
+Note that `--rho` is **ignored** unless `--uncertainty-npz` is cleared, because
+the NPZ supplies a per-hour radius and overrides the scalar.
 
 Most-used flags (full list via `--help`):
 
@@ -61,11 +81,11 @@ Most-used flags (full list via `--help`):
 |---|---|---|
 | `--hours` | 48 | Horizon length |
 | `--start-month` / `--start-day` | 7 / 15 | Simulation start |
-| `--uncertainty-npz` | None | Time-varying (Sigma, rho); overrides `--rho` |
-| `--enforce-lines` | off | Network limits (otherwise copperplate) |
+| `--uncertainty-npz` | α=0.99 NPZ | Time-varying (Sigma, rho); overrides `--rho` |
+| `--no-enforce-lines` | lines **on** | Copperplate instead of network limits |
 | `--with-reserve` | on | Adds the DAM+spinning-reserve baseline |
-| `--no-fix-wind-z` | off | Free Z — let the LDR choose the wind response |
-| `--robust-ramp` | off | SOC-based robust ramp constraints |
+| `--fix-wind-z` | free Z | Fix the wind block of Z to identity (free Z is the default) |
+| `--no-robust-ramp` | robust ramps **on** | Nominal ramp constraints instead |
 | `--skip-aruc` | off | Skip the one-shot ARUC solve (usually the bulk of runtime) |
 | `--line-monitor-threshold` | 0.95 | Per-hour line filtering by DAM loading |
 | `--mip-gap` | 0.005 | MIP optimality gap |
@@ -110,21 +130,33 @@ Note that **DAM w/Res is taken from `reserve_then_daruc/`**, not from
 compared against the first stage it actually amends, and the two solves differ
 slightly within the MIP gap.
 
-Run both scenarios:
+**The suite defaults are the canonical paper configuration**, so running both
+scenarios needs no flags:
 
 ```
-python run_sensitivity_suite.py --start-month 7 --start-day 15 --hours 48 --day2-interval 2 --uncertainty-npz uncertainty_sets_refactored/data/uncertainty_sets_rts4_v2_16d/sigma_rho_alpha99.npz --provider-start 2448 --line-monitor-threshold 0.9 --mip-gap 0.005 --out-dir sensitivity_suite/<tag>
+python run_sensitivity_suite.py
 ```
+
+That is equivalent to `--start-month 7 --start-day 15 --hours 48
+--day2-interval 2 --provider-start 2448 --line-monitor-threshold 0.9 --mip-gap
+0.005` with the α=0.99 uncertainty NPZ, writing to `sensitivity_suite/freeZ/`.
+The resolved configuration is printed at startup and recorded in `config.json`.
 
 Then backfill worst-case line flows (reserve deployment vs LDR re-dispatch at
 worst-case wind), which produces `worst_case_flow_analysis_*.csv` per case:
 
 ```
-python utils/backfill_worst_case_flows.py --scan-dir sensitivity_suite/<tag>
+python utils/backfill_worst_case_flows.py --scan-dir sensitivity_suite/freeZ
 ```
 
 A single scenario can be run alone with `--scenarios reserve_then_daruc`, and an
 interrupted suite resumed with `--resume`.
+
+Because the default output directory is a fixed path, a run with non-default
+parameters would otherwise overwrite the canonical results silently. The suite
+compares against the previous run's `config.json` and prints a loud warning if
+they disagree. Use `--out-dir <path>` for variants, or `--out-dir auto` for a
+name generated from rho, horizon and start date.
 
 ### Checking a run is trustworthy
 
@@ -132,7 +164,7 @@ Every run writes solve provenance into `summary.json`. Check it before using any
 number:
 
 ```
-python -c "import json;d=json.load(open('sensitivity_suite/<tag>/reserve_then_daruc/summary.json'));print(d['solve_diagnostics']);print(d['line_resolve_max_iter_hit'])"
+python -c "import json;d=json.load(open('sensitivity_suite/freeZ/reserve_then_daruc/summary.json'));print(d['solve_diagnostics']);print(d['line_resolve_max_iter_hit'])"
 ```
 
 - `converged` must be `true` for every solve. `status_name: TIME_LIMIT` means the
